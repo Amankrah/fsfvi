@@ -1,0 +1,92 @@
+INFO 2025-06-01 11:47:24,184 autoreload 18968 6860 Watching for file changes with StatReloader
+INFO 2025-06-01 11:48:44,505 autoreload 21636 22852 Watching for file changes with StatReloader
+INFO 2025-06-01 11:55:27,732 autoreload 21636 22852 C:\Users\USER\Desktop\Dev_Projects\fsfvi\backend\django_app\fsfvi\services.py changed, reloading.
+INFO 2025-06-01 11:55:28,502 autoreload 20092 13536 Watching for file changes with StatReloader
+INFO 2025-06-01 11:55:40,609 autoreload 20092 13536 C:\Users\USER\Desktop\Dev_Projects\fsfvi\backend\django_app\fsfvi\services.py changed, reloading.
+INFO 2025-06-01 11:55:41,462 autoreload 8340 23504 Watching for file changes with StatReloader
+INFO 2025-06-01 11:56:01,171 autoreload 8340 23504 C:\Users\USER\Desktop\Dev_Projects\fsfvi\backend\django_app\fsfvi\services.py changed, reloading.
+INFO 2025-06-01 11:56:01,949 autoreload 20672 5232 Watching for file changes with StatReloader
+INFO 2025-06-01 11:56:17,229 autoreload 20672 5232 C:\Users\USER\Desktop\Dev_Projects\fsfvi\backend\django_app\fsfvi\services.py changed, reloading.
+INFO 2025-06-01 11:56:18,063 autoreload 19440 20576 Watching for file changes with StatReloader
+INFO 2025-06-01 11:58:30,149 autoreload 19440 20576 C:\Users\USER\Desktop\Dev_Projects\fsfvi\backend\django_app\fsfvi\services.py changed, reloading.
+INFO 2025-06-01 11:58:31,027 autoreload 18476 16840 Watching for file changes with StatReloader
+WARNING 2025-06-01 12:12:42,789 log 18476 17276 Not Found: /
+WARNING 2025-06-01 12:12:42,790 basehttp 18476 17276 "GET / HTTP/1.1" 404 2268
+WARNING 2025-06-01 12:12:42,800 log 18476 17276 Not Found: /calculate_fsfvi
+WARNING 2025-06-01 12:12:42,801 basehttp 18476 17276 "POST /calculate_fsfvi HTTP/1.1" 404 2332
+WARNING 2025-06-01 12:12:42,808 log 18476 17276 Not Found: /optimize_allocation
+WARNING 2025-06-01 12:12:42,809 basehttp 18476 17276 "POST /optimize_allocation HTTP/1.1" 404 2344
+WARNING 2025-06-01 12:12:42,818 log 18476 17276 Not Found: /simulate_shock
+WARNING 2025-06-01 12:12:42,819 basehttp 18476 17276 "POST /simulate_shock HTTP/1.1" 404 2329
+WARNING 2025-06-01 12:12:42,824 log 18476 17276 Not Found: /performance_gaps
+WARNING 2025-06-01 12:12:42,825 basehttp 18476 17276 "POST /performance_gaps HTTP/1.1" 404 2335
+INFO 2025-06-01 12:15:41,723 autoreload 18476 16840 C:\Users\USER\Desktop\Dev_Projects\fsfvi\backend\django_app\fsfvi\services.py changed, reloading.
+INFO 2025-06-01 12:15:42,684 autoreload 10872 7868 Watching for file changes with StatReloader
+INFO 2025-06-01 12:16:00,208 autoreload 10872 7868 C:\Users\USER\Desktop\Dev_Projects\fsfvi\backend\django_app\fsfvi\services.py changed, reloading.
+INFO 2025-06-01 12:16:01,103 autoreload 17912 16896 Watching for file changes with StatReloader
+INFO 2025-06-01 12:17:43,621 autoreload 16468 11764 Watching for file changes with StatReloader
+INFO 2025-06-01 12:29:21,136 autoreload 22612 11120 Watching for file changes with StatReloader
+INFO 2025-06-01 13:12:33,397 autoreload 16484 11672 Watching for file changes with StatReloader
+INFO 2025-06-03 15:03:02,867 autoreload 9332 11776 Watching for file changes with StatReloader
+INFO 2025-06-06 16:38:30,268 autoreload 9332 11776 C:\Users\USER\Desktop\Dev_Projects\fsfvi\backend\django_app\fsfvi\serializers.py changed, reloading.
+INFO 2025-06-06 16:38:31,761 autoreload 19800 17488 Watching for file changes with StatReloader
+INFO 2025-06-07 11:23:12,052 validators 13584 14952 AHP matrix consistency validated: CR = 0.002
+INFO 2025-06-07 11:23:12,052 validators 13584 14952 Dependency matrix validation completed successfully
+INFO 2025-06-07 11:23:12,053 advanced_weighting 13584 14952 Dynamic Weighting System initialized
+INFO 2025-06-07 11:23:12,053 fsfvi_service 13584 14952 FSFVI Calculation Service initialized
+INFO 2025-06-07 11:23:12,053 fsfvi_service 13584 14952 FSFVI Optimization Service initialized
+INFO 2025-06-07 11:23:12,054 validators 13584 14952 AHP matrix consistency validated: CR = 0.002
+INFO 2025-06-07 11:23:12,054 validators 13584 14952 Dependency matrix validation completed successfully
+INFO 2025-06-07 11:23:12,055 advanced_weighting 13584 14952 Dynamic Weighting System initialized
+INFO 2025-06-07 11:23:12,055 fsfvi_service 13584 14952 FSFVI Calculation Service initialized
+INFO 2025-06-07 11:23:12,055 fsfvi_service 13584 14952 FSFVI Optimization Service initialized
+INFO 2025-06-07 11:23:12,055 fsfvi_service 13584 14952 FSFVI Analysis Service initialized
+INFO 2025-06-07 11:23:12,090 validators 13584 14952 AHP matrix consistency validated: CR = 0.002
+INFO 2025-06-07 11:23:12,091 validators 13584 14952 Dependency matrix validation completed successfully
+INFO 2025-06-07 11:23:12,091 advanced_weighting 13584 14952 Dynamic Weighting System initialized
+INFO 2025-06-07 11:23:12,092 fsfvi_service 13584 14952 FSFVI Calculation Service initialized
+INFO 2025-06-07 11:40:09,811 validators 1076 11932 AHP matrix consistency validated: CR = 0.002
+INFO 2025-06-07 11:40:09,812 validators 1076 11932 Dependency matrix validation completed successfully
+INFO 2025-06-07 11:40:09,812 advanced_weighting 1076 11932 Dynamic Weighting System initialized
+INFO 2025-06-07 11:40:09,813 fsfvi_service 1076 11932 FSFVI Calculation Service initialized
+INFO 2025-06-07 11:40:09,813 fsfvi_service 1076 11932 FSFVI Optimization Service initialized
+INFO 2025-06-07 11:40:09,814 validators 1076 11932 AHP matrix consistency validated: CR = 0.002
+INFO 2025-06-07 11:40:09,814 validators 1076 11932 Dependency matrix validation completed successfully
+INFO 2025-06-07 11:40:09,814 advanced_weighting 1076 11932 Dynamic Weighting System initialized
+INFO 2025-06-07 11:40:09,815 fsfvi_service 1076 11932 FSFVI Calculation Service initialized
+INFO 2025-06-07 11:40:09,815 fsfvi_service 1076 11932 FSFVI Optimization Service initialized
+INFO 2025-06-07 11:40:09,815 fsfvi_service 1076 11932 FSFVI Analysis Service initialized
+INFO 2025-06-07 11:40:09,846 validators 1076 11932 AHP matrix consistency validated: CR = 0.002
+INFO 2025-06-07 11:40:09,846 validators 1076 11932 Dependency matrix validation completed successfully
+INFO 2025-06-07 11:40:09,847 advanced_weighting 1076 11932 Dynamic Weighting System initialized
+INFO 2025-06-07 11:40:09,847 fsfvi_service 1076 11932 FSFVI Calculation Service initialized
+INFO 2025-06-07 11:45:20,742 validators 14056 12676 AHP matrix consistency validated: CR = 0.002
+INFO 2025-06-07 11:45:20,742 validators 14056 12676 Dependency matrix validation completed successfully
+INFO 2025-06-07 11:45:20,743 advanced_weighting 14056 12676 Dynamic Weighting System initialized
+INFO 2025-06-07 11:45:20,743 fsfvi_service 14056 12676 FSFVI Calculation Service initialized
+INFO 2025-06-07 11:45:20,743 fsfvi_service 14056 12676 FSFVI Optimization Service initialized
+INFO 2025-06-07 11:45:20,744 validators 14056 12676 AHP matrix consistency validated: CR = 0.002
+INFO 2025-06-07 11:45:20,744 validators 14056 12676 Dependency matrix validation completed successfully
+INFO 2025-06-07 11:45:20,744 advanced_weighting 14056 12676 Dynamic Weighting System initialized
+INFO 2025-06-07 11:45:20,745 fsfvi_service 14056 12676 FSFVI Calculation Service initialized
+INFO 2025-06-07 11:45:20,745 fsfvi_service 14056 12676 FSFVI Optimization Service initialized
+INFO 2025-06-07 11:45:20,745 fsfvi_service 14056 12676 FSFVI Analysis Service initialized
+INFO 2025-06-07 11:45:20,772 validators 14056 12676 AHP matrix consistency validated: CR = 0.002
+INFO 2025-06-07 11:45:20,773 validators 14056 12676 Dependency matrix validation completed successfully
+INFO 2025-06-07 11:45:20,773 advanced_weighting 14056 12676 Dynamic Weighting System initialized
+INFO 2025-06-07 11:45:20,773 fsfvi_service 14056 12676 FSFVI Calculation Service initialized
+INFO 2025-06-07 11:56:11,510 validators 5660 5240 AHP matrix consistency validated: CR = 0.002
+INFO 2025-06-07 11:56:11,510 validators 5660 5240 Dependency matrix validation completed successfully
+INFO 2025-06-07 11:56:11,511 advanced_weighting 5660 5240 Dynamic Weighting System initialized
+INFO 2025-06-07 11:56:11,511 fsfvi_service 5660 5240 FSFVI Calculation Service initialized
+INFO 2025-06-07 11:56:11,511 fsfvi_service 5660 5240 FSFVI Optimization Service initialized
+INFO 2025-06-07 11:56:11,512 validators 5660 5240 AHP matrix consistency validated: CR = 0.002
+INFO 2025-06-07 11:56:11,512 validators 5660 5240 Dependency matrix validation completed successfully
+INFO 2025-06-07 11:56:11,513 advanced_weighting 5660 5240 Dynamic Weighting System initialized
+INFO 2025-06-07 11:56:11,513 fsfvi_service 5660 5240 FSFVI Calculation Service initialized
+INFO 2025-06-07 11:56:11,513 fsfvi_service 5660 5240 FSFVI Optimization Service initialized
+INFO 2025-06-07 11:56:11,513 fsfvi_service 5660 5240 FSFVI Analysis Service initialized
+INFO 2025-06-07 11:56:11,540 validators 5660 5240 AHP matrix consistency validated: CR = 0.002
+INFO 2025-06-07 11:56:11,541 validators 5660 5240 Dependency matrix validation completed successfully
+INFO 2025-06-07 11:56:11,541 advanced_weighting 5660 5240 Dynamic Weighting System initialized
+INFO 2025-06-07 11:56:11,542 fsfvi_service 5660 5240 FSFVI Calculation Service initialized
