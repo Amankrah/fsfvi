@@ -47,12 +47,70 @@ class ComponentType(Enum):
 
 @dataclass
 class FSFVIConfig:
-    """Core FSFVI calculation configuration"""
+    """
+    Core FSFVI calculation configuration
+    
+    Mathematical Context:
+    The FSFVI system calculates vulnerability using the formula:
+    FSFVI = Σᵢ ωᵢ · υᵢ(fᵢ) = Σᵢ ωᵢ · δᵢ · [1/(1 + αᵢfᵢ)]
+    
+    Where:
+    - ωᵢ: Component weights (dimensionless, Σωᵢ = 1)
+    - δᵢ: Performance gaps (dimensionless, [0,1])
+    - αᵢ: Sensitivity parameters (1/financial_units)
+    - fᵢ: Financial allocations (financial_units)
+    """
     precision: int = 6
     tolerance: float = 1e-6
     max_iterations: int = 1000
     default_weighting: WeightingMethod = WeightingMethod.HYBRID
     default_scenario: Scenario = Scenario.NORMAL_OPERATIONS
+    
+    # Sensitivity parameter estimation configuration
+    sensitivity_estimation_method: str = "empirical"  # Primary estimation method
+    sensitivity_estimation_fallback: str = "hardcoded"  # Fallback when primary method fails
+    
+    """
+    Sensitivity Parameter Estimation Methods:
+    
+    1. "hardcoded": Base component-specific values with performance adjustments
+       - Uses empirically-derived base values by component type
+       - Applies adjustments for scale economies, complexity, performance gaps
+       - Range: [0.0005, 0.005] for allocations in millions USD
+       - Fast, reliable, but not adaptive
+    
+    2. "empirical": Historical effectiveness analysis with country context
+       - Analyzes historical allocation-performance relationships
+       - Incorporates country-specific factors (GDP, governance, capacity)
+       - Uses cross-sectional estimation when historical data unavailable
+       - More accurate but requires quality historical data
+    
+    3. "ml": Machine learning prediction from training data
+       - Gradient boosting models trained on allocation-effectiveness patterns
+       - Features: component type, performance gaps, allocation levels, country context
+       - Highly accurate with sufficient training data
+       - Requires sklearn and substantial historical dataset
+    
+    4. "bayesian": Probabilistic estimation with uncertainty quantification
+       - Combines prior beliefs with observed likelihood
+       - Provides confidence intervals and uncertainty measures
+       - Updates estimates as new evidence becomes available
+       - Good for decision-making under uncertainty
+    
+    5. "adaptive": Self-learning from performance history
+       - Exponential smoothing of historical sensitivity estimates
+       - Adjusts based on recent performance trends and effectiveness
+       - Improves over time with system usage
+       - Ideal for long-term system deployment
+    
+    Mathematical Foundation:
+    All methods estimate αᵢ such that the vulnerability function υᵢ(fᵢ) = δᵢ/(1 + αᵢfᵢ)
+    produces realistic vulnerability values that:
+    - Reflect actual responsiveness to funding
+    - Satisfy mathematical bounds [0.0005, 0.005] for millions USD
+    - Ensure dimensionless αᵢfᵢ factor
+    - Enable meaningful optimization and comparison
+    """
     
     # Risk thresholds - Updated based on mathematical analysis
     # FSFVI is dimensionless, ranging [0,1] with real-world values typically 0.01-0.10
@@ -218,7 +276,7 @@ class ValidationConfig:
     min_observed_value: float = 0.0
     min_benchmark_value: float = 0.0
     min_financial_allocation: float = 0.0
-    min_sensitivity_parameter: float = 0.0
+    min_sensitivity_parameter: float = 0.0005
     
     # Weight validation
     max_weight_concentration: float = 0.7
@@ -233,6 +291,17 @@ class ValidationConfig:
 FSFVI_CONFIG = FSFVIConfig()
 WEIGHTING_CONFIG = WeightingConfig()
 VALIDATION_CONFIG = ValidationConfig()
+
+# Performance direction preferences for each component type
+# True = higher values are better, False = lower values are better
+COMPONENT_PERFORMANCE_PREFERENCES = {
+    ComponentType.AGRICULTURAL_DEVELOPMENT: True,      # Higher production/productivity is better
+    ComponentType.INFRASTRUCTURE: True,               # Higher capacity/coverage is better  
+    ComponentType.NUTRITION_HEALTH: True,            # Better health outcomes (higher is better)
+    ComponentType.CLIMATE_NATURAL_RESOURCES: True,   # Better environmental performance (higher is better)
+    ComponentType.SOCIAL_ASSISTANCE: True,           # Higher coverage/effectiveness is better
+    ComponentType.GOVERNANCE_INSTITUTIONS: True      # Better governance metrics (higher is better)
+}
 
 # Component type mappings for normalization
 COMPONENT_TYPE_MAPPINGS = {
@@ -317,4 +386,21 @@ def get_weighting_methods() -> List[str]:
 
 def get_scenarios() -> List[str]:
     """Get all available scenarios"""
-    return [s.value for s in Scenario] 
+    return [s.value for s in Scenario]
+
+def get_component_performance_preference(component_type: str) -> bool:
+    """
+    Get performance direction preference for a component type
+    
+    Args:
+        component_type: Component type as string
+        
+    Returns:
+        True if higher values are better, False if lower values are better
+    """
+    try:
+        comp_enum = ComponentType(component_type)
+        return COMPONENT_PERFORMANCE_PREFERENCES.get(comp_enum, True)  # Default to higher is better
+    except ValueError:
+        logger.warning(f"Unknown component type '{component_type}', defaulting to prefer_higher=True")
+        return True 

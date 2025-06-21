@@ -2,24 +2,41 @@
 FSFVI Validators
 ===============
 
-Centralized validation functions for the FSFVI system to eliminate duplicate
-validation logic and provide consistent validation across all modules.
+Validation functions for FSFVI calculations and data.
+Ensures data integrity and calculation correctness.
 """
 
+from typing import Dict, List, Any, Optional
 import numpy as np
-from typing import List, Dict, Optional, Union, Any
+import pandas as pd
+from datetime import datetime
 import logging
 
-from .config import (
-    FSFVI_CONFIG, WEIGHTING_CONFIG, VALIDATION_CONFIG,
-    normalize_component_type, get_weighting_methods, get_scenarios
+# Import dependencies
+from config import (
+    FSFVI_CONFIG,
+    VALIDATION_CONFIG,
+    WEIGHTING_CONFIG,
+    get_weighting_methods,
+    get_scenarios,
+    normalize_component_type
 )
-from .exceptions import (
-    ValidationError, ComponentError, WeightValidationError, AHPValidationError,
-    DependencyMatrixError, BudgetConstraintError, ScenarioError, MethodError,
-    DataIntegrityError
+from exceptions import (
+    ValidationError, 
+    FSFVIException,
+    ComponentError,
+    WeightValidationError,
+    AHPValidationError,
+    DependencyMatrixError,
+    BudgetConstraintError,
+    MethodError,
+    ScenarioError,
+    DataIntegrityError,
+    handle_calculation_error
 )
 
+
+# Configure logging
 logger = logging.getLogger(__name__)
 
 
@@ -322,6 +339,7 @@ def validate_optimization_constraints(constraints: Dict[str, Any], budget: float
             raise ValidationError(f"Minimum allocation {min_alloc} exceeds maximum allocation {max_alloc}")
 
 
+@handle_calculation_error
 def validate_calculation_inputs(
     components: List[Dict[str, Any]], 
     method: Optional[str] = None,
@@ -329,7 +347,7 @@ def validate_calculation_inputs(
     budget: Optional[float] = None
 ) -> tuple:
     """
-    Comprehensive validation of calculation inputs
+    STREAMLINED: Comprehensive validation of calculation inputs with consistent config access
     
     Args:
         components: Component data
@@ -343,29 +361,39 @@ def validate_calculation_inputs(
     Raises:
         Various validation errors if inputs are invalid
     """
-    # Validate components
-    validate_component_data(components)
+    logger.info(f"=== VALIDATION START ===")
+    logger.info(f"Components: {len(components)}, Method: {method}, Scenario: {scenario}")
     
-    # Normalize component weights if they exist
+    # 1. Validate components structure and values
+    validate_component_data(components)
+    logger.info("PASS: Component data validation passed")
+    
+    # 2. Handle component weights - normalize if needed
     has_weights = all('weight' in comp for comp in components)
     if has_weights:
         try:
             validate_component_weights(components)
-        except WeightValidationError:
-            # Auto-normalize if weights don't sum to 1.0
+            logger.info("PASS: Component weights validation passed")
+        except WeightValidationError as e:
+            logger.warning(f"Weight validation failed: {e.message}. Auto-normalizing...")
             normalize_component_weights(components)
+            logger.info("PASS: Component weights auto-normalized")
     else:
-        # Assign equal weights if none exist
+        logger.info("No weights found, assigning equal weights")
         normalize_component_weights(components)
+        logger.info("PASS: Equal weights assigned")
     
-    # Validate method and scenario
+    # 3. Validate and set defaults for method and scenario using config
     validated_method = validate_method(method) if method else FSFVI_CONFIG.default_weighting.value
     validated_scenario = validate_scenario(scenario) if scenario else FSFVI_CONFIG.default_scenario.value
+    logger.info(f"PASS: Method: {validated_method}, Scenario: {validated_scenario}")
     
-    # Validate budget constraint if provided
+    # 4. Validate budget constraint if provided
     if budget is not None:
         validate_budget_constraint(components, budget)
+        logger.info(f"PASS: Budget constraint validated: ${budget/1e6:.1f}M")
     
+    logger.info(f"=== VALIDATION COMPLETE ===")
     return components, validated_method, validated_scenario
 
 

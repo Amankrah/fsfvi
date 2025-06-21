@@ -215,26 +215,33 @@ class TestFSFVICore:
     
     def test_calculate_performance_gap(self):
         """Test performance gap calculation"""
-        # Normal case
+        # Normal case - underperforming (prefer_higher=True by default)
         gap = calculate_performance_gap(75.0, 90.0)
-        expected = abs(75.0 - 90.0) / 75.0  # |75-90|/75 = 0.2
+        expected = (90.0 - 75.0) / 75.0  # (benchmark - observed) / observed = 0.2
         assert abs(gap - expected) < 1e-6
         
-        # Edge case: observed = 0
+        # Case where observed > benchmark (meeting/exceeding benchmark)
+        gap = calculate_performance_gap(95.0, 90.0)
+        assert gap == 0.0  # Should return 0 when meeting/exceeding benchmark
+        
+        # Edge case: observed = 0, benchmark > 0
         gap = calculate_performance_gap(0.0, 90.0)
         assert gap == 1.0  # Should return 1.0 when observed is 0
         
         # Edge case: benchmark = 0
         gap = calculate_performance_gap(75.0, 0.0)
-        assert gap == 1.0  # Should return 1.0 when benchmark is 0
+        assert gap == 0.0  # Should return 0.0 when benchmark is 0
         
         # Edge case: both = 0
         gap = calculate_performance_gap(0.0, 0.0)
         assert gap == 0.0
         
-        # Case where observed > benchmark (good performance)
-        gap = calculate_performance_gap(95.0, 90.0)
-        expected = abs(95.0 - 90.0) / 95.0  # Should still calculate absolute gap
+        # Test prefer_higher=False (lower values are better)
+        gap = calculate_performance_gap(75.0, 90.0, prefer_higher=False)
+        assert gap == 0.0  # 75 < 90 is good when lower is better
+        
+        gap = calculate_performance_gap(95.0, 90.0, prefer_higher=False)
+        expected = (95.0 - 90.0) / 95.0  # Underperforming when lower is better
         assert abs(gap - expected) < 1e-6
     
     def test_calculate_vulnerability(self):
@@ -302,15 +309,25 @@ class TestFSFVICore:
         assert efficiency == 0.0
     
     def test_determine_priority_level(self):
-        """Test priority level determination"""
-        assert determine_priority_level(0.8, 0.6) == "critical"
-        assert determine_priority_level(0.6, 0.4) == "high"
-        assert determine_priority_level(0.4, 0.2) == "medium"
-        assert determine_priority_level(0.2, 0.05) == "low"
+        """Test priority level determination using robust multi-factor risk assessment"""
+        # Test primary vulnerability-based risk determination
+        assert determine_priority_level(0.8) == "critical"  # High vulnerability
+        assert determine_priority_level(0.5) == "high"      # Medium vulnerability
+        assert determine_priority_level(0.3) == "medium"    # Low vulnerability
+        assert determine_priority_level(0.1) == "low"       # Very low vulnerability
         
-        # Edge cases
-        assert determine_priority_level(0.7, 0.1) == "critical"  # High vulnerability
-        assert determine_priority_level(0.1, 0.5) == "critical"  # High gap
+        # Test financial exposure adjustments
+        # Large allocation with moderate vulnerability should increase priority
+        assert determine_priority_level(0.4, financial_allocation=1000, total_budget=2000) == "high"  # 50% allocation share
+        assert determine_priority_level(0.4, financial_allocation=100, total_budget=2000) == "medium"  # 5% allocation share
+        
+        # Test system importance adjustments  
+        # High weight with moderate vulnerability should increase priority
+        assert determine_priority_level(0.4, weight=0.8) == "high"    # High system importance
+        assert determine_priority_level(0.4, weight=0.1) == "medium"  # Low system importance
+        
+        # Test combined factors
+        assert determine_priority_level(0.4, financial_allocation=800, weight=0.6, total_budget=1000) == "critical"  # Multiple risk factors
     
     def test_determine_risk_level(self):
         """Test risk level determination"""

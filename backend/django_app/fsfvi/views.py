@@ -240,6 +240,28 @@ def dashboard_summary(request):
     # Risk level distribution
     risk_distribution = analyses.values('risk_level').annotate(count=Count('risk_level'))
     
+    # Get component distribution from the most recent session
+    component_distribution = []
+    latest_session = sessions.order_by('-created_at').first()
+    
+    if latest_session:
+        components = latest_session.components.all()
+        total_budget = latest_session.total_budget
+        
+        for component in components:
+            component_distribution.append({
+                'component_type': component.component_type,
+                'component_name': component.component_name,
+                'allocation': component.financial_allocation,
+                'percentage': round((component.financial_allocation / total_budget * 100), 1) if total_budget > 0 else 0,
+                'vulnerability': component.vulnerability if component.vulnerability else None,
+                'priority_level': component.priority_level or 'medium'
+            })
+    
+    # Calculate additional statistics
+    total_countries = sessions.values('country_name').distinct().count()
+    total_budget_analyzed = sessions.aggregate(total=Avg('total_budget'))['total'] or 0
+    
     return Response({
         'user': UserSerializer(user).data,
         'statistics': {
@@ -248,9 +270,17 @@ def dashboard_summary(request):
             'completed_sessions': completed_sessions,
             'average_fsfvi': round(avg_fsfvi, 2),
             'total_analyses': analyses.count(),
+            'total_countries': total_countries,
+            'total_budget_analyzed': round(total_budget_analyzed, 1),
             'risk_distribution': list(risk_distribution)
         },
-        'recent_sessions': SessionSummarySerializer(recent_sessions, many=True).data
+        'recent_sessions': SessionSummarySerializer(recent_sessions, many=True).data,
+        'component_distribution': {
+            'session_id': str(latest_session.id) if latest_session else None,
+            'country_name': latest_session.country_name if latest_session else None,
+            'total_budget': latest_session.total_budget if latest_session else 0,
+            'components': component_distribution
+        }
     })
 
 @api_view(['GET'])

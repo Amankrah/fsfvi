@@ -60,6 +60,7 @@ export const RegisterForm: React.FC = () => {
         username: data.username,
         email: data.email,
         password: data.password,
+        password_confirm: data.confirmPassword,
         first_name: data.firstName || '',
         last_name: data.lastName || '',
       };
@@ -69,7 +70,35 @@ export const RegisterForm: React.FC = () => {
       // Redirect to dashboard on successful registration
       router.push('/dashboard');
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Registration failed');
+      console.error('Registration error details:', err);
+      
+      // Check if it's an Axios error with validation details
+      if (err && typeof err === 'object' && 'response' in err) {
+        const axiosError = err as { response?: { data?: Record<string, string[]> } };
+        const validationErrors = axiosError.response?.data;
+        
+        if (validationErrors) {
+          console.log('Validation errors:', validationErrors);
+          
+          // Extract field-specific errors
+          const errorMessages: string[] = [];
+          Object.entries(validationErrors).forEach(([field, messages]) => {
+            if (Array.isArray(messages)) {
+              errorMessages.push(`${field}: ${messages.join(', ')}`);
+            }
+          });
+          
+          const errorMessage = errorMessages.length > 0 
+            ? errorMessages.join('. ') 
+            : 'Registration failed. Please check your information and try again.';
+          
+          setError(errorMessage);
+        } else {
+          setError('Registration failed. Please try again.');
+        }
+      } else {
+        setError(err instanceof Error ? err.message : 'Registration failed');
+      }
     }
   };
 

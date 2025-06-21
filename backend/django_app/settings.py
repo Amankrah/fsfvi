@@ -25,9 +25,10 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',
+    'rest_framework.authtoken',  # Add authtoken app for Token authentication
     'corsheaders',
     'django_filters',
-    'django_app.fsfvi.apps.FsfviConfig',  # Our FSFVI Django app with explicit config
+    'fsfvi.apps.FsfviConfig',  # Our FSFVI Django app with explicit config
 ]
 
 MIDDLEWARE = [

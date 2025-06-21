@@ -17,12 +17,21 @@ from typing import Dict, List, Tuple, Optional
 from scipy.linalg import eig
 import logging
 
-from .config import WEIGHTING_CONFIG, get_component_types, normalize_component_type
-from .exceptions import (
-    WeightingError, AHPValidationError, NetworkAnalysisError, 
-    DependencyMatrixError, handle_weighting_error
-)
-from .validators import validate_ahp_matrix, validate_dependency_matrix
+try:
+    from .config import WEIGHTING_CONFIG, get_component_types, normalize_component_type
+    from .exceptions import (
+        WeightingError, AHPValidationError, NetworkAnalysisError, 
+        DependencyMatrixError, handle_weighting_error
+    )
+    from .validators import validate_ahp_matrix, validate_dependency_matrix
+except ImportError:
+    # Fallback to absolute imports
+    from config import WEIGHTING_CONFIG, get_component_types, normalize_component_type
+    from exceptions import (
+        WeightingError, AHPValidationError, NetworkAnalysisError, 
+        DependencyMatrixError, handle_weighting_error
+    )
+    from validators import validate_ahp_matrix, validate_dependency_matrix
 
 logger = logging.getLogger(__name__)
 
@@ -529,7 +538,10 @@ def get_hybrid_weights(
 
 def validate_weighting_system() -> Dict[str, any]:
     """Validate the advanced weighting system"""
-    from .validators import validate_system_health
+    try:
+        from .validators import validate_system_health
+    except ImportError:
+        from validators import validate_system_health
     
     # Get system health validation
     health_report = validate_system_health()
