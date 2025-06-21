@@ -6,9 +6,12 @@ Provides database operations for the FSFVI system
 import os
 import sys
 import django
+import logging
 from typing import Dict, List, Any, Optional
 from datetime import datetime
 import uuid
+
+logger = logging.getLogger(__name__)
 
 # Setup Django environment
 def setup_django():
@@ -122,7 +125,8 @@ class DjangoFSFVIIntegration:
         """Get session by ID and user"""
         try:
             session = FSFVISession.objects.get(id=session_id, user_id=user_id)
-            return {
+            
+            session_data = {
                 'id': str(session.id),
                 'country_name': session.country_name,
                 'fiscal_year': session.fiscal_year,
@@ -135,7 +139,10 @@ class DjangoFSFVIIntegration:
                 'created_at': session.created_at.isoformat(),
                 'updated_at': session.updated_at.isoformat()
             }
+            
+            return session_data
         except FSFVISession.DoesNotExist:
+            logger.warning(f"Django Integration: Session {session_id} not found for user {user_id}")
             return None
     
     def update_session_status(self, session_id: str, user_id: int, status: str) -> bool:
@@ -152,23 +159,29 @@ class DjangoFSFVIIntegration:
         """Get all sessions for a user"""
         try:
             sessions = FSFVISession.objects.filter(user_id=user_id).order_by('-created_at')
-            return [
-                {
+            
+            sessions_data = []
+            for session in sessions:
+                session_data = {
                     'id': str(session.id),
                     'country_name': session.country_name,
                     'fiscal_year': session.fiscal_year,
                     'currency': session.currency,
                     'budget_unit': session.budget_unit,
                     'total_budget': session.total_budget,
+                    'method_used': session.method_used,
+                    'scenario': session.scenario,
                     'status': session.status,
                     'created_at': session.created_at.isoformat(),
                     'updated_at': session.updated_at.isoformat(),
+                    'component_count': session.components.count(),
                     'has_uploaded_file': hasattr(session, 'uploaded_file') and session.uploaded_file is not None
                 }
-                for session in sessions
-            ]
+                sessions_data.append(session_data)
+            
+            return sessions_data
         except Exception as e:
-            print(f"Error getting user sessions: {e}")
+            logger.error(f"Error getting user sessions: {e}")
             return []
     
     # File Upload Integration
@@ -272,8 +285,9 @@ class DjangoFSFVIIntegration:
         """Get all components for a session"""
         try:
             components = Component.objects.filter(session_id=session_id)
-            return [
-                {
+            component_list = []
+            for comp in components:
+                component_data = {
                     'component_id': str(comp.component_id),
                     'component_name': comp.component_name,
                     'component_type': comp.component_type,
@@ -288,8 +302,13 @@ class DjangoFSFVIIntegration:
                     'efficiency_index': comp.efficiency_index,
                     'priority_level': comp.priority_level
                 }
-                for comp in components
-            ]
+                component_list.append(component_data)
+            
+            # Calculate total budget for verification
+            total_from_db = sum(comp.financial_allocation or 0 for comp in components)
+            logger.info(f"Django Integration: Retrieved {components.count()} components, total budget: ${total_from_db:.1f}M")
+            
+            return component_list
         except Exception as e:
             print(f"Error getting components: {e}")
             return []

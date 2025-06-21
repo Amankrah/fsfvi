@@ -224,31 +224,30 @@ async def analyze_system(
         # Update session status
         await _update_session_status(session_id, current_user['id'], 'system_analyzed')
         
+        # Structure system vulnerability data consistently  
+        # Update session_data with corrected total_budget if needed
+        if analysis_result.get('total_budget', 0) > 0:
+            session_data = {**session_data, 'total_budget': analysis_result['total_budget']}
+        
+        system_vulnerability_data = _structure_system_vulnerability_response(
+            analysis_result['system_fsfvi'], session_data, session_id
+        ) if analysis_result.get('system_fsfvi') else {}
+        
         return {
             "session_id": session_id,
             "country": session_data.get('country_name', 'Unknown'),
             "analysis_type": "comprehensive_system_analysis",
             "timestamp": datetime.now().isoformat(),
-            "results": analysis_result,
             "next_step": "Call /optimize_allocation for detailed optimization",
             
-            # Direct access fields for frontend components (PerformanceGapAnalysis)
+            # Core analysis results
             "performance_gaps": analysis_result.get('performance_gaps'),
-            
-            # Direct access fields for SystemVulnerabilityOverview
-            "fsfvi_results": analysis_result.get('fsfvi_results'),
-            "financial_context": analysis_result.get('financial_context'),
-            "system_analysis": analysis_result.get('system_analysis'),
-            "mathematical_interpretation": analysis_result.get('mathematical_interpretation'),
-            "executive_summary": analysis_result.get('executive_summary'),
-            
-            # Direct access fields for ComponentVulnerabilityDetails
             "component_vulnerabilities": analysis_result.get('enhanced_component_vulnerabilities'),
-            
-            # Direct access for AnalysisWorkflow
             "distribution_analysis": analysis_result.get('distribution_analysis'),
-            "system_fsfvi": analysis_result.get('system_fsfvi'),
-            "optimization_preview": analysis_result.get('optimization_preview')
+            "optimization_preview": analysis_result.get('optimization_preview'),
+            
+            # Structured system vulnerability data
+            **system_vulnerability_data
         }
         
     except Exception as e:
@@ -394,8 +393,19 @@ async def calculate_system_vulnerability(
         session_data = await _get_session_data(session_id, current_user['id'])
         components = await _get_session_components(session_id)
         
-        # Delegate to calculation service for system FSFVI
-        system_fsfvi = calculation_service.calculate_fsfvi(
+        # Calculate total budget from components if not in session
+        component_budget_sum = sum(comp.get('financial_allocation', 0) for comp in components)
+        logger.info(f"Sum of component financial_allocations: ${component_budget_sum:.1f}M")
+        
+        if session_data.get('total_budget', 0) == 0:
+            if component_budget_sum > 0:
+                session_data = {**session_data, 'total_budget': component_budget_sum}
+                logger.info(f"Updated session with calculated budget: ${component_budget_sum:.1f}M")
+            else:
+                logger.warning("Both session total_budget and component allocations are zero! Check Django data.")
+        
+        # Delegate to calculation service for complete system FSFVI calculation
+        system_result = calculation_service.calculate_fsfvi(
             components=components,
             method=method,
             scenario=scenario
@@ -404,66 +414,16 @@ async def calculate_system_vulnerability(
         # Update session status
         await _update_session_status(session_id, current_user['id'], 'system_vulnerability_calculated')
         
-        # Generate enhanced structures for SystemVulnerabilityOverview
+        # The calculation service already returns comprehensive results from fsfvi_core
+        # Just need to structure them for frontend compatibility
         total_budget = session_data.get('total_budget', 0)
         
-        fsfvi_results = {
-            'fsfvi_score': system_fsfvi['fsfvi_value'],
-            'vulnerability_percent': system_fsfvi['fsfvi_value'] * 100,
-            'risk_level': system_fsfvi['risk_level'],
-            'financing_efficiency_percent': (1 - system_fsfvi['fsfvi_value']) * 100
-        }
+        # Extract and structure results for SystemVulnerabilityOverview
+        response_data = _structure_system_vulnerability_response(
+            system_result, session_data, session_id
+        )
         
-        financial_context = {
-            'total_budget_millions': total_budget / 1e6 if total_budget > 0 else 0,
-            'budget_efficiency': 'high' if system_fsfvi['fsfvi_value'] < 0.1 else 'medium' if system_fsfvi['fsfvi_value'] < 0.2 else 'low',
-            'optimization_potential': 'high' if system_fsfvi['fsfvi_value'] > 0.15 else 'medium' if system_fsfvi['fsfvi_value'] > 0.05 else 'low',
-            'intervention_urgency': system_fsfvi.get('government_insights', {}).get('intervention_urgency', 'medium')
-        }
-        
-        system_analysis = {
-            'fsfvi_score': system_fsfvi['fsfvi_value'],
-            'risk_level': system_fsfvi['risk_level'],
-            'total_allocation_millions': total_budget / 1e6 if total_budget > 0 else 0,
-            'component_statistics': system_fsfvi.get('component_statistics', {}),
-            'government_insights': system_fsfvi.get('government_insights', {}),
-            'critical_components': [comp['name'] for comp in system_fsfvi.get('critical_components', [])],
-            'high_priority_components': [comp['name'] for comp in system_fsfvi.get('high_risk_components', [])]
-        }
-        
-        mathematical_interpretation = {
-            'score': system_fsfvi['fsfvi_value'],
-            'vulnerability_percent': system_fsfvi['fsfvi_value'] * 100,
-            'interpretation': f"System shows {system_fsfvi['risk_level']} vulnerability with {(system_fsfvi['fsfvi_value'] * 100):.2f}% financing inefficiency",
-            'performance_category': 'excellent' if system_fsfvi['fsfvi_value'] < 0.05 else 'good' if system_fsfvi['fsfvi_value'] < 0.15 else 'fair' if system_fsfvi['fsfvi_value'] < 0.30 else 'poor'
-        }
-        
-        executive_summary = {
-            'overall_assessment': f"Food system shows {system_fsfvi['risk_level']} vulnerability requiring {'immediate' if len(system_fsfvi.get('critical_components', [])) > 0 else 'strategic'} intervention",
-            'key_metrics': {
-                'fsfvi_score': f"{system_fsfvi['fsfvi_value']:.6f}",
-                'financing_efficiency': f"{((1 - system_fsfvi['fsfvi_value']) * 100):.1f}%",
-                'critical_components': len(system_fsfvi.get('critical_components', [])),
-                'total_budget': f"${total_budget / 1e6:.1f}M" if total_budget > 0 else "N/A"
-            },
-            'immediate_actions_required': len(system_fsfvi.get('critical_components', [])) > 0,
-            'system_stability': system_fsfvi.get('government_insights', {}).get('system_stability', 'unknown')
-        }
-        
-        return {
-            "session_id": session_id,
-            "country": session_data.get('country_name', 'Unknown'),
-            "analysis_type": "system_vulnerability",
-            "timestamp": datetime.now().isoformat(),
-            "system_fsfvi": system_fsfvi,
-            
-            # Enhanced structures for SystemVulnerabilityOverview
-            "fsfvi_results": fsfvi_results,
-            "financial_context": financial_context,
-            "system_analysis": system_analysis,
-            "mathematical_interpretation": mathematical_interpretation,
-            "executive_summary": executive_summary
-        }
+        return response_data
         
     except Exception as e:
         logger.error(f"System vulnerability calculation error: {str(e)}")
@@ -573,6 +533,7 @@ async def get_session_status(
     except Exception as e:
         logger.error(f"Session status error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Session status retrieval failed: {str(e)}")
+
 
 
 @app.get("/validate_system", summary="Validate System Health")
@@ -789,6 +750,111 @@ async def _save_optimization_results(session_id: str, optimization_result: Dict[
         await run_django_operation(
             django_integration.save_optimization_results, session_id, optimization_result
         )
+
+
+def _structure_system_vulnerability_response(
+    system_result: Dict[str, Any], 
+    session_data: Dict[str, Any], 
+    session_id: str
+) -> Dict[str, Any]:
+    """
+    Structure system vulnerability response for SystemVulnerabilityOverview component
+    
+    Args:
+        system_result: Complete system FSFVI calculation results from fsfvi_core
+        session_data: Session metadata (country, budget, etc.)
+        session_id: Session identifier
+        
+    Returns:
+        Clean, structured response for frontend consumption
+    """
+    # Get total budget from multiple sources for robustness
+    total_budget = (
+        session_data.get('total_budget', 0) or 
+        system_result.get('total_allocation', 0) or
+        system_result.get('total_allocation_millions', 0) * 1e6 or 
+        0
+    )
+    
+    # Log budget for debugging  
+    logger.info(f"Total budget in _structure_system_vulnerability_response: ${total_budget:.1f}M (already in millions)")
+    
+    fsfvi_score = system_result.get('fsfvi_value', 0)
+    risk_level = system_result.get('risk_level', 'unknown')
+    
+    # Core FSFVI results
+    fsfvi_results = {
+        'fsfvi_score': fsfvi_score,
+        'vulnerability_percent': fsfvi_score * 100,
+        'risk_level': risk_level,
+        'financing_efficiency_percent': (1 - fsfvi_score) * 100
+    }
+    
+    # Financial context - budget values are already in millions
+    financial_context = {
+        'total_budget_millions': total_budget if total_budget > 0 else 0,
+        'budget_efficiency': 'high' if fsfvi_score < 0.1 else 'medium' if fsfvi_score < 0.2 else 'low',
+        'optimization_potential': system_result.get('government_insights', {}).get('budget_optimization_potential', 
+                                 'high' if fsfvi_score > 0.15 else 'medium' if fsfvi_score > 0.05 else 'low'),
+        'intervention_urgency': system_result.get('government_insights', {}).get('intervention_urgency', 'medium')
+    }
+    
+    # System analysis
+    system_analysis = {
+        'fsfvi_score': fsfvi_score,
+        'risk_level': risk_level,
+        'total_allocation_millions': system_result.get('total_allocation_millions', total_budget if total_budget > 0 else 0),
+        'component_statistics': system_result.get('component_statistics', {}),
+        'government_insights': system_result.get('government_insights', {}),
+        'critical_components': [comp.get('name', comp.get('component_name', 'Unknown')) 
+                               for comp in system_result.get('critical_components', [])],
+        'high_priority_components': [comp.get('name', comp.get('component_name', 'Unknown')) 
+                                   for comp in system_result.get('high_risk_components', [])]
+    }
+    
+    # Mathematical interpretation
+    mathematical_interpretation = {
+        'score': fsfvi_score,
+        'vulnerability_percent': fsfvi_score * 100,
+        'interpretation': f"System shows {risk_level} vulnerability with {(fsfvi_score * 100):.2f}% financing inefficiency",
+        'performance_category': 'excellent' if fsfvi_score < 0.05 else 'good' if fsfvi_score < 0.15 else 'fair' if fsfvi_score < 0.30 else 'poor',
+        'formula_applied': 'FSFVI = Σᵢ ωᵢ·υᵢ(fᵢ) = Σᵢ ωᵢ·δᵢ·[1/(1+αᵢfᵢ)]'
+    }
+    
+    # Executive summary
+    critical_count = len(system_result.get('critical_components', []))
+    executive_summary = {
+        'overall_assessment': f"Food system shows {risk_level} vulnerability requiring {'immediate' if critical_count > 0 else 'strategic'} intervention",
+        'key_metrics': {
+            'fsfvi_score': f"{fsfvi_score:.6f}",
+            'financing_efficiency': f"{((1 - fsfvi_score) * 100):.1f}%",
+            'critical_components': critical_count,
+            'total_budget': f"${total_budget:.1f}M" if total_budget > 0 else "N/A"
+        },
+        'immediate_actions_required': critical_count > 0,
+        'system_stability': system_result.get('government_insights', {}).get('system_stability', 'unknown')
+    }
+    
+    return {
+        "session_id": session_id,
+        "country": session_data.get('country_name', 'Unknown'),
+        "analysis_type": "system_vulnerability",
+        "timestamp": datetime.now().isoformat(),
+        "fiscal_year": session_data.get('fiscal_year'),
+        "currency": session_data.get('currency'),
+        "weighting_method": system_result.get('weighting_method'),
+        "scenario": system_result.get('scenario'),
+        
+        # Core system results
+        "system_fsfvi": system_result,
+        
+        # Structured UI data
+        "fsfvi_results": fsfvi_results,
+        "financial_context": financial_context,
+        "system_analysis": system_analysis,
+        "mathematical_interpretation": mathematical_interpretation,
+        "executive_summary": executive_summary
+    }
 
 
 if __name__ == "__main__":

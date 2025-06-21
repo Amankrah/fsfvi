@@ -6,13 +6,13 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { 
-  ArrowLeft, 
   RefreshCw,
   AlertTriangle,
   Loader2
 } from 'lucide-react';
 import { analysisAPI } from '@/lib/api';
 import { PerformanceGapAnalysis } from '@/components/dashboard/PerformanceGapAnalysis';
+import { AnalysisNavigation } from '@/components/analysis/AnalysisNavigation';
 
 interface PerformanceGapResults {
   gaps: { [key: string]: {
@@ -133,38 +133,28 @@ export default function PerformanceGapsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
-            <div className="flex items-center space-x-4">
-              <Button variant="outline" onClick={() => router.push('/dashboard')}>
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Back to Dashboard
-              </Button>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">
-                  Performance Gaps Analysis
-                </h1>
-                <p className="text-sm text-gray-600">
-                  {data ? (
-                    <>
-                      {data.country} • FY {data.fiscal_year || 2024} • Session: {sessionId}
-                    </>
-                  ) : (
-                    `Session: ${sessionId}`
-                  )}
-                </p>
-              </div>
-            </div>
-            
-            <Button onClick={refreshData} disabled={refreshing}>
+      {/* Navigation */}
+      <AnalysisNavigation 
+        sessionId={sessionId}
+        currentPage="performance-gaps"
+        sessionInfo={{
+          country: data?.country,
+          fiscal_year: data?.fiscal_year,
+          currency: data?.currency
+        }}
+      />
+
+      {/* Action Bar */}
+      <div className="bg-white border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+          <div className="flex justify-end">
+            <Button onClick={refreshData} disabled={refreshing} size="sm">
               <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
               Refresh Analysis
             </Button>
           </div>
         </div>
-      </header>
+      </div>
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">

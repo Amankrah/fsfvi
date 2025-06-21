@@ -445,7 +445,7 @@ def calculate_system_fsfvi(component_results: List[Dict[str, float]]) -> Dict[st
     # Detailed debug logging for transparency
     logger.info(f"=== SYSTEM FSFVI CALCULATION ===")
     logger.info(f"Total Components: {len(component_results)}")
-    logger.info(f"Total Budget: ${total_allocation/1e6:.1f}M")
+    logger.info(f"Total Budget: ${total_allocation:.1f}M")
     logger.info(f"FSFVI Score: {total_fsfvi:.6f}")
     logger.info(f"Risk Level: {risk_level}")
     logger.info(f"Critical Components: {len(critical_components)}")
@@ -460,7 +460,7 @@ def calculate_system_fsfvi(component_results: List[Dict[str, float]]) -> Dict[st
         
         # Financial Context
         'total_allocation': total_allocation,
-        'total_allocation_millions': round_to_precision(total_allocation / 1e6, 2),
+        'total_allocation_millions': round_to_precision(total_allocation, 2),
         
         # Component Statistics
         'component_statistics': {
@@ -558,7 +558,7 @@ def _generate_government_action_priorities(
         'strategic_actions_6_24_months': strategic_actions,
         'resource_recommendations': resource_recommendations,
         'overall_urgency': 'critical' if len(critical_components) > 2 else 'high' if len(critical_components) > 0 else 'moderate',
-        'estimated_intervention_cost': f"${total_budget * 0.1 / 1e6:.1f}M - ${total_budget * 0.3 / 1e6:.1f}M" if total_budget > 0 else "TBD"
+        'estimated_intervention_cost': f"${total_budget * 0.1:.1f}M - ${total_budget * 0.3:.1f}M" if total_budget > 0 else "TBD"
     }
 
 

@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -12,8 +12,11 @@ import {
   MoreHorizontal,
   Globe,
   Clock,
-  TrendingUp
+  TrendingUp,
+  Trash2,
+  RotateCcw
 } from 'lucide-react';
+import { dataAPI } from '@/lib/api';
 
 interface Session {
   id: string;
@@ -28,9 +31,11 @@ interface Session {
 
 interface SessionsListProps {
   sessions: Session[];
+  onSessionDeleted?: (sessionId: string) => void;
 }
 
-export const SessionsList: React.FC<SessionsListProps> = ({ sessions }) => {
+export const SessionsList: React.FC<SessionsListProps> = ({ sessions, onSessionDeleted }) => {
+  const [clearingSessionId, setClearingSessionId] = useState<string | null>(null);
   const getStatusBadge = (status: string) => {
     const statusConfig = {
       'active': { color: 'bg-blue-100 text-blue-800', label: 'Active' },
@@ -66,9 +71,31 @@ export const SessionsList: React.FC<SessionsListProps> = ({ sessions }) => {
   };
 
   const handleViewSession = (sessionId: string) => {
-    // Navigate to analysis page
-    window.location.href = `/analysis/${sessionId}`;
+    // Navigate to performance gaps analysis (starting point)
+    window.location.href = `/analysis/${sessionId}/performance-gaps`;
   };
+
+  const handleClearSession = async (sessionId: string) => {
+    if (!confirm('Are you sure you want to clear this session? This will delete all associated data and cannot be undone.')) {
+      return;
+    }
+
+    setClearingSessionId(sessionId);
+    try {
+      await dataAPI.clearSession(sessionId);
+      if (onSessionDeleted) {
+        onSessionDeleted(sessionId);
+      }
+      // Dashboard will refresh automatically via callback
+    } catch (error) {
+      console.error('Failed to clear session:', error);
+      alert('Failed to clear session. Please try again.');
+    } finally {
+      setClearingSessionId(null);
+    }
+  };
+
+  const isClearing = (sessionId: string) => clearingSessionId === sessionId;
 
   if (!sessions || sessions.length === 0) {
     return (
@@ -172,32 +199,80 @@ export const SessionsList: React.FC<SessionsListProps> = ({ sessions }) => {
                 </Button>
                 
                 {(session.status === 'completed' || session.status === 'analysis_completed') && (
-                  <Button 
-                    size="sm"
-                    onClick={() => handleViewSession(session.id)}
-                  >
-                    <TrendingUp className="h-4 w-4 mr-1" />
-                    Gap Analysis
-                  </Button>
+                  <>
+                    <Button 
+                      size="sm"
+                      onClick={() => handleViewSession(session.id)}
+                    >
+                      <TrendingUp className="h-4 w-4 mr-1" />
+                      Gap Analysis
+                    </Button>
+                    <Button 
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleClearSession(session.id)}
+                      disabled={isClearing(session.id)}
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                    >
+                      {isClearing(session.id) ? (
+                        <RotateCcw className="h-4 w-4 mr-1 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-4 w-4 mr-1" />
+                      )}
+                      Clear
+                    </Button>
+                  </>
                 )}
 
                 {session.status === 'performance_gaps_calculated' && (
-                  <Button 
-                    size="sm"
-                    onClick={() => handleViewSession(session.id)}
-                  >
-                    <TrendingUp className="h-4 w-4 mr-1" />
-                    View Gaps
-                  </Button>
+                  <>
+                    <Button 
+                      size="sm"
+                      onClick={() => handleViewSession(session.id)}
+                    >
+                      <TrendingUp className="h-4 w-4 mr-1" />
+                      View Gaps
+                    </Button>
+                    <Button 
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleClearSession(session.id)}
+                      disabled={isClearing(session.id)}
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                    >
+                      {isClearing(session.id) ? (
+                        <RotateCcw className="h-4 w-4 mr-1 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-4 w-4 mr-1" />
+                      )}
+                      Clear
+                    </Button>
+                  </>
                 )}
                 
                 {session.status === 'data_uploaded' && (
-                  <Button 
-                    size="sm"
-                    onClick={() => handleViewSession(session.id)}
-                  >
-                    Start Gap Analysis
-                  </Button>
+                  <>
+                    <Button 
+                      size="sm"
+                      onClick={() => handleViewSession(session.id)}
+                    >
+                      Start Gap Analysis
+                    </Button>
+                    <Button 
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleClearSession(session.id)}
+                      disabled={isClearing(session.id)}
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                    >
+                      {isClearing(session.id) ? (
+                        <RotateCcw className="h-4 w-4 mr-1 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-4 w-4 mr-1" />
+                      )}
+                      Clear
+                    </Button>
+                  </>
                 )}
               </div>
             </div>

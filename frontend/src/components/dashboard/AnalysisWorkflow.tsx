@@ -17,9 +17,11 @@ import {
   ChevronDown,
   ChevronUp,
   Eye,
-  Activity
+  Activity,
+  Trash2,
+  RotateCcw
 } from 'lucide-react';
-import { analysisAPI } from '@/lib/api';
+import { analysisAPI, dataAPI } from '@/lib/api';
 
 interface AnalysisStep {
   id: string;
@@ -42,6 +44,7 @@ export const AnalysisWorkflow: React.FC<AnalysisWorkflowProps> = ({
   onAnalysisComplete 
 }) => {
   const router = useRouter();
+  const [clearingSession, setClearingSession] = useState(false);
   const [steps, setSteps] = useState<AnalysisStep[]>([
     {
       id: 'distribution',
@@ -79,6 +82,11 @@ export const AnalysisWorkflow: React.FC<AnalysisWorkflowProps> = ({
     setSteps(prev => prev.map(step => 
       step.id === stepId ? { ...step, status, results } : step
     ));
+    
+    // Auto-expand step when completed
+    if (status === 'completed' && results) {
+      setExpandedSteps(prev => new Set([...prev, stepId]));
+    }
   };
 
   const toggleStepExpansion = (stepId: string) => {
@@ -113,13 +121,9 @@ export const AnalysisWorkflow: React.FC<AnalysisWorkflowProps> = ({
           break;
         case 'performance_gaps':
           results = await analysisAPI.calculatePerformanceGaps(sessionId, token);
-          // Automatically expand performance gaps when completed
-          setExpandedSteps(prev => new Set([...prev, stepId]));
           break;
         case 'vulnerabilities':
           results = await analysisAPI.calculateComponentVulnerabilities(sessionId, token);
-          // Automatically expand vulnerabilities when completed
-          setExpandedSteps(prev => new Set([...prev, stepId]));
           break;
         case 'system_vulnerability':
           results = await analysisAPI.calculateSystemVulnerability(sessionId, token);
@@ -155,6 +159,26 @@ export const AnalysisWorkflow: React.FC<AnalysisWorkflowProps> = ({
     }
   };
 
+  const handleClearSession = async () => {
+    if (!sessionId) return;
+    
+    if (!confirm('Are you sure you want to clear this session? This will delete all analysis results and cannot be undone.')) {
+      return;
+    }
+
+    setClearingSession(true);
+    try {
+      await dataAPI.clearSession(sessionId);
+      // Navigate back to dashboard
+      router.push('/dashboard');
+    } catch (error) {
+      console.error('Failed to clear session:', error);
+      alert('Failed to clear session. Please try again.');
+    } finally {
+      setClearingSession(false);
+    }
+  };
+
   const runComprehensiveAnalysis = async () => {
     if (!sessionId) {
       alert('No session selected. Please upload data first.');
@@ -170,12 +194,13 @@ export const AnalysisWorkflow: React.FC<AnalysisWorkflowProps> = ({
       // Call the comprehensive analysis endpoint
       const comprehensiveResult = await analysisAPI.analyzeSystem(sessionId, token);
       
-      // Extract results for each step from the comprehensive analysis
+      // Extract and update results for each step - auto-expansion handled by updateStepStatus
       updateStepStatus('distribution', 'completed', {
-        key_insights: comprehensiveResult.distribution_analysis?.key_insights || [
+        key_insights: [
           `Total budget: $${comprehensiveResult.distribution_analysis?.total_budget_usd_millions?.toFixed(1) || '0.0'}M`,
           `Budget utilization: ${comprehensiveResult.distribution_analysis?.budget_utilization_percent?.toFixed(1) || '0.0'}%`,
-          'Comprehensive distribution analysis completed'
+          `Components analyzed: ${comprehensiveResult.distribution_analysis?.component_allocations ? Object.keys(comprehensiveResult.distribution_analysis.component_allocations).length : 0}`,
+          `Concentration level: ${comprehensiveResult.distribution_analysis?.concentration_analysis?.concentration_level || 'Unknown'}`
         ]
       });
       
@@ -183,11 +208,7 @@ export const AnalysisWorkflow: React.FC<AnalysisWorkflowProps> = ({
       
       updateStepStatus('vulnerabilities', 'completed', comprehensiveResult.component_vulnerabilities || {});
       
-      updateStepStatus('system_vulnerability', 'completed', {
-        fsfvi_results: comprehensiveResult.fsfvi_results,
-        system_analysis: comprehensiveResult.system_analysis,
-        executive_summary: comprehensiveResult.executive_summary
-      });
+      updateStepStatus('system_vulnerability', 'completed', comprehensiveResult);
 
       if (onAnalysisComplete) {
         onAnalysisComplete();
@@ -195,7 +216,6 @@ export const AnalysisWorkflow: React.FC<AnalysisWorkflowProps> = ({
       
     } catch (error) {
       console.error('Comprehensive analysis failed:', error);
-      // Mark all steps as error
       steps.forEach(step => updateStepStatus(step.id, 'error'));
       alert(`Comprehensive analysis failed: ${error}`);
     }
@@ -542,74 +562,131 @@ export const AnalysisWorkflow: React.FC<AnalysisWorkflowProps> = ({
       case 'system_vulnerability':
         return (
           <div className="mt-3 space-y-3">
-            {/* FSFVI Results */}
+            {/* FSFVI Results - Robust data extraction */}
             <div className="p-3 bg-red-50 rounded-lg border border-red-200">
-              <h4 className="text-sm font-semibold text-red-900 mb-2">FSFVI Results:</h4>
+              <h4 className="text-sm font-semibold text-red-900 mb-2">System FSFVI Analysis:</h4>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
                 <div className="text-center">
-                  <div className="text-lg font-bold text-red-800">{(step.results.fsfvi_results?.fsfvi_score * 100).toFixed(2) || '0.00'}%</div>
+                  <div className="text-lg font-bold text-red-800">
+                    {(() => {
+                      const score = step.results.fsfvi_results?.fsfvi_score || 
+                                   step.results.system_analysis?.fsfvi_score || 0;
+                      return (score * 100).toFixed(2);
+                    })()}%
+                  </div>
                   <div className="text-red-700">FSFVI Score</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-lg font-bold text-orange-800">{step.results.fsfvi_results?.risk_level || 'Unknown'}</div>
+                  <div className="text-lg font-bold text-orange-800">
+                    {step.results.fsfvi_results?.risk_level || 
+                     step.results.system_analysis?.risk_level || 'Unknown'}
+                  </div>
                   <div className="text-orange-700">Risk Level</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-lg font-bold text-green-800">{step.results.fsfvi_results?.financing_efficiency_percent?.toFixed(1) || '0.0'}%</div>
+                  <div className="text-lg font-bold text-green-800">
+                    {(() => {
+                      const efficiency = step.results.fsfvi_results?.financing_efficiency_percent ||
+                                        step.results.system_analysis?.government_insights?.financing_efficiency_percent ||
+                                        ((1 - (step.results.fsfvi_results?.fsfvi_score || step.results.system_analysis?.fsfvi_score || 0)) * 100);
+                      return efficiency.toFixed(1);
+                    })()}%
+                  </div>
                   <div className="text-green-700">Efficiency</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-lg font-bold text-blue-800">{step.results.system_analysis?.critical_components?.length || 0}</div>
+                  <div className="text-lg font-bold text-blue-800">
+                    {step.results.system_analysis?.critical_components?.length || 0}
+                  </div>
                   <div className="text-blue-700">Critical Components</div>
                 </div>
               </div>
             </div>
 
-            {/* Executive Summary */}
-            {step.results.executive_summary && (
-              <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
-                <h5 className="text-sm font-semibold text-blue-900">Assessment:</h5>
-                <p className="text-xs text-blue-800 mt-1">{step.results.executive_summary.overall_assessment}</p>
-                {step.results.executive_summary.immediate_actions_required && (
-                  <div className="mt-2 px-2 py-1 bg-orange-100 rounded text-xs text-orange-800">
-                    ⚠️ Immediate actions required
-                  </div>
-                )}
-              </div>
-            )}
-
-                         {/* API Endpoint Info */}
-             <div className="flex justify-center">
-               <Badge className="bg-blue-100 text-blue-800 text-xs">
-                 /calculate_system_vulnerability
-               </Badge>
+            {/* Mathematical Formula Display */}
+                         <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+               <div className="flex items-center justify-between mb-2">
+                 <h5 className="text-sm font-semibold text-blue-900">FSFVI Mathematical Framework:</h5>
+                 <Badge className="bg-green-100 text-green-800 text-xs">
+                   <CheckCircle className="w-3 h-3 mr-1" />
+                   Calculated
+                 </Badge>
+               </div>
+               <code className="text-xs font-mono text-blue-800 font-bold">
+                 {step.results.mathematical_interpretation?.formula_applied || 
+                  'FSFVI = Σᵢ ωᵢ·υᵢ(fᵢ) = Σᵢ ωᵢ·δᵢ·[1/(1+αᵢfᵢ)]'}
+               </code>
+               <p className="text-xs text-blue-700 mt-1">
+                 Aggregated vulnerability across {step.results.system_analysis?.component_statistics?.total_components || 'all'} food system components
+               </p>
              </div>
 
-             {/* Actions */}
-             <div className="flex justify-between items-center">
-               <Button
-                 variant="outline"
-                 size="sm"
-                 onClick={() => {
-                   if (sessionId) {
-                     router.push(`/analysis/${sessionId}/system-vulnerability`);
-                   } else {
-                     alert('Session ID not available');
-                   }
-                 }}
-               >
-                 <Eye className="w-4 h-4 mr-1" />
-                 View Detailed Analysis
-               </Button>
-               <Button
-                 size="sm"
-                 onClick={() => runAnalysisStep('system_vulnerability')}
-                 disabled={step.status === 'running'}
-               >
-                 <Activity className="w-4 h-4 mr-1" />
-                 Recalculate
-               </Button>
-             </div>
+                         {/* Executive Summary */}
+             {(step.results.executive_summary || step.results.system_analysis?.government_insights) && (
+               <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+                 <h5 className="text-sm font-semibold text-blue-900">Government Assessment:</h5>
+                 <p className="text-xs text-blue-800 mt-1">
+                   {step.results.executive_summary?.overall_assessment || 
+                    `System shows ${step.results.system_analysis?.risk_level || 'unknown'} vulnerability level`}
+                 </p>
+                 {(step.results.executive_summary?.immediate_actions_required || 
+                   (step.results.system_analysis?.critical_components?.length || 0) > 0) && (
+                   <div className="mt-2 px-2 py-1 bg-orange-100 rounded text-xs text-orange-800">
+                     ⚠️ Immediate interventions required for critical components
+                   </div>
+                 )}
+               </div>
+             )}
+
+                         {/* Critical Components Alert */}
+             {(step.results.system_analysis?.critical_components?.length || 0) > 0 && (
+               <div className="p-3 bg-red-50 rounded-lg border border-red-300">
+                 <div className="flex items-center mb-2">
+                   <AlertCircle className="w-4 h-4 text-red-600 mr-2" />
+                   <h5 className="text-sm font-semibold text-red-900">Critical System Components</h5>
+                 </div>
+                 <div className="flex flex-wrap gap-1">
+                   {step.results.system_analysis.critical_components.map((comp: string, idx: number) => (
+                     <Badge key={idx} className="bg-red-100 text-red-800 text-xs">
+                       {comp}
+                     </Badge>
+                   ))}
+                 </div>
+               </div>
+             )}
+
+            {/* API Endpoint Info */}
+            <div className="flex justify-center">
+              <Badge className="bg-blue-100 text-blue-800 text-xs">
+                /calculate_system_vulnerability
+              </Badge>
+            </div>
+
+            {/* Actions */}
+            <div className="flex justify-between items-center">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  if (sessionId) {
+                    router.push(`/analysis/${sessionId}/system-vulnerability`);
+                  } else {
+                    alert('Session ID not available');
+                  }
+                }}
+              >
+                <Eye className="w-4 h-4 mr-1" />
+                View Comprehensive Analysis
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => runAnalysisStep('system_vulnerability')}
+                disabled={step.status === 'running'}
+              >
+                <Activity className="w-4 h-4 mr-1" />
+                Recalculate
+              </Button>
+            </div>
           </div>
         );
       default:
@@ -655,6 +732,19 @@ export const AnalysisWorkflow: React.FC<AnalysisWorkflowProps> = ({
               <Button onClick={runFullAnalysis} variant="outline" className="flex items-center">
                 <PlayCircle className="w-4 h-4 mr-2" />
                 Step-by-Step
+              </Button>
+              <Button 
+                onClick={handleClearSession} 
+                variant="outline" 
+                disabled={clearingSession}
+                className="flex items-center text-red-600 hover:text-red-700 hover:bg-red-50"
+              >
+                {clearingSession ? (
+                  <RotateCcw className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Trash2 className="w-4 h-4 mr-2" />
+                )}
+                Clear Session
               </Button>
             </div>
           </CardTitle>

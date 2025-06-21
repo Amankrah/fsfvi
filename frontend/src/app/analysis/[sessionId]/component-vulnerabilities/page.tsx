@@ -7,9 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { 
-  ArrowLeft, 
   AlertTriangle,
-  Shield,
   Activity,
   AlertOctagon,
   Info,
@@ -17,6 +15,7 @@ import {
   Share2
 } from 'lucide-react';
 import { ComponentVulnerabilityDetails } from '@/components/dashboard/ComponentVulnerabilityDetails';
+import { AnalysisNavigation } from '@/components/analysis/AnalysisNavigation';
 
 export default function ComponentVulnerabilitiesPage() {
   const params = useParams();
@@ -90,77 +89,64 @@ export default function ComponentVulnerabilitiesPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Enhanced Header */}
-      <header className="bg-white border-b border-gray-200 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
-            <div className="flex items-center space-x-4">
-              <Button variant="outline" onClick={() => router.push('/dashboard')}>
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Back to Dashboard
-              </Button>
-              <div>
-                <div className="flex items-center space-x-2">
-                  <Shield className="w-6 h-6 text-blue-600" />
-                  <h1 className="text-2xl font-bold text-gray-900">
-                    Component Vulnerabilities Analysis
-                  </h1>
-                  {insights && (
-                    <Badge className={
-                      insights.riskLevel === 'critical' ? 'bg-red-100 text-red-800' :
-                      insights.riskLevel === 'high' ? 'bg-orange-100 text-orange-800' :
-                      insights.riskLevel === 'medium' ? 'bg-yellow-100 text-yellow-800' :
-                      'bg-green-100 text-green-800'
-                    }>
-                      {insights.riskLevel.toUpperCase()} RISK SYSTEM
-                    </Badge>
+      {/* Navigation */}
+      <AnalysisNavigation 
+        sessionId={sessionId}
+        currentPage="component-vulnerabilities"
+      />
+
+      {/* Status Bar */}
+      {insights && (
+        <div className="bg-white border-b border-gray-200">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <Badge className={
+                  insights.riskLevel === 'critical' ? 'bg-red-100 text-red-800' :
+                  insights.riskLevel === 'high' ? 'bg-orange-100 text-orange-800' :
+                  insights.riskLevel === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+                  'bg-green-100 text-green-800'
+                }>
+                  {insights.riskLevel.toUpperCase()} RISK SYSTEM
+                </Badge>
+                <div className="flex items-center space-x-3 text-xs text-gray-500">
+                  <span className="flex items-center">
+                    <Activity className="w-3 h-3 mr-1" />
+                    {insights.totalComponents} components
+                  </span>
+                  {insights.criticalCount > 0 && (
+                    <span className="flex items-center text-red-600">
+                      <AlertOctagon className="w-3 h-3 mr-1" />
+                      {insights.criticalCount} critical
+                    </span>
                   )}
-                </div>
-                <div className="flex items-center space-x-4 mt-1">
-                  <p className="text-sm text-gray-600">
-                    <span className="font-medium">Session:</span> {sessionId}
-                  </p>
-                  {insights && (
-                    <div className="flex items-center space-x-3 text-xs text-gray-500">
-                      <span className="flex items-center">
-                        <Activity className="w-3 h-3 mr-1" />
-                        {insights.totalComponents} components
-                      </span>
-                      {insights.criticalCount > 0 && (
-                        <span className="flex items-center text-red-600">
-                          <AlertOctagon className="w-3 h-3 mr-1" />
-                          {insights.criticalCount} critical
-                        </span>
-                      )}
-                      <span>
-                        {insights.avgVulnerability.toFixed(1)}% avg vulnerability
-                      </span>
-                    </div>
-                  )}
+                  <span>
+                    {insights.avgVulnerability.toFixed(1)}% avg vulnerability
+                  </span>
                 </div>
               </div>
-            </div>
-            
-            <div className="flex items-center space-x-2">
-              {hasData && (
-                <>
-                  <Button variant="outline" size="sm" onClick={downloadReport}>
-                    <Download className="w-4 h-4 mr-2" />
-                    Export Report
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={() => {
-                    navigator.clipboard.writeText(window.location.href);
-                    alert('Analysis link copied to clipboard!');
-                  }}>
-                    <Share2 className="w-4 h-4 mr-2" />
-                    Share
-                  </Button>
-                </>
-              )}
+              
+              <div className="flex items-center space-x-2">
+                {hasData && (
+                  <>
+                    <Button variant="outline" size="sm" onClick={downloadReport}>
+                      <Download className="w-4 h-4 mr-2" />
+                      Export Report
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => {
+                      navigator.clipboard.writeText(window.location.href);
+                      alert('Analysis link copied to clipboard!');
+                    }}>
+                      <Share2 className="w-4 h-4 mr-2" />
+                      Share
+                    </Button>
+                  </>
+                )}
+              </div>
             </div>
           </div>
         </div>
-      </header>
+      )}
 
       {/* System Status Alert */}
       {insights && insights.criticalCount > 0 && (

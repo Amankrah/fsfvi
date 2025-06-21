@@ -185,6 +185,7 @@ class DataProcessingService:
             validation_results = prep.validate_against_system(components_data)
             
             # Update session with total budget
+            logger.info(f"Data Processing Service: Updating session total_budget to ${total_budget:.1f}M")
             session.total_budget = total_budget
             session.status = 'data_processed'
             session.save()
@@ -253,7 +254,10 @@ class DataProcessingService:
         
         # Bulk create components
         Component.objects.bulk_create(components_to_create)
-        logger.info(f"Created {len(components_to_create)} components for session {session.id}")
+        
+        # Verify total allocation
+        total_allocation = sum(comp_data['financial_allocation'] for comp_data in components_data)
+        logger.info(f"Created {len(components_to_create)} components for session {session.id}, total allocation: ${total_allocation:.1f}M")
     
     def get_user_files(self, user: User) -> List[Dict[str, Any]]:
         """Get all uploaded files for a user"""

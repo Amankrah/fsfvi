@@ -300,7 +300,7 @@ class FSFVICalculationService:
         # Calculate system-level results using fsfvi_core comprehensive analysis
         system_results = calculate_system_fsfvi(component_results)
         
-        # Return the complete system analysis from fsfvi_core, plus metadata
+        # Return the complete system analysis from fsfvi_core with consistent metadata
         result = system_results.copy()
         result.update({
             'component_vulnerabilities': component_results,
@@ -310,7 +310,15 @@ class FSFVICalculationService:
                 'timestamp': datetime.now().isoformat(),
                 'num_components': len(component_results),
                 'advanced_weighting_used': ADVANCED_WEIGHTING_AVAILABLE and method != 'financial',
-                'sensitivity_estimation_method': FSFVI_CONFIG.sensitivity_estimation_method
+                'sensitivity_estimation_method': FSFVI_CONFIG.sensitivity_estimation_method,
+                'mathematical_formula': 'FSFVI = Σᵢ ωᵢ·υᵢ(fᵢ) = Σᵢ ωᵢ·δᵢ·[1/(1+αᵢfᵢ)]',
+                'calculation_flow': [
+                    '1. Calculate performance gaps: δᵢ = |xᵢ - x̄ᵢ|/xᵢ',
+                    '2. Estimate sensitivity parameters: αᵢ (component-specific)',
+                    '3. Calculate component vulnerabilities: υᵢ(fᵢ) = δᵢ·[1/(1+αᵢfᵢ)]',
+                    '4. Apply advanced weighting: ωᵢ (expert/network/hybrid)',
+                    '5. Aggregate to system FSFVI: Σᵢ ωᵢ·υᵢ(fᵢ)'
+                ]
             }
         })
         
@@ -1049,9 +1057,15 @@ class FSFVIAnalysisService:
         Perform comprehensive system analysis combining multiple analysis types
         Returns complete data structures expected by all frontend components
         """
-        # 1. Current Distribution Analysis
+        # 1. Current Distribution Analysis  
+        total_budget = session_data.get('total_budget', 0)
+        if total_budget == 0:
+            # Calculate total budget from component allocations if not provided
+            total_budget = sum(comp.get('financial_allocation', 0) for comp in components)
+            logger.info(f"Calculated total budget from components: ${total_budget:.1f}M")
+        
         distribution_analysis = self._analyze_current_distribution(
-            components, session_data.get('total_budget', 0)
+            components, total_budget
         )
         
         # 2. Performance Gaps Analysis (enhanced with debug info)
@@ -1062,7 +1076,7 @@ class FSFVIAnalysisService:
             components, method=method, scenario=scenario
         )
         
-        # 4. System-Level FSFVI (comprehensive)
+        # 4. System-Level FSFVI (comprehensive) - Use single source of truth
         system_fsfvi = self.calculation_service.calculate_fsfvi(
             components, method=method, scenario=scenario
         )
@@ -1073,57 +1087,6 @@ class FSFVIAnalysisService:
             optimization_preview = self._generate_optimization_preview(
                 components, system_fsfvi['fsfvi_value'], method, scenario
             )
-        
-        # 6. Generate comprehensive response structures for frontend components
-        
-        # FSFVI Results for SystemVulnerabilityOverview
-        fsfvi_results = {
-            'fsfvi_score': system_fsfvi['fsfvi_value'],
-            'vulnerability_percent': system_fsfvi['fsfvi_value'] * 100,
-            'risk_level': system_fsfvi['risk_level'],
-            'financing_efficiency_percent': (1 - system_fsfvi['fsfvi_value']) * 100
-        }
-        
-        # Financial Context for SystemVulnerabilityOverview
-        total_budget = session_data.get('total_budget', 0)
-        financial_context = {
-            'total_budget_millions': total_budget / 1e6 if total_budget > 0 else 0,
-            'budget_efficiency': 'high' if system_fsfvi['fsfvi_value'] < 0.1 else 'medium' if system_fsfvi['fsfvi_value'] < 0.2 else 'low',
-            'optimization_potential': optimization_preview['optimization_priority'] if optimization_preview else 'medium',
-            'intervention_urgency': system_fsfvi.get('government_insights', {}).get('intervention_urgency', 'medium')
-        }
-        
-        # System Analysis for SystemVulnerabilityOverview
-        system_analysis = {
-            'fsfvi_score': system_fsfvi['fsfvi_value'],
-            'risk_level': system_fsfvi['risk_level'],
-            'total_allocation_millions': total_budget / 1e6 if total_budget > 0 else 0,
-            'component_statistics': system_fsfvi.get('component_statistics', {}),
-            'government_insights': system_fsfvi.get('government_insights', {}),
-            'critical_components': [comp['name'] for comp in system_fsfvi.get('critical_components', [])],
-            'high_priority_components': [comp['name'] for comp in system_fsfvi.get('high_risk_components', [])]
-        }
-        
-        # Mathematical Interpretation for SystemVulnerabilityOverview  
-        mathematical_interpretation = {
-            'score': system_fsfvi['fsfvi_value'],
-            'vulnerability_percent': system_fsfvi['fsfvi_value'] * 100,
-            'interpretation': f"System shows {system_fsfvi['risk_level']} vulnerability with {(system_fsfvi['fsfvi_value'] * 100):.2f}% financing inefficiency",
-            'performance_category': 'excellent' if system_fsfvi['fsfvi_value'] < 0.05 else 'good' if system_fsfvi['fsfvi_value'] < 0.15 else 'fair' if system_fsfvi['fsfvi_value'] < 0.30 else 'poor'
-        }
-        
-        # Executive Summary for SystemVulnerabilityOverview
-        executive_summary = {
-            'overall_assessment': f"Food system shows {system_fsfvi['risk_level']} vulnerability requiring {'immediate' if len(system_fsfvi.get('critical_components', [])) > 0 else 'strategic'} intervention",
-            'key_metrics': {
-                'fsfvi_score': f"{system_fsfvi['fsfvi_value']:.6f}",
-                'financing_efficiency': f"{((1 - system_fsfvi['fsfvi_value']) * 100):.1f}%",
-                'critical_components': len(system_fsfvi.get('critical_components', [])),
-                'total_budget': f"${total_budget / 1e6:.1f}M" if total_budget > 0 else "N/A"
-            },
-            'immediate_actions_required': len(system_fsfvi.get('critical_components', [])) > 0,
-            'system_stability': system_fsfvi.get('government_insights', {}).get('system_stability', 'unknown')
-        }
         
         # Enhanced component vulnerabilities structure for ComponentVulnerabilityDetails
         enhanced_component_vulnerabilities = {
@@ -1140,29 +1103,44 @@ class FSFVIAnalysisService:
         }
         
         return {
-            # Original structure
+            # Core analysis results - Single source of truth
             'distribution_analysis': distribution_analysis,
             'performance_gaps': performance_gaps,
             'component_vulnerabilities': component_vulnerabilities,
-            'system_fsfvi': system_fsfvi,
+            'system_fsfvi': system_fsfvi,  # Complete results from fsfvi_core
             'optimization_preview': optimization_preview,
+            
+            # Enhanced component vulnerabilities structure for ComponentVulnerabilityDetails
+            'enhanced_component_vulnerabilities': enhanced_component_vulnerabilities,
+            
+            # Analysis metadata - Consistent with ComponentVulnerabilityDetails expectations
+            'analysis_metadata': {
+                'total_components': len(components),
+                'total_budget_millions': total_budget,  # Already in millions
+                'method_used': method,
+                'scenario': scenario,
+                'timestamp': datetime.now().isoformat(),
+                'advanced_weighting_used': ADVANCED_WEIGHTING_AVAILABLE and method != 'financial',
+                'sensitivity_estimation_method': FSFVI_CONFIG.sensitivity_estimation_method
+            },
+            
+            # Top-level metadata for backward compatibility
             'method': method,
             'scenario': scenario,
             'timestamp': datetime.now().isoformat(),
-            
-            # Enhanced structures for specific components
-            'fsfvi_results': fsfvi_results,
-            'financial_context': financial_context,
-            'system_analysis': system_analysis,
-            'mathematical_interpretation': mathematical_interpretation,
-            'executive_summary': executive_summary,
-            'enhanced_component_vulnerabilities': enhanced_component_vulnerabilities,
-            
-            # Additional metadata
             'country': session_data.get('country_name', 'Unknown'),
             'session_id': session_data.get('session_id'),
             'total_budget': total_budget,
-            'analysis_complete': True
+            'analysis_complete': True,
+            
+            # Flow documentation for transparency
+            'calculation_flow_summary': {
+                'step_1': 'Distribution analysis completed',
+                'step_2': f'Performance gaps calculated for {len(components)} components',
+                'step_3': f'Component vulnerabilities calculated using {method} weighting',
+                'step_4': f'System FSFVI aggregated: {system_fsfvi.get("fsfvi_value", 0):.6f}',
+                'step_5': f'Optimization preview generated' if optimization_preview else 'Optimization preview skipped'
+            }
         }
     
     def generate_comprehensive_report(
@@ -1208,39 +1186,189 @@ class FSFVIAnalysisService:
         components: List[Dict[str, Any]], 
         total_budget: float
     ) -> Dict[str, Any]:
-        """Analyze current budget distribution across components"""
-        component_allocations = {}
+        """
+        Enhanced budget distribution analysis with FSFVI insights
         
+        Provides comprehensive analysis including:
+        - Allocation efficiency assessment
+        - FSFVI-informed optimization potential
+        - Risk-weighted resource distribution
+        - Comparative performance metrics
+        - Actionable reallocation recommendations
+        """
+        from fsfvi_core import calculate_performance_gap, calculate_vulnerability, determine_priority_level
+        from config import get_component_performance_preference
+        import numpy as np
+        
+        component_allocations = {}
+        allocation_efficiency = {}
+        risk_distribution = {}
+        allocations = []
+        
+        # Enhanced component analysis with FSFVI insights
         for comp in components:
+            allocation = comp['financial_allocation']
+            allocations.append(allocation)
+            
+            # Calculate FSFVI metrics for insights
+            prefer_higher = get_component_performance_preference(comp['component_type'])
+            performance_gap = calculate_performance_gap(
+                comp['observed_value'], comp['benchmark_value'], prefer_higher
+            )
+            vulnerability = calculate_vulnerability(
+                performance_gap, allocation, comp.get('sensitivity_parameter', 0.001)
+            )
+            priority = determine_priority_level(vulnerability, allocation, comp.get('weight', 1/6), total_budget)
+            
+            # Calculate efficiency metrics
+            performance_efficiency = (comp['observed_value'] / comp['benchmark_value']) if comp['benchmark_value'] > 0 else 1.0
+            if not prefer_higher:
+                performance_efficiency = (comp['benchmark_value'] / comp['observed_value']) if comp['observed_value'] > 0 else 1.0
+            
+            allocation_efficiency_score = performance_efficiency / (allocation / total_budget) if total_budget > 0 else 0
+            cost_effectiveness = (1 - vulnerability) / (allocation / 100) if allocation > 0 else 0  # Per $100M
+            
+            # Theoretical optimal allocation based on FSFVI
+            if performance_gap > 0 and comp.get('sensitivity_parameter', 0) > 0:
+                # Theoretical allocation for 50% vulnerability reduction
+                target_vulnerability = vulnerability * 0.5
+                if target_vulnerability > 0:
+                    optimal_multiplier = (performance_gap / target_vulnerability - 1) / comp.get('sensitivity_parameter', 0.001)
+                    theoretical_optimal = max(allocation * 0.5, min(allocation * 2.0, optimal_multiplier))
+                else:
+                    theoretical_optimal = allocation
+            else:
+                theoretical_optimal = allocation
+            
             component_allocations[comp['component_type']] = {
                 'component_name': comp['component_name'],
-                'current_allocation_usd_millions': comp['financial_allocation'],
-                'percentage_of_total': (comp['financial_allocation'] / total_budget) * 100 if total_budget > 0 else 0,
-                'sensitivity_parameter': comp.get('sensitivity_parameter', 0.0)
+                'current_allocation_usd_millions': allocation,
+                'percentage_of_total': (allocation / total_budget) * 100 if total_budget > 0 else 0,
+                'sensitivity_parameter': comp.get('sensitivity_parameter', 0.0),
+                
+                # Enhanced FSFVI insights
+                'performance_metrics': {
+                    'observed_value': comp['observed_value'],
+                    'benchmark_value': comp['benchmark_value'],
+                    'performance_gap_percent': performance_gap * 100,
+                    'performance_efficiency': performance_efficiency,
+                    'prefer_higher': prefer_higher
+                },
+                'vulnerability_analysis': {
+                    'vulnerability_score': vulnerability,
+                    'priority_level': priority,
+                    'risk_category': 'Critical' if vulnerability > 0.7 else 'High' if vulnerability > 0.5 else 'Medium' if vulnerability > 0.3 else 'Low'
+                },
+                'efficiency_analysis': {
+                    'allocation_efficiency_score': allocation_efficiency_score,
+                    'cost_effectiveness_per_100m': cost_effectiveness,
+                    'theoretical_optimal_allocation': theoretical_optimal,
+                    'optimization_potential_percent': ((theoretical_optimal - allocation) / allocation * 100) if allocation > 0 else 0
+                },
+                'strategic_insights': {
+                    'funding_adequacy': 'Underfunded' if vulnerability > 0.5 else 'Adequate' if vulnerability < 0.3 else 'Monitored',
+                    'requires_attention': priority in ['critical', 'high'],
+                    'efficiency_rating': 'High' if allocation_efficiency_score > 2.0 else 'Medium' if allocation_efficiency_score > 1.0 else 'Low'
+                }
             }
+            
+            allocation_efficiency[comp['component_type']] = allocation_efficiency_score
+            risk_distribution[comp['component_type']] = vulnerability
         
-        # Calculate concentration metrics
-        allocations = [comp['financial_allocation'] for comp in components]
+        # Enhanced concentration analysis
         allocations.sort(reverse=True)
+        total_nonzero = sum(1 for a in allocations if a > 0)
         
-        largest_share = (allocations[0] / total_budget) * 100 if total_budget > 0 else 0
-        
-        if largest_share > 50:
-            concentration_level = "High"
-        elif largest_share > 30:
-            concentration_level = "Moderate"
+        # Calculate Herfindahl-Hirschman Index for concentration
+        if total_budget > 0:
+            shares = [a / total_budget for a in allocations]
+            hhi = sum(share ** 2 for share in shares)
+            
+            if hhi > 0.25:
+                concentration_level = "High Risk"
+                concentration_concern = "Excessive concentration may increase systemic risk"
+            elif hhi > 0.15:
+                concentration_level = "Moderate"
+                concentration_concern = "Balanced but monitor largest allocations"
+            else:
+                concentration_level = "Well Distributed"
+                concentration_concern = "Good diversification across components"
         else:
-            concentration_level = "Low"
+            hhi = 0
+            concentration_level = "Unknown"
+            concentration_concern = "Unable to assess - no budget data"
+        
+        # Risk-weighted distribution analysis
+        total_risk_weighted_budget = sum(
+            comp['financial_allocation'] * risk_distribution.get(comp['component_type'], 0)
+            for comp in components
+        )
+        risk_concentration = total_risk_weighted_budget / total_budget if total_budget > 0 else 0
+        
+        # Efficiency distribution analysis
+        efficiency_values = list(allocation_efficiency.values())
+        avg_efficiency = np.mean(efficiency_values) if efficiency_values else 0
+        efficiency_std = np.std(efficiency_values) if len(efficiency_values) > 1 else 0
+        
+        # Generate distribution insights and recommendations
+        insights = self._generate_distribution_insights(
+            component_allocations, allocation_efficiency, risk_distribution, 
+            total_budget, hhi, risk_concentration
+        )
         
         return {
             'total_budget_usd_millions': total_budget,
             'budget_utilization_percent': 100.0,
             'component_allocations': component_allocations,
+            
+            # Enhanced concentration analysis
             'concentration_analysis': {
                 'concentration_level': concentration_level,
-                'largest_component': max(components, key=lambda x: x['financial_allocation'])['component_name'],
-                'largest_share_percent': largest_share,
-                'top_2_share_percent': ((allocations[0] + allocations[1]) / total_budget) * 100 if len(allocations) > 1 and total_budget > 0 else 0
+                'herfindahl_index': hhi,
+                'concentration_concern': concentration_concern,
+                'largest_component': max(components, key=lambda x: x['financial_allocation'])['component_name'] if components else 'N/A',
+                'largest_share_percent': (allocations[0] / total_budget) * 100 if allocations and total_budget > 0 else 0,
+                'top_2_share_percent': ((allocations[0] + allocations[1]) / total_budget) * 100 if len(allocations) > 1 and total_budget > 0 else 0,
+                'diversification_score': 1 - hhi,  # Higher is better
+                'optimal_diversification': total_nonzero >= 4 and hhi < 0.25
+            },
+            
+            # Risk analysis
+            'risk_analysis': {
+                'risk_weighted_budget_percent': risk_concentration * 100,
+                'high_risk_allocation_percent': sum(
+                    (comp['financial_allocation'] / total_budget) * 100 
+                    for comp in components 
+                    if risk_distribution.get(comp['component_type'], 0) > 0.5
+                ) if total_budget > 0 else 0,
+                'risk_distribution_balance': 'Balanced' if risk_concentration < 0.3 else 'Concentrated' if risk_concentration > 0.5 else 'Moderate',
+                'critical_components_count': sum(1 for comp in components if risk_distribution.get(comp['component_type'], 0) > 0.7)
+            },
+            
+            # Efficiency analysis
+            'efficiency_analysis': {
+                'average_efficiency_score': avg_efficiency,
+                'efficiency_variation': efficiency_std,
+                'most_efficient_component': max(allocation_efficiency.keys(), key=allocation_efficiency.get) if allocation_efficiency else 'N/A',
+                'least_efficient_component': min(allocation_efficiency.keys(), key=allocation_efficiency.get) if allocation_efficiency else 'N/A',
+                'efficiency_balance': 'Well Balanced' if efficiency_std < 0.5 else 'Highly Variable',
+                'total_optimization_potential_percent': sum(
+                    abs(details['efficiency_analysis']['optimization_potential_percent'])
+                    for details in component_allocations.values()
+                ) / len(component_allocations) if component_allocations else 0
+            },
+            
+            # Strategic insights and recommendations
+            'strategic_insights': insights,
+            
+            # Mathematical context
+            'mathematical_context': {
+                'analysis_framework': 'FSFVI-informed budget distribution analysis',
+                'efficiency_formula': 'Efficiency = Performance / (Allocation Share)',
+                'risk_weighting': 'Risk Weight = Component Vulnerability Score',
+                'optimization_basis': 'υᵢ(fᵢ) = δᵢ · 1/(1 + αᵢfᵢ) for optimal allocation',
+                'concentration_measure': 'Herfindahl-Hirschman Index (HHI)',
+                'validation_status': 'FSFVI mathematical framework applied'
             }
         }
     
@@ -1674,50 +1802,7 @@ class FSFVIAnalysisService:
             )
         }
     
-    def _analyze_current_distribution(self, components: List[Dict[str, Any]], total_budget: float) -> Dict[str, Any]:
-        """Analyze current budget distribution across components"""
-        
-        distribution = {}
-        total_allocated = sum(comp.get('financial_allocation', 0) for comp in components)
-        
-        for comp in components:
-            allocation = comp.get('financial_allocation', 0)
-            percentage = (allocation / total_allocated) * 100 if total_allocated > 0 else 0
-            
-            distribution[comp.get('component_type', f'unknown_{len(distribution)}')] = {
-                'component_name': comp.get('component_name', 'Unknown Component'),
-                'current_allocation_usd_millions': allocation,
-                'percentage_of_total': percentage,
-                'projects_count': 1,  # This would be actual project count in real implementation
-                'allocation_per_project_avg': allocation  # Would be allocation/projects_count
-            }
-        
-        # Handle empty components list
-        if not distribution:
-            return {
-                'total_budget_usd_millions': total_budget,
-                'total_allocated_usd_millions': 0,
-                'budget_utilization_percent': 0,
-                'component_allocations': {},
-                'largest_allocation': None,
-                'smallest_allocation': None,
-                'allocation_concentration': {
-                    'herfindahl_index': 0,
-                    'concentration_level': 'N/A',
-                    'largest_share_percent': 0,
-                    'top_2_share_percent': 0
-                }
-            }
-        
-        return {
-            'total_budget_usd_millions': total_budget,
-            'total_allocated_usd_millions': total_allocated,
-            'budget_utilization_percent': (total_allocated / total_budget) * 100 if total_budget > 0 else 0,
-            'component_allocations': distribution,
-            'largest_allocation': max(distribution.keys(), key=lambda x: distribution[x]['current_allocation_usd_millions']),
-            'smallest_allocation': min(distribution.keys(), key=lambda x: distribution[x]['current_allocation_usd_millions']),
-            'allocation_concentration': self._calculate_allocation_concentration(distribution)
-        }
+
     
     def _detailed_component_analysis(
         self, 
@@ -2018,6 +2103,87 @@ class FSFVIAnalysisService:
             'medium_term_18_36_months': medium_term
         }
     
+    def _generate_distribution_insights(
+        self,
+        component_allocations: Dict[str, Any],
+        allocation_efficiency: Dict[str, float],
+        risk_distribution: Dict[str, float],
+        total_budget: float,
+        hhi: float,
+        risk_concentration: float
+    ) -> Dict[str, Any]:
+        """Generate strategic insights and recommendations for budget distribution"""
+        
+        insights = {
+            'key_findings': [],
+            'efficiency_insights': [],
+            'risk_insights': [],
+            'recommendations': [],
+            'optimization_opportunities': []
+        }
+        
+        # Efficiency insights
+        if allocation_efficiency:
+            most_efficient = max(allocation_efficiency.keys(), key=allocation_efficiency.get)
+            least_efficient = min(allocation_efficiency.keys(), key=allocation_efficiency.get)
+            avg_efficiency = sum(allocation_efficiency.values()) / len(allocation_efficiency)
+            
+            insights['efficiency_insights'] = [
+                f"Most efficient component: {most_efficient.replace('_', ' ').title()} (Score: {allocation_efficiency[most_efficient]:.2f})",
+                f"Least efficient component: {least_efficient.replace('_', ' ').title()} (Score: {allocation_efficiency[least_efficient]:.2f})",
+                f"Average efficiency score: {avg_efficiency:.2f}",
+                f"Efficiency range: {max(allocation_efficiency.values()) - min(allocation_efficiency.values()):.2f}"
+            ]
+        
+        # Risk insights
+        high_risk_components = [comp for comp, risk in risk_distribution.items() if risk > 0.5]
+        critical_components = [comp for comp, risk in risk_distribution.items() if risk > 0.7]
+        
+        insights['risk_insights'] = [
+            f"High-risk components: {len(high_risk_components)}/{len(risk_distribution)}",
+            f"Critical components requiring immediate attention: {len(critical_components)}",
+            f"Risk-weighted budget concentration: {risk_concentration * 100:.1f}%",
+            f"Overall risk distribution: {'Balanced' if risk_concentration < 0.3 else 'Concentrated'}"
+        ]
+        
+        # Key findings
+        insights['key_findings'] = [
+            f"Budget concentration (HHI): {hhi:.3f} ({'High' if hhi > 0.25 else 'Moderate' if hhi > 0.15 else 'Low'} concentration)",
+            f"Total budget: ${total_budget:.1f}M across {len(component_allocations)} components",
+            f"Components needing attention: {len([c for c in component_allocations.values() if c['strategic_insights']['requires_attention']])}",
+            f"Average allocation efficiency: {avg_efficiency:.2f}" if allocation_efficiency else "Efficiency data incomplete"
+        ]
+        
+        # Recommendations based on analysis
+        recommendations = []
+        
+        if hhi > 0.25:
+            recommendations.append("Reduce concentration risk by diversifying allocations across components")
+        
+        if len(critical_components) > 0:
+            recommendations.append(f"Immediate intervention needed for {len(critical_components)} critical component(s)")
+        
+        if allocation_efficiency and max(allocation_efficiency.values()) / min(allocation_efficiency.values()) > 3:
+            recommendations.append("Large efficiency gaps detected - consider reallocation from low to high-efficiency components")
+        
+        if risk_concentration > 0.5:
+            recommendations.append("High risk concentration - strengthen vulnerable components or diversify investments")
+        
+        # Add optimization opportunities
+        optimization_opportunities = []
+        for comp_type, details in component_allocations.items():
+            opt_potential = details['efficiency_analysis']['optimization_potential_percent']
+            if abs(opt_potential) > 15:  # Significant optimization potential
+                direction = "increase" if opt_potential > 0 else "decrease"
+                optimization_opportunities.append(
+                    f"{details['component_name']}: {direction} allocation by {abs(opt_potential):.1f}%"
+                )
+        
+        insights['recommendations'] = recommendations[:5]  # Top 5 recommendations
+        insights['optimization_opportunities'] = optimization_opportunities[:3]  # Top 3 opportunities
+        
+        return insights
+
     def _generate_kenya_executive_summary(
         self, 
         current_distribution: Dict[str, Any],

@@ -94,6 +94,16 @@ export const dataAPI = {
     const response = await api.get(`/api/sessions/${sessionId}/`);
     return response.data;
   },
+
+  clearSession: async (sessionId: string) => {
+    const response = await api.delete(`/sessions/${sessionId}/delete/`);
+    return response.data;
+  },
+
+  listUserSessions: async () => {
+    const response = await api.get('/api/sessions/');
+    return response.data;
+  },
 };
 
 // FastAPI Analysis endpoints - DEDICATED + COMPREHENSIVE API

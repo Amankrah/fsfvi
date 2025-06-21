@@ -113,6 +113,14 @@ export const Dashboard: React.FC = () => {
     console.log('Analysis started with session ID:', sessionId);
   };
 
+  const handleSessionDeleted = (sessionId: string) => {
+    // Reload dashboard data after session deletion
+    if (user) {
+      dataAPI.getDashboard().then(setDashboardData).catch(console.error);
+    }
+    console.log('Session deleted:', sessionId);
+  };
+
   if (isLoading || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -229,7 +237,7 @@ export const Dashboard: React.FC = () => {
               <CardContent>
                 <div className="flex space-x-4">
                   <Button 
-                    onClick={() => router.push(`/analysis/${dashboardData.component_distribution.session_id}`)}
+                    onClick={() => router.push(`/analysis/${dashboardData.component_distribution.session_id}/performance-gaps`)}
                     className="flex items-center"
                   >
                     <TrendingUp className="w-4 h-4 mr-2" />
@@ -269,7 +277,10 @@ export const Dashboard: React.FC = () => {
             </Button>
           </div>
           
-          <SessionsList sessions={dashboardData?.recent_sessions || []} />
+          <SessionsList 
+            sessions={dashboardData?.recent_sessions || []} 
+            onSessionDeleted={handleSessionDeleted}
+          />
         </div>
 
         {/* System Status */}
