@@ -2246,3 +2246,42 @@ INFO 2025-06-21 01:55:05,956 basehttp 17792 5128 "GET /auth/profile/ HTTP/1.1" 2
 INFO 2025-06-21 01:55:08,032 basehttp 17792 1336 "GET /auth/profile/ HTTP/1.1" 200 150
 INFO 2025-06-21 01:55:08,039 django_integration 14240 15608 Django Integration: Retrieved 6 components, total budget: $2908.5M
 INFO 2025-06-21 01:55:08,041 django_integration 14240 15416 Django Integration: Retrieved 6 components, total budget: $2908.5M
+INFO 2025-06-21 01:55:58,681 validators 15680 12712 AHP matrix consistency validated: CR = 0.002
+INFO 2025-06-21 01:55:58,683 validators 15680 12712 Dependency matrix validation completed successfully
+INFO 2025-06-21 01:55:58,684 advanced_weighting 15680 12712 Dynamic Weighting System initialized
+INFO 2025-06-21 01:55:58,685 fsfvi_service 15680 12712 FSFVI Calculation Service initialized - Advanced Weighting Available: True
+INFO 2025-06-21 01:55:58,685 fsfvi_service 15680 12712 Advanced weighting system loaded successfully
+INFO 2025-06-21 01:55:58,685 fsfvi_service 15680 12712 FSFVI Optimization Service initialized
+INFO 2025-06-21 01:55:58,686 validators 15680 12712 AHP matrix consistency validated: CR = 0.002
+INFO 2025-06-21 01:55:58,687 validators 15680 12712 Dependency matrix validation completed successfully
+INFO 2025-06-21 01:55:58,687 advanced_weighting 15680 12712 Dynamic Weighting System initialized
+INFO 2025-06-21 01:55:58,688 fsfvi_service 15680 12712 FSFVI Calculation Service initialized - Advanced Weighting Available: True
+INFO 2025-06-21 01:55:58,688 fsfvi_service 15680 12712 Advanced weighting system loaded successfully
+INFO 2025-06-21 01:55:58,688 fsfvi_service 15680 12712 FSFVI Optimization Service initialized
+INFO 2025-06-21 01:55:58,688 fsfvi_service 15680 12712 FSFVI Analysis Service initialized
+INFO 2025-06-21 17:34:07,828 autoreload 5868 6508 Watching for file changes with StatReloader
+INFO 2025-06-21 17:34:45,364 validators 14144 9720 AHP matrix consistency validated: CR = 0.002
+INFO 2025-06-21 17:34:45,365 validators 14144 9720 Dependency matrix validation completed successfully
+INFO 2025-06-21 17:34:45,365 advanced_weighting 14144 9720 Dynamic Weighting System initialized
+INFO 2025-06-21 17:34:45,365 fsfvi_service 14144 9720 FSFVI Calculation Service initialized - Advanced Weighting Available: True
+INFO 2025-06-21 17:34:45,365 fsfvi_service 14144 9720 Advanced weighting system loaded successfully
+INFO 2025-06-21 17:34:45,365 fsfvi_service 14144 9720 FSFVI Optimization Service initialized
+INFO 2025-06-21 17:34:45,366 validators 14144 9720 AHP matrix consistency validated: CR = 0.002
+INFO 2025-06-21 17:34:45,366 validators 14144 9720 Dependency matrix validation completed successfully
+INFO 2025-06-21 17:34:45,367 advanced_weighting 14144 9720 Dynamic Weighting System initialized
+INFO 2025-06-21 17:34:45,367 fsfvi_service 14144 9720 FSFVI Calculation Service initialized - Advanced Weighting Available: True
+INFO 2025-06-21 17:34:45,367 fsfvi_service 14144 9720 Advanced weighting system loaded successfully
+INFO 2025-06-21 17:34:45,367 fsfvi_service 14144 9720 FSFVI Optimization Service initialized
+INFO 2025-06-21 17:34:45,368 fsfvi_service 14144 9720 FSFVI Analysis Service initialized
+INFO 2025-06-21 17:35:14,803 basehttp 5868 8616 "OPTIONS /auth/profile/ HTTP/1.1" 200 0
+INFO 2025-06-21 17:35:14,885 basehttp 5868 8616 "GET /auth/profile/ HTTP/1.1" 200 150
+INFO 2025-06-21 17:35:16,894 basehttp 5868 10848 "GET /auth/profile/ HTTP/1.1" 200 150
+INFO 2025-06-21 17:35:18,959 basehttp 5868 12808 "GET /auth/profile/ HTTP/1.1" 200 150
+INFO 2025-06-21 17:35:18,967 django_integration 14144 3388 Django Integration: Retrieved 6 components, total budget: $2908.5M
+INFO 2025-06-21 17:35:18,971 django_integration 14144 8264 Django Integration: Retrieved 6 components, total budget: $2908.5M
+INFO 2025-06-21 21:08:03,312 basehttp 5868 6112 "OPTIONS /auth/profile/ HTTP/1.1" 200 0
+INFO 2025-06-21 21:08:03,352 basehttp 5868 6112 "GET /auth/profile/ HTTP/1.1" 200 150
+INFO 2025-06-21 21:08:05,400 basehttp 5868 4436 "GET /auth/profile/ HTTP/1.1" 200 150
+INFO 2025-06-21 21:08:07,492 basehttp 5868 16764 "GET /auth/profile/ HTTP/1.1" 200 150
+INFO 2025-06-21 21:08:07,507 django_integration 14144 3388 Django Integration: Retrieved 6 components, total budget: $2908.5M
+INFO 2025-06-21 21:08:07,509 django_integration 14144 8264 Django Integration: Retrieved 6 components, total budget: $2908.5M

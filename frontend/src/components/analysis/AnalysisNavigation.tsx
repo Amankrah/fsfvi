@@ -33,6 +33,13 @@ export const AnalysisNavigation: React.FC<AnalysisNavigationProps> = ({
 
   const navigationItems = [
     {
+      id: 'budget-distribution',
+      title: 'Budget Distribution',
+      icon: <BarChart3 className="w-4 h-4" />,
+      path: `/analysis/${sessionId}/budget-distribution`,
+      description: 'Analyze budget allocation patterns and concentration'
+    },
+    {
       id: 'performance-gaps',
       title: 'Performance Gaps',
       icon: <TrendingDown className="w-4 h-4" />,
@@ -52,13 +59,6 @@ export const AnalysisNavigation: React.FC<AnalysisNavigationProps> = ({
       icon: <Target className="w-4 h-4" />,
       path: `/analysis/${sessionId}/system-vulnerability`,
       description: 'Overall system vulnerability index and recommendations'
-    },
-    {
-      id: 'budget-distribution',
-      title: 'Budget Distribution',
-      icon: <BarChart3 className="w-4 h-4" />,
-      path: `/analysis/${sessionId}/budget-distribution`,
-      description: 'Analyze budget allocation patterns and concentration'
     }
   ];
 

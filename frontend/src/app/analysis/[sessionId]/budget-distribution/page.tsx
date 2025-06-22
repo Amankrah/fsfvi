@@ -12,8 +12,7 @@ import {
   AlertTriangle,
   DollarSign,
   TrendingUp,
-  Loader2,
-  Target
+  Loader2
 } from 'lucide-react';
 import { analysisAPI } from '@/lib/api';
 import { AnalysisNavigation } from '@/components/analysis/AnalysisNavigation';
@@ -243,71 +242,81 @@ export default function BudgetDistributionPage() {
       <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
         <div className="space-y-6">
           {/* Enhanced Overview Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <Card>
-              <CardContent className="p-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <Card className="border-0 shadow-lg hover:shadow-xl transition-shadow duration-200 bg-gradient-to-br from-blue-50 to-blue-100">
+              <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-gray-600">Total Budget</p>
-                    <p className="text-2xl font-bold text-blue-600">
+                    <p className="text-sm font-semibold text-blue-700 uppercase tracking-wide">Total Budget</p>
+                    <p className="text-3xl font-bold text-blue-800 mt-2">
                       ${(data.distribution_analysis?.total_budget_usd_millions || 0).toFixed(1)}M
                     </p>
-                    <p className="text-xs text-gray-500 mt-1">
-                      Across {components.length} component{components.length !== 1 ? 's' : ''}
+                    <p className="text-sm text-blue-600 mt-2 font-medium">
+                      {components.length} Component{components.length !== 1 ? 's' : ''}
                     </p>
                   </div>
-                  <DollarSign className="w-8 h-8 text-blue-500" />
+                  <div className="bg-blue-200 p-3 rounded-full">
+                    <DollarSign className="w-8 h-8 text-blue-700" />
+                  </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card>
-              <CardContent className="p-4">
+            <Card className="border-0 shadow-lg hover:shadow-xl transition-shadow duration-200 bg-gradient-to-br from-green-50 to-green-100">
+              <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-gray-600">Efficiency Score</p>
-                    <p className="text-2xl font-bold text-green-600">
+                    <p className="text-sm font-semibold text-green-700 uppercase tracking-wide">Efficiency Score</p>
+                    <p className="text-3xl font-bold text-green-800 mt-2">
                       {(data.distribution_analysis?.efficiency_analysis?.average_efficiency_score || 0).toFixed(2)}
                     </p>
-                    <p className="text-xs text-gray-500 mt-1">
+                    <p className="text-sm text-green-600 mt-2 font-medium">
                       {data.distribution_analysis?.efficiency_analysis?.efficiency_balance || 'Unknown'}
                     </p>
                   </div>
-                  <TrendingUp className="w-8 h-8 text-green-500" />
+                  <div className="bg-green-200 p-3 rounded-full">
+                    <TrendingUp className="w-8 h-8 text-green-700" />
+                  </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card>
-              <CardContent className="p-4">
+            <Card className="border-0 shadow-lg hover:shadow-xl transition-shadow duration-200 bg-gradient-to-br from-orange-50 to-orange-100">
+              <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-gray-600">Risk Level</p>
-                    <p className="text-2xl font-bold text-orange-600">
+                    <p className="text-sm font-semibold text-orange-700 uppercase tracking-wide">Risk Level</p>
+                    <p className="text-3xl font-bold text-orange-800 mt-2">
                       {(data.distribution_analysis?.risk_analysis?.risk_weighted_budget_percent || 0).toFixed(1)}%
                     </p>
-                    <p className="text-xs text-gray-500 mt-1">
+                    <p className="text-sm text-orange-600 mt-2 font-medium">
                       {data.distribution_analysis?.risk_analysis?.risk_distribution_balance || 'Unknown'}
                     </p>
                   </div>
-                  <AlertTriangle className="w-8 h-8 text-orange-500" />
+                  <div className="bg-orange-200 p-3 rounded-full">
+                    <AlertTriangle className="w-8 h-8 text-orange-700" />
+                  </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card>
-              <CardContent className="p-4">
+            <Card className="border-0 shadow-lg hover:shadow-xl transition-shadow duration-200 bg-gradient-to-br from-purple-50 to-purple-100">
+              <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-gray-600">Concentration</p>
-                    <Badge className={getConcentrationColor(data.distribution_analysis.concentration_analysis?.concentration_level || 'unknown')}>
-                      {data.distribution_analysis.concentration_analysis?.concentration_level || 'Unknown'}
-                    </Badge>
-                    <p className="text-xs text-gray-500 mt-1">
+                    <p className="text-sm font-semibold text-purple-700 uppercase tracking-wide">Concentration</p>
+                    <div className="mt-2">
+                      <Badge className={`${getConcentrationColor(data.distribution_analysis.concentration_analysis?.concentration_level || 'unknown')} text-base px-3 py-1`}>
+                        {data.distribution_analysis.concentration_analysis?.concentration_level || 'Unknown'}
+                      </Badge>
+                    </div>
+                    <p className="text-sm text-purple-600 mt-2 font-medium">
                       HHI: {(data.distribution_analysis.concentration_analysis?.herfindahl_index || 0).toFixed(3)}
                     </p>
                   </div>
-                  <BarChart3 className="w-8 h-8 text-purple-500" />
+                  <div className="bg-purple-200 p-3 rounded-full">
+                    <BarChart3 className="w-8 h-8 text-purple-700" />
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -315,117 +324,90 @@ export default function BudgetDistributionPage() {
 
           {/* Strategic Insights */}
           {data.distribution_analysis?.strategic_insights && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <TrendingUp className="w-5 h-5 mr-2" />
-                    Key Findings & Efficiency Insights
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div>
-                      <h4 className="font-medium text-gray-900 mb-2">Key Findings</h4>
-                      <ul className="space-y-1">
-                        {data.distribution_analysis.strategic_insights.key_findings?.map((finding, index) => (
-                          <li key={index} className="text-sm text-gray-600 flex items-start">
-                            <span className="w-2 h-2 bg-blue-500 rounded-full mt-2 mr-2 flex-shrink-0"></span>
-                            {finding}
-                          </li>
-                        ))}
-                      </ul>
+            <Card className="shadow-lg border-0 bg-gradient-to-br from-blue-50 to-indigo-50">
+              <CardHeader className="pb-4">
+                <CardTitle className="flex items-center text-xl text-gray-800">
+                  <TrendingUp className="w-6 h-6 mr-3 text-blue-600" />
+                  Key Findings & Efficiency Insights
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-6">
+                  <div>
+                    <h4 className="font-semibold text-gray-900 mb-3 text-lg">Key Findings</h4>
+                    <div className="space-y-2">
+                      {data.distribution_analysis.strategic_insights.key_findings?.map((finding, index) => (
+                        <div key={index} className="flex items-start p-3 bg-white rounded-lg border border-blue-100 shadow-sm">
+                          <span className="w-3 h-3 bg-blue-500 rounded-full mt-1.5 mr-3 flex-shrink-0"></span>
+                          <p className="text-sm text-gray-700 leading-relaxed">{finding}</p>
+                        </div>
+                      ))}
                     </div>
-                    
-                    {data.distribution_analysis.strategic_insights.efficiency_insights?.length > 0 && (
-                      <div>
-                        <h4 className="font-medium text-gray-900 mb-2">Efficiency Analysis</h4>
-                        <ul className="space-y-1">
-                          {data.distribution_analysis.strategic_insights.efficiency_insights.map((insight, index) => (
-                            <li key={index} className="text-sm text-gray-600 flex items-start">
-                              <span className="w-2 h-2 bg-green-500 rounded-full mt-2 mr-2 flex-shrink-0"></span>
-                              {insight}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
                   </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <AlertTriangle className="w-5 h-5 mr-2" />
-                    Risk Analysis & Recommendations
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
+                  
+                  {data.distribution_analysis.strategic_insights.efficiency_insights?.length > 0 && (
                     <div>
-                      <h4 className="font-medium text-gray-900 mb-2">Risk Insights</h4>
-                      <ul className="space-y-1">
-                        {data.distribution_analysis.strategic_insights.risk_insights?.map((insight, index) => (
-                          <li key={index} className="text-sm text-gray-600 flex items-start">
-                            <span className="w-2 h-2 bg-orange-500 rounded-full mt-2 mr-2 flex-shrink-0"></span>
-                            {insight}
-                          </li>
+                      <h4 className="font-semibold text-gray-900 mb-3 text-lg">Efficiency Analysis</h4>
+                      <div className="space-y-2">
+                        {data.distribution_analysis.strategic_insights.efficiency_insights.map((insight, index) => (
+                          <div key={index} className="flex items-start p-3 bg-white rounded-lg border border-green-100 shadow-sm">
+                            <span className="w-3 h-3 bg-green-500 rounded-full mt-1.5 mr-3 flex-shrink-0"></span>
+                            <p className="text-sm text-gray-700 leading-relaxed">{insight}</p>
+                          </div>
                         ))}
-                      </ul>
-                    </div>
-                    
-                    {data.distribution_analysis.strategic_insights.recommendations?.length > 0 && (
-                      <div>
-                        <h4 className="font-medium text-gray-900 mb-2">Recommendations</h4>
-                        <ul className="space-y-1">
-                          {data.distribution_analysis.strategic_insights.recommendations.map((rec, index) => (
-                            <li key={index} className="text-sm text-blue-700 flex items-start">
-                              <span className="w-2 h-2 bg-blue-700 rounded-full mt-2 mr-2 flex-shrink-0"></span>
-                              {rec}
-                            </li>
-                          ))}
-                        </ul>
                       </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
           )}
 
           {/* Concentration Analysis */}
           {data.distribution_analysis.concentration_analysis && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <AlertTriangle className="w-5 h-5 mr-2" />
-                  Concentration Analysis
+            <Card className="shadow-lg border-0 bg-gradient-to-br from-purple-50 to-pink-50">
+              <CardHeader className="pb-4">
+                <CardTitle className="flex items-center text-xl text-gray-800">
+                  <BarChart3 className="w-6 h-6 mr-3 text-purple-600" />
+                  Portfolio Concentration Analysis
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div className="text-center p-4 bg-blue-50 rounded-lg">
-                    <div className="text-2xl font-bold text-blue-600">
+                  <div className="text-center p-6 bg-white rounded-xl shadow-md border border-blue-100 hover:shadow-lg transition-shadow duration-200">
+                    <div className="text-3xl font-bold text-blue-700 mb-2">
                       {(data.distribution_analysis.concentration_analysis?.largest_share_percent || 0).toFixed(1)}%
                     </div>
-                    <div className="text-sm text-blue-700">Largest Component Share</div>
-                    <div className="text-xs text-gray-600 mt-1">
+                    <div className="text-sm font-semibold text-blue-800 uppercase tracking-wide mb-1">
+                      Largest Component
+                    </div>
+                    <div className="text-sm text-gray-600 bg-blue-50 px-3 py-1 rounded-full">
                       {data.distribution_analysis.concentration_analysis?.largest_component || 'N/A'}
                     </div>
                   </div>
-                  <div className="text-center p-4 bg-yellow-50 rounded-lg">
-                    <div className="text-2xl font-bold text-yellow-600">
+                  <div className="text-center p-6 bg-white rounded-xl shadow-md border border-yellow-100 hover:shadow-lg transition-shadow duration-200">
+                    <div className="text-3xl font-bold text-yellow-700 mb-2">
                       {(data.distribution_analysis.concentration_analysis?.top_2_share_percent || 0).toFixed(1)}%
                     </div>
-                    <div className="text-sm text-yellow-700">Top 2 Components Share</div>
-                    <div className="text-xs text-gray-600 mt-1">Combined allocation</div>
+                    <div className="text-sm font-semibold text-yellow-800 uppercase tracking-wide mb-1">
+                      Top 2 Components
+                    </div>
+                    <div className="text-sm text-gray-600 bg-yellow-50 px-3 py-1 rounded-full">
+                      Combined Share
+                    </div>
                   </div>
-                  <div className="text-center p-4 bg-orange-50 rounded-lg">
-                    <Badge className={`${getConcentrationColor(data.distribution_analysis.concentration_analysis.concentration_level)} text-lg py-2 px-4`}>
-                      {data.distribution_analysis.concentration_analysis.concentration_level} Concentration
-                    </Badge>
-                    <div className="text-xs text-gray-600 mt-2">Risk Assessment</div>
+                  <div className="text-center p-6 bg-white rounded-xl shadow-md hover:shadow-lg transition-shadow duration-200">
+                    <div className="mb-3">
+                      <Badge className={`${getConcentrationColor(data.distribution_analysis.concentration_analysis.concentration_level)} text-lg py-2 px-4 font-semibold`}>
+                        {data.distribution_analysis.concentration_analysis.concentration_level}
+                      </Badge>
+                    </div>
+                    <div className="text-sm font-semibold text-gray-800 uppercase tracking-wide mb-1">
+                      Risk Level
+                    </div>
+                    <div className="text-sm text-gray-600 bg-gray-50 px-3 py-1 rounded-full">
+                      Portfolio Balance
+                    </div>
                   </div>
                 </div>
               </CardContent>
@@ -433,28 +415,40 @@ export default function BudgetDistributionPage() {
           )}
 
           {/* Enhanced Component Allocations */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <BarChart3 className="w-5 h-5 mr-2" />
-                Component Budget Allocations with FSFVI Analysis
+          <Card className="shadow-lg border-0">
+            <CardHeader className="bg-gradient-to-r from-slate-50 to-gray-50 border-b border-gray-100 rounded-t-lg">
+              <CardTitle className="flex items-center text-xl text-gray-800">
+                <BarChart3 className="w-6 h-6 mr-3 text-slate-600" />
+                Component Budget Allocations
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-6">
-                {sortedComponents.map(([componentType, allocation]) => (
-                  <div key={componentType} className="border rounded-lg p-6 bg-gray-50">
+            <CardContent className="p-0">
+              <div className="space-y-1">
+                {sortedComponents.map(([componentType, allocation], index) => (
+                  <div key={componentType} className={`border-b border-gray-100 p-6 hover:bg-gray-50 transition-colors duration-200 ${index === 0 ? 'bg-blue-50/30' : ''}`}>
                     {/* Header */}
-                    <div className="flex items-center justify-between mb-4">
-                      <div>
-                        <h3 className="text-lg font-semibold text-gray-900">{allocation.component_name}</h3>
-                        <p className="text-sm text-gray-600">{componentType.replace('_', ' ').toUpperCase()}</p>
+                    <div className="flex items-center justify-between mb-6">
+                      <div className="flex items-center space-x-4">
+                        <div className={`w-12 h-12 rounded-full flex items-center justify-center font-bold text-white ${
+                          index === 0 ? 'bg-blue-600' : 
+                          index === 1 ? 'bg-green-600' : 
+                          index === 2 ? 'bg-purple-600' : 
+                          'bg-gray-600'
+                        }`}>
+                          #{index + 1}
+                        </div>
+                        <div>
+                          <h3 className="text-xl font-bold text-gray-900">{allocation.component_name}</h3>
+                          <p className="text-sm text-gray-500 font-medium uppercase tracking-wide">
+                            {componentType.replace('_', ' ')}
+                          </p>
+                        </div>
                       </div>
                       <div className="text-right">
-                        <div className="text-2xl font-bold text-blue-600">
+                        <div className="text-3xl font-bold text-gray-900">
                           ${(allocation.current_allocation_usd_millions || 0).toFixed(1)}M
                         </div>
-                        <div className="text-sm text-gray-600">
+                        <div className="text-sm text-gray-600 font-medium">
                           {(allocation.percentage_of_total || 0).toFixed(1)}% of total budget
                         </div>
                       </div>
@@ -584,49 +578,15 @@ export default function BudgetDistributionPage() {
                       </div>
                     </div>
 
-                    {/* Optimization Potential */}
-                    {allocation.efficiency_analysis?.optimization_potential_percent && Math.abs(allocation.efficiency_analysis.optimization_potential_percent) > 5 && (
-                      <div className="bg-blue-50 border border-blue-200 rounded p-3">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium text-blue-900">
-                            Optimization Potential: 
-                            <span className={`ml-1 font-bold ${allocation.efficiency_analysis.optimization_potential_percent > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                              {allocation.efficiency_analysis.optimization_potential_percent > 0 ? '+' : ''}
-                              {allocation.efficiency_analysis.optimization_potential_percent.toFixed(1)}%
-                            </span>
-                          </span>
-                          <span className="text-xs text-blue-700">
-                            Theoretical optimal: ${allocation.efficiency_analysis.theoretical_optimal_allocation.toFixed(1)}M
-                          </span>
-                        </div>
-                      </div>
-                    )}
+
 
                     {/* Technical Details */}
                     <div className="mt-3 pt-3 border-t border-gray-200">
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                        <div>
-                          <span className="text-gray-600">Sensitivity (α):</span>
-                          <span className="ml-2 font-mono text-xs bg-gray-100 px-1 rounded">
-                            {(allocation.sensitivity_parameter || 0).toFixed(4)}
-                          </span>
-                        </div>
-                        <div>
-                          <span className="text-gray-600">Priority Rank:</span>
-                          <span className="ml-2 font-medium">
-                            #{sortedComponents.findIndex(([type]) => type === componentType) + 1}
-                          </span>
-                        </div>
+                      <div className="text-sm">
                         <div>
                           <span className="text-gray-600">Requires Attention:</span>
                           <span className={`ml-2 font-medium ${allocation.strategic_insights?.requires_attention ? 'text-red-600' : 'text-green-600'}`}>
                             {allocation.strategic_insights?.requires_attention ? 'Yes' : 'No'}
-                          </span>
-                        </div>
-                        <div>
-                          <span className="text-gray-600">Priority Level:</span>
-                          <span className="ml-2 font-medium text-purple-600">
-                            {allocation.vulnerability_analysis?.priority_level || 'N/A'}
                           </span>
                         </div>
                       </div>
@@ -637,81 +597,7 @@ export default function BudgetDistributionPage() {
             </CardContent>
           </Card>
 
-          {/* Optimization Opportunities */}
-          {data.distribution_analysis?.strategic_insights?.optimization_opportunities && data.distribution_analysis.strategic_insights.optimization_opportunities.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Target className="w-5 h-5 mr-2" />
-                  Optimization Opportunities
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {data.distribution_analysis.strategic_insights.optimization_opportunities.map((opportunity, index) => (
-                    <div key={index} className="flex items-start p-3 bg-blue-50 border border-blue-200 rounded">
-                      <div className="w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs font-bold mr-3 mt-0.5">
-                        {index + 1}
-                      </div>
-                      <div className="flex-1">
-                        <p className="text-sm text-blue-900">{opportunity}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
 
-          {/* Mathematical Context */}
-          {data.distribution_analysis?.mathematical_context && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <AlertTriangle className="w-5 h-5 mr-2" />
-                  Mathematical Framework & Context
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <h4 className="font-medium text-gray-900 mb-3">Analysis Framework</h4>
-                    <div className="space-y-2 text-sm">
-                      <div>
-                        <span className="font-medium text-gray-700">Framework:</span>
-                        <span className="ml-2 text-gray-600">{data.distribution_analysis.mathematical_context.analysis_framework}</span>
-                      </div>
-                      <div>
-                        <span className="font-medium text-gray-700">Efficiency Formula:</span>
-                        <span className="ml-2 font-mono text-xs bg-gray-100 px-1 rounded">{data.distribution_analysis.mathematical_context.efficiency_formula}</span>
-                      </div>
-                      <div>
-                        <span className="font-medium text-gray-700">Risk Weighting:</span>
-                        <span className="ml-2 text-gray-600">{data.distribution_analysis.mathematical_context.risk_weighting}</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div>
-                    <h4 className="font-medium text-gray-900 mb-3">Optimization Basis</h4>
-                    <div className="space-y-2 text-sm">
-                      <div>
-                        <span className="font-medium text-gray-700">Core Formula:</span>
-                        <span className="ml-2 font-mono text-xs bg-gray-100 px-1 rounded">{data.distribution_analysis.mathematical_context.optimization_basis}</span>
-                      </div>
-                      <div>
-                        <span className="font-medium text-gray-700">Concentration Measure:</span>
-                        <span className="ml-2 text-gray-600">{data.distribution_analysis.mathematical_context.concentration_measure}</span>
-                      </div>
-                      <div>
-                        <span className="font-medium text-gray-700">Validation:</span>
-                        <Badge className="ml-2 bg-green-100 text-green-800">{data.distribution_analysis.mathematical_context.validation_status}</Badge>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
         </div>
       </main>
     </div>
