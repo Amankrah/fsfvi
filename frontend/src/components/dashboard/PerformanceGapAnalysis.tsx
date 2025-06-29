@@ -216,7 +216,7 @@ export const PerformanceGapAnalysis: React.FC<PerformanceGapAnalysisProps> = ({
             Performance Gap Analysis
           </CardTitle>
           <CardDescription>
-            Calculate performance gaps to identify areas needing attention
+            Calculate performance gaps to see detailed component-level gaps
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -254,7 +254,7 @@ export const PerformanceGapAnalysis: React.FC<PerformanceGapAnalysisProps> = ({
                 Performance Gap Analysis
               </CardTitle>
               <CardDescription>
-                Performance gaps for {countryName} - δᵢ = (x̄ᵢ - xᵢ) / xᵢ when underperforming, 0 otherwise
+                Performance gaps for {countryName} - Performance gap analysis
               </CardDescription>
             </div>
             <div className="flex items-center space-x-2">
@@ -264,7 +264,7 @@ export const PerformanceGapAnalysis: React.FC<PerformanceGapAnalysisProps> = ({
                 onClick={() => setShowMathematicalDetails(!showMathematicalDetails)}
               >
                 {showMathematicalDetails ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                {showMathematicalDetails ? 'Hide' : 'Show'} Math
+                {showMathematicalDetails ? 'Hide' : 'Show'} Details
               </Button>
               {onRecalculate && (
                 <Button size="sm" onClick={onRecalculate}>
@@ -326,52 +326,37 @@ export const PerformanceGapAnalysis: React.FC<PerformanceGapAnalysisProps> = ({
             </div>
           )}
 
-          {/* Mathematical Context (Expandable) */}
+          {/* Analysis Details (Expandable) */}
           {showMathematicalDetails && (
             <Card className="mb-6 border-blue-200 bg-blue-50">
               <CardHeader>
                 <CardTitle className="text-base flex items-center">
                   <Calculator className="w-4 h-4 mr-2" />
-                  Mathematical Foundation
+                  Analysis Details
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
                   <div className="bg-white p-4 rounded-lg border">
-                    <h5 className="font-semibold text-sm mb-2">Performance Gap Formula:</h5>
-                    <code className="block bg-gray-100 p-2 rounded text-sm font-mono">
-                      {results.mathematical_context?.formula_used || 'δᵢ = |xᵢ - x̄ᵢ| / xᵢ'}
-                    </code>
+                    <h5 className="font-semibold text-sm mb-2">Performance Gap Analysis:</h5>
                     <p className="text-sm text-gray-600 mt-2">
-                      {results.mathematical_context?.formula_description || 'Performance gap as absolute deviation from benchmark normalized by observed value'}
+                      {results.mathematical_context?.formula_description || 'Performance gap analysis measures deviation from benchmark values'}
                     </p>
                   </div>
                   
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {results.mathematical_context?.variables ? (
-                      Object.entries(results.mathematical_context.variables).map(([variable, description]) => (
-                        <div key={variable} className="bg-white p-3 rounded-lg border">
-                          <div className="font-mono text-sm font-semibold text-blue-600">{variable}</div>
-                          <div className="text-xs text-gray-600 mt-1">{description}</div>
-                        </div>
-                      ))
-                    ) : (
-                      // Fallback variables if not provided
-                      <>
-                        <div className="bg-white p-3 rounded-lg border">
-                          <div className="font-mono text-sm font-semibold text-blue-600">δᵢ</div>
-                          <div className="text-xs text-gray-600 mt-1">Normalized performance gap (dimensionless, [0,1])</div>
-                        </div>
-                        <div className="bg-white p-3 rounded-lg border">
-                          <div className="font-mono text-sm font-semibold text-blue-600">xᵢ</div>
-                          <div className="text-xs text-gray-600 mt-1">Observed performance value</div>
-                        </div>
-                        <div className="bg-white p-3 rounded-lg border">
-                          <div className="font-mono text-sm font-semibold text-blue-600">x̄ᵢ</div>
-                          <div className="text-xs text-gray-600 mt-1">Benchmark performance value</div>
-                        </div>
-                      </>
-                    )}
+                    <div className="bg-white p-3 rounded-lg border">
+                      <div className="text-sm font-semibold text-blue-600">Performance Gap</div>
+                      <div className="text-xs text-gray-600 mt-1">Normalized performance gap (dimensionless, [0,1])</div>
+                    </div>
+                    <div className="bg-white p-3 rounded-lg border">
+                      <div className="text-sm font-semibold text-blue-600">Observed Value</div>
+                      <div className="text-xs text-gray-600 mt-1">Current performance measurement</div>
+                    </div>
+                    <div className="bg-white p-3 rounded-lg border">
+                      <div className="text-sm font-semibold text-blue-600">Benchmark</div>
+                      <div className="text-xs text-gray-600 mt-1">Target performance value</div>
+                    </div>
                   </div>
 
                   <div className="flex items-center justify-between text-sm">
@@ -492,7 +477,7 @@ export const PerformanceGapAnalysis: React.FC<PerformanceGapAnalysisProps> = ({
                     </Badge>
                     <div className="text-right">
                       <div className="text-sm font-semibold text-gray-900">
-                        δᵢ = {component.normalized_gap?.toFixed(4) || '0.0000'}
+                        {component.normalized_gap?.toFixed(4) || '0.0000'}
                       </div>
                       <div className="text-xs text-gray-500">Normalized Gap</div>
                     </div>
@@ -535,7 +520,7 @@ export const PerformanceGapAnalysis: React.FC<PerformanceGapAnalysisProps> = ({
                             </div>
                           )}
                           <div className="flex justify-between">
-                            <span className="text-gray-600">Normalized Gap (δᵢ):</span>
+                            <span className="text-gray-600">Normalized Gap:</span>
                             <span className="font-medium font-mono">{component.normalized_gap?.toFixed(6) || '0.000000'}</span>
                           </div>
                           <div className="flex justify-between">

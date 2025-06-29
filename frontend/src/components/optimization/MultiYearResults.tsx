@@ -479,36 +479,7 @@ export const MultiYearResults: React.FC<MultiYearResultsProps> = ({ result }) =>
         </Card>
       )}
 
-      {/* Debug Information for Budget Clarity */}
-      {process.env.NODE_ENV === 'development' && (
-        <Card className="border border-gray-300 bg-gray-50">
-          <CardHeader>
-            <CardTitle className="text-sm">Budget Calculation Debug</CardTitle>
-          </CardHeader>
-          <CardContent className="text-xs space-y-2">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p><strong>Backend Data:</strong></p>
-                <p>• total_budget_billions: {totalBudgetBillions.toFixed(6)}</p>
-                <p>• total_years: {planningYears}</p>
-                <p>• yearly_recommendations count: {Object.keys(yearlyRecommendations).length}</p>
-              </div>
-              <div>
-                <p><strong>Calculated Values:</strong></p>
-                <p>• Cumulative Budget: ${totalBudgetMillions.toFixed(1)}M</p>
-                <p>• Average per year: ${averageBudgetPerYear.toFixed(1)}M</p>
-                <p>• Starting year budget: ${currentYearBudget.toFixed(1)}M</p>
-              </div>
-            </div>
-            <div className="border-t pt-2">
-              <p><strong>Explanation:</strong></p>
-              <p>• <strong>Cumulative Budget</strong> = Total spending across all {planningYears} years</p>
-              <p>• <strong>Starting Budget</strong> = Budget for year {formatYear(planningHorizon.start_year)} only</p>
-              <p>• Backend logs show single-year budget, frontend shows multi-year totals</p>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+
     </div>
   );
 }; 

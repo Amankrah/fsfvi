@@ -261,12 +261,7 @@ export const AnalysisWorkflow: React.FC<AnalysisWorkflowProps> = ({
               </ul>
             </div>
             
-            {/* API Endpoint Info */}
-            <div className="flex justify-center">
-              <Badge className="bg-blue-100 text-blue-800 text-xs">
-                /analyze_current_distribution
-              </Badge>
-            </div>
+
 
             {/* Actions */}
             <div className="flex flex-col sm:flex-row gap-3 mt-4">
@@ -331,22 +326,20 @@ export const AnalysisWorkflow: React.FC<AnalysisWorkflowProps> = ({
               </div>
             </div>
 
-            {/* Mathematical Context Indicator */}
+            {/* Analysis Context Indicator */}
             {step.results.mathematical_context && (
               <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h5 className="text-sm font-semibold text-blue-900">Formula Used:</h5>
-                    <code className="text-xs font-mono text-blue-800">{step.results.mathematical_context.formula_used}</code>
+                    <h5 className="text-sm font-semibold text-blue-900">Analysis Method:</h5>
+                    <p className="text-xs text-blue-800">Performance gap calculation completed</p>
                   </div>
                   <div className="flex items-center space-x-2">
                     <Badge className="bg-green-100 text-green-800 text-xs">
                       <CheckCircle className="w-3 h-3 mr-1" />
                       Validated
                     </Badge>
-                    <Badge className="bg-blue-100 text-blue-800 text-xs">
-                      /calculate_performance_gaps
-                    </Badge>
+
                   </div>
                 </div>
                 <p className="text-xs text-blue-700 mt-1">{step.results.mathematical_context.formula_description}</p>
@@ -455,22 +448,20 @@ export const AnalysisWorkflow: React.FC<AnalysisWorkflowProps> = ({
               </div>
             )}
 
-            {/* Enhanced Mathematical Context Indicator */}
+            {/* Enhanced Analysis Context Indicator */}
             {step.results.mathematical_context && (
               <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
                 <div className="flex items-center justify-between mb-2">
                   <div>
-                    <h5 className="text-sm font-semibold text-blue-900">FSFVI Formula:</h5>
-                    <code className="text-xs font-mono text-blue-800 font-bold">{step.results.mathematical_context.formula_used}</code>
+                    <h5 className="text-sm font-semibold text-blue-900">FSFVI Analysis:</h5>
+                    <p className="text-xs text-blue-800">Component vulnerability assessment completed</p>
                   </div>
                   <div className="flex items-center space-x-2">
                     <Badge className="bg-green-100 text-green-800 text-xs">
                       <CheckCircle className="w-3 h-3 mr-1" />
-                      Mathematically Validated
+                      Analysis Validated
                     </Badge>
-                    <Badge className="bg-blue-100 text-blue-800 text-xs">
-                      /calculate_component_vulnerabilities
-                    </Badge>
+
                   </div>
                 </div>
                 <p className="text-xs text-blue-700">{step.results.mathematical_context.formula_description}</p>
@@ -601,23 +592,22 @@ export const AnalysisWorkflow: React.FC<AnalysisWorkflowProps> = ({
               </div>
             </div>
 
-            {/* Mathematical Formula Display */}
-                         <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
-               <div className="flex items-center justify-between mb-2">
-                 <h5 className="text-sm font-semibold text-blue-900">FSFVI Mathematical Framework:</h5>
-                 <Badge className="bg-green-100 text-green-800 text-xs">
-                   <CheckCircle className="w-3 h-3 mr-1" />
-                   Calculated
-                 </Badge>
-               </div>
-               <code className="text-xs font-mono text-blue-800 font-bold">
-                 {step.results.mathematical_interpretation?.formula_applied || 
-                  'FSFVI = Σᵢ ωᵢ·υᵢ(fᵢ) = Σᵢ ωᵢ·δᵢ·[1/(1+αᵢfᵢ)]'}
-               </code>
-               <p className="text-xs text-blue-700 mt-1">
-                 Aggregated vulnerability across {step.results.system_analysis?.component_statistics?.total_components || 'all'} food system components
-               </p>
-             </div>
+                        {/* Analysis Framework Display */}
+            <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+              <div className="flex items-center justify-between mb-2">
+                <h5 className="text-sm font-semibold text-blue-900">FSFVI Analysis Framework:</h5>
+                <Badge className="bg-green-100 text-green-800 text-xs">
+                  <CheckCircle className="w-3 h-3 mr-1" />
+                  Calculated
+                </Badge>
+              </div>
+              <p className="text-xs text-blue-800">
+                System vulnerability assessment using comprehensive analysis framework
+              </p>
+              <p className="text-xs text-blue-700 mt-1">
+                Aggregated vulnerability across {step.results.system_analysis?.component_statistics?.total_components || 'all'} food system components
+              </p>
+            </div>
 
                          {/* Executive Summary */}
              {(step.results.executive_summary || step.results.system_analysis?.government_insights) && (
@@ -653,12 +643,7 @@ export const AnalysisWorkflow: React.FC<AnalysisWorkflowProps> = ({
                </div>
              )}
 
-            {/* API Endpoint Info */}
-            <div className="flex justify-center">
-              <Badge className="bg-blue-100 text-blue-800 text-xs">
-                /calculate_system_vulnerability
-              </Badge>
-            </div>
+
 
             {/* Actions */}
             <div className="flex flex-col sm:flex-row gap-3 mt-4">
@@ -721,25 +706,23 @@ export const AnalysisWorkflow: React.FC<AnalysisWorkflowProps> = ({
               </div>
             </div>
 
-            {/* Mathematical Validation */}
+            {/* Optimization Validation */}
             <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
               <div className="flex items-center justify-between mb-2">
-                <h5 className="text-sm font-semibold text-blue-900">Mathematical Optimization:</h5>
+                <h5 className="text-sm font-semibold text-blue-900">Optimization Process:</h5>
                 <div className="flex items-center space-x-2">
                   <Badge className="bg-green-100 text-green-800 text-xs">
                     <CheckCircle className="w-3 h-3 mr-1" />
                     {step.results.optimization_results?.success ? 'Converged' : 'Failed'}
                   </Badge>
-                  <Badge className="bg-blue-100 text-blue-800 text-xs">
-                    /optimize_allocation
-                  </Badge>
+
                 </div>
               </div>
-              <code className="text-xs font-mono text-blue-800 font-bold">
-                Minimize FSFVI = Σᵢ ωᵢ·υᵢ(fᵢ) subject to budget constraints
-              </code>
+              <p className="text-xs text-blue-800">
+                FSFVI minimization optimization with budget allocation constraints
+              </p>
               <p className="text-xs text-blue-700 mt-1">
-                {step.results.optimization_results?.solver || 'Mathematical gradient descent'} with prioritization constraint: fᵢ ≥ fⱼ if δᵢ ≥ δⱼ
+                {step.results.optimization_results?.solver || 'Advanced optimization algorithm'} with prioritization constraints for optimal resource allocation
               </p>
             </div>
 
