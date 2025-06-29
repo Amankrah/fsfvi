@@ -329,7 +329,8 @@ export default function Home() {
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 <Link href="/auth/register">
-                  <Button size="lg" className="bg-white text-blue-600 hover:text-blue-600 px-8">
+                  <Button size="lg" className="bg-white text-blue-600 hover:text-blue-600 px-8
+                  ">
                     Start Country Analysis
                     <ArrowRight className="w-5 h-5 ml-2" />
                   </Button>
