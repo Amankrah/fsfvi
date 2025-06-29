@@ -36,12 +36,20 @@ class Scenario(Enum):
 
 
 class ComponentType(Enum):
-    """Standard component types based on 3FS methodology"""
+    """
+    Standard component types based on validated food systems frameworks
+    
+    Framework Validation:
+    - Strong alignment with 3FS (Tracking Financial Flows to Food Systems) methodology
+    - Incorporates FSCI (Food Systems Countdown Initiative) governance insights
+    - Addresses critical gaps in existing frameworks
+    - Balances analytical utility with practical implementation
+    """
     AGRICULTURAL_DEVELOPMENT = "agricultural_development"
-    INFRASTRUCTURE = "infrastructure"
+    INFRASTRUCTURE = "infrastructure" 
     NUTRITION_HEALTH = "nutrition_health"
     CLIMATE_NATURAL_RESOURCES = "climate_natural_resources"
-    SOCIAL_ASSISTANCE = "social_assistance"
+    SOCIAL_PROTECTION_EQUITY = "social_protection_equity"  # Enhanced from social_assistance
     GOVERNANCE_INSTITUTIONS = "governance_institutions"
 
 
@@ -299,59 +307,78 @@ COMPONENT_PERFORMANCE_PREFERENCES = {
     ComponentType.INFRASTRUCTURE: True,               # Higher capacity/coverage is better  
     ComponentType.NUTRITION_HEALTH: True,            # Better health outcomes (higher is better)
     ComponentType.CLIMATE_NATURAL_RESOURCES: True,   # Better environmental performance (higher is better)
-    ComponentType.SOCIAL_ASSISTANCE: True,           # Higher coverage/effectiveness is better
+    ComponentType.SOCIAL_PROTECTION_EQUITY: True,    # Higher coverage/effectiveness is better
     ComponentType.GOVERNANCE_INSTITUTIONS: True      # Better governance metrics (higher is better)
 }
 
-# Component type mappings for normalization
+# Component type mappings for normalization based on validated frameworks
 COMPONENT_TYPE_MAPPINGS = {
     ComponentType.AGRICULTURAL_DEVELOPMENT: [
-        # Core agricultural terms
-        'agriculture', 'agri', 'farming', 'crop', 'livestock', 'fisheries', 'production systems',
-        'input supply', 'production systems and input supply', 'food production', 'farming systems',
-        # Food system terms that relate to agricultural development
-        'food availability', 'food security', 'food systems', 'rural development'
+        # Core agricultural production (3FS Framework alignment)
+        'agriculture', 'agri', 'farming', 'crop', 'livestock', 'fisheries', 'aquaculture',
+        'production systems', 'input supply', 'agricultural research', 'extension services',
+        'value chain', 'value chain strengthening', 'productivity enhancement',
+        # Food production and availability
+        'food production', 'farming systems', 'food availability', 'agricultural yields',
+        'rural development', 'agricultural development', 'smallholder', 'farmer support'
     ],
     ComponentType.INFRASTRUCTURE: [
-        # Physical infrastructure
-        'transport', 'logistics', 'roads', 'storage', 'distribution', 'irrigation', 'warehouse',
-        'post-harvest', 'supply chain', 'connectivity', 'telecommunications', 'energy',
-        # Food system infrastructure
-        'storage and distribution', 'processing and packaging', 'processing', 'packaging',
-        'market infrastructure', 'cold chain'
+        # Physical infrastructure (3FS Infrastructure for Food Systems)
+        'transport', 'logistics', 'roads', 'rural roads', 'storage', 'storage facilities',
+        'distribution', 'irrigation', 'irrigation systems', 'warehouse', 'post-harvest',
+        'supply chain', 'market infrastructure', 'cold chain', 'processing facilities',
+        # Digital and energy infrastructure
+        'connectivity', 'telecommunications', 'digital connectivity', 'energy',
+        'processing and packaging', 'processing', 'packaging', 'storage and distribution'
     ],
     ComponentType.NUTRITION_HEALTH: [
-        # Health and nutrition
-        'nutrition', 'health', 'medical', 'healthcare', 'nutritional', 'feeding', 'malnutrition',
-        'dietary', 'micronutrient', 'vitamin', 'mineral', 'food safety', 'safety',
-        # Nutrition programs
-        'school feeding', 'maternal nutrition', 'child nutrition', 'public health'
+        # Nutrition-specific interventions (3FS & FSCI alignment)
+        'nutrition', 'health', 'medical', 'healthcare', 'nutritional', 'feeding',
+        'malnutrition', 'dietary', 'micronutrient', 'vitamin', 'mineral', 'supplementation',
+        'nutrition education', 'fortification', 'food safety', 'safety',
+        # Nutrition programs and health outcomes
+        'school feeding', 'maternal nutrition', 'child nutrition', 'public health',
+        'food environments', 'food security', 'diet quality', 'nutrition-specific'
     ],
     ComponentType.CLIMATE_NATURAL_RESOURCES: [
-        # Climate and environment
-        'climate', 'environment', 'water', 'natural_resources', 'environmental', 'forestry',
-        'biodiversity', 'ecosystem', 'sustainability', 'conservation', 'renewable',
-        # Climate adaptation/resilience
-        'resilience', 'adaptation', 'mitigation', 'disaster risk', 'early warning',
-        'climate change', 'natural resource management'
+        # Climate-smart agriculture and adaptation (3FS & FSCI Environment theme)
+        'climate', 'climate-smart agriculture', 'climate change', 'adaptation', 'mitigation',
+        'resilience', 'climate resilience', 'disaster risk', 'early warning',
+        # Natural resource management (FSCI Environmental indicators)
+        'environment', 'environmental', 'water', 'water resources', 'natural_resources',
+        'natural resource management', 'forestry', 'biodiversity', 'ecosystem',
+        'ecosystem restoration', 'sustainability', 'conservation', 'renewable energy',
+        # Environmental outcomes
+        'emissions', 'greenhouse gas', 'land use', 'pollution', 'biosphere integrity'
     ],
-    ComponentType.SOCIAL_ASSISTANCE: [
-        # Social protection
-        'social', 'safety_nets', 'assistance', 'welfare', 'protection', 'transfer',
-        'cash transfer', 'social safety', 'poverty reduction', 'vulnerability',
-        # Livelihood and equity
-        'livelihoods', 'poverty', 'equity', 'livelihoods, poverty, and equity',
-        'income', 'employment', 'gender', 'youth', 'women empowerment',
-        # Demographics
-        'population', 'migration', 'population growth and migration', 'demographic'
+    ComponentType.SOCIAL_PROTECTION_EQUITY: [
+        # Enhanced social protection (FSCI Livelihoods, Poverty, and Equity theme)
+        'social protection', 'social', 'safety_nets', 'assistance', 'welfare', 'protection',
+        'cash transfer', 'social safety', 'emergency food assistance', 'school feeding',
+        # Equity and rights dimensions (FSCI enhancement)
+        'poverty reduction', 'poverty', 'equity', 'livelihoods', 'rights', 'human rights',
+        'income', 'employment', 'gender', 'gender equity', 'youth', 'women empowerment',
+        'social inclusion', 'vulnerable populations', 'marginalized communities',
+        # Demographics and migration
+        'population', 'migration', 'population growth and migration', 'demographic',
+        'livelihoods, poverty, and equity'
     ],
     ComponentType.GOVERNANCE_INSTITUTIONS: [
-        # Governance and institutions
-        'governance', 'institutions', 'policy', 'regulation', 'institutional', 'legal',
-        'coordination', 'management', 'administration', 'monitoring', 'evaluation',
+        # Policy and regulatory frameworks (FSCI Governance theme)
+        'governance', 'institutions', 'policy', 'regulation', 'regulatory frameworks',
+        'institutional', 'legal', 'policy frameworks', 'food environment policies',
+        'right to food', 'legal recognition', 'regulatory standards',
+        # Institutional capacity and coordination (3FS gap addressed)
+        'coordination', 'cross-sectoral coordination', 'management', 'administration',
+        'institutional capacity', 'implementation capacity', 'administrative resources',
+        'multi-stakeholder platforms', 'inter-sectoral coordination',
+        # Democratic participation and accountability (FSCI indicators)
+        'monitoring', 'evaluation', 'transparency', 'accountability', 'civil society',
+        'participation', 'multi-stakeholder governance', 'access to information',
         # Market and economic governance
         'retail', 'marketing', 'retail and marketing', 'market', 'trade', 'economic',
-        'financial services', 'credit', 'insurance', 'market development'
+        'financial services', 'credit', 'insurance', 'market development',
+        'corporate concentration', 'power dynamics', 'political stability'
     ]
 }
 
@@ -360,11 +387,22 @@ def get_component_types() -> List[str]:
     return [ct.value for ct in ComponentType]
 
 def normalize_component_type(component_type: str) -> str:
-    """Normalize component type to standard categories"""
+    """
+    Normalize component type to standard categories based on validated frameworks
+    
+    Handles legacy mappings and provides enhanced categorization based on:
+    - 3FS (Tracking Financial Flows to Food Systems) methodology
+    - FSCI (Food Systems Countdown Initiative) governance insights
+    - Academic literature on food systems frameworks
+    """
     if not component_type:
         return ComponentType.AGRICULTURAL_DEVELOPMENT.value
     
     component_type = component_type.lower().strip()
+    
+    # Handle legacy social_assistance mapping to social_protection_equity
+    if component_type in ['social_assistance', 'social assistance']:
+        return ComponentType.SOCIAL_PROTECTION_EQUITY.value
     
     # Direct match
     try:
@@ -372,7 +410,7 @@ def normalize_component_type(component_type: str) -> str:
     except ValueError:
         pass
     
-    # Fuzzy match using mappings
+    # Fuzzy match using enhanced mappings
     for standard_type, aliases in COMPONENT_TYPE_MAPPINGS.items():
         if component_type in aliases or any(alias in component_type for alias in aliases):
             return standard_type.value

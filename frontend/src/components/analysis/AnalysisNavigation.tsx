@@ -10,12 +10,14 @@ import {
   Shield,
   Target,
   BarChart3,
-  Home
+  Home,
+  BookOpen,
+  Zap
 } from 'lucide-react';
 
 interface AnalysisNavigationProps {
   sessionId: string;
-  currentPage: 'performance-gaps' | 'component-vulnerabilities' | 'system-vulnerability' | 'budget-distribution';
+  currentPage: 'components-overview' | 'budget-distribution' | 'performance-gaps' | 'component-vulnerabilities' | 'system-vulnerability' | 'allocation-optimization';
   sessionInfo?: {
     country?: string;
     fiscal_year?: number;
@@ -32,6 +34,13 @@ export const AnalysisNavigation: React.FC<AnalysisNavigationProps> = ({
   const router = useRouter();
 
   const navigationItems = [
+    {
+      id: 'components-overview',
+      title: 'Framework Components',
+      icon: <BookOpen className="w-4 h-4" />,
+      path: `/analysis/${sessionId}/components-overview`,
+      description: 'Understand the 6 validated food system components'
+    },
     {
       id: 'budget-distribution',
       title: 'Budget Distribution',
@@ -59,6 +68,13 @@ export const AnalysisNavigation: React.FC<AnalysisNavigationProps> = ({
       icon: <Target className="w-4 h-4" />,
       path: `/analysis/${sessionId}/system-vulnerability`,
       description: 'Overall system vulnerability index and recommendations'
+    },
+    {
+      id: 'allocation-optimization',
+      title: 'Allocation Optimization',
+      icon: <Zap className="w-4 h-4" />,
+      path: `/analysis/${sessionId}/allocation-optimization`,
+      description: 'Optimize budget allocation to minimize system vulnerability'
     }
   ];
 
@@ -97,7 +113,7 @@ export const AnalysisNavigation: React.FC<AnalysisNavigationProps> = ({
                 <p className="text-sm text-gray-600 mt-1">
                   {sessionInfo ? (
                     <>
-                      {sessionInfo.country} • FY {sessionInfo.fiscal_year || 2024} • 
+                      {sessionInfo.country} • FY {sessionInfo.fiscal_year || new Date().getFullYear()} • 
                       {sessionInfo.total_budget && sessionInfo.currency ? 
                         ` $${(sessionInfo.total_budget / 1e6).toFixed(1)}M ${sessionInfo.currency}` : 
                         ` Session: ${sessionId.substring(0, 8)}...`
@@ -147,20 +163,9 @@ export const AnalysisNavigation: React.FC<AnalysisNavigationProps> = ({
       {/* Breadcrumb Context */}
       <div className="bg-gray-50 border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2">
-          <div className="flex items-center justify-between">
-            <p className="text-xs text-gray-600">
-              {navigationItems.find(item => item.id === currentPage)?.description}
-            </p>
-            <div className="flex items-center space-x-2 text-xs text-gray-500">
-              <span>Mathematical Framework:</span>
-              <code className="bg-white px-2 py-1 rounded text-xs font-mono">
-                {currentPage === 'performance-gaps' ? 'δᵢ = |xᵢ-x̄ᵢ|/xᵢ' :
-                 currentPage === 'component-vulnerabilities' ? 'υᵢ(fᵢ) = δᵢ·1/(1+αᵢfᵢ)' :
-                 currentPage === 'system-vulnerability' ? 'FSFVI = Σᵢ ωᵢ·υᵢ(fᵢ)' :
-                 'Budget Analysis'}
-              </code>
-            </div>
-          </div>
+          <p className="text-xs text-gray-600">
+            {navigationItems.find(item => item.id === currentPage)?.description}
+          </p>
         </div>
       </div>
     </div>

@@ -344,7 +344,7 @@ export const NewAnalysisDialog: React.FC<NewAnalysisDialogProps> = ({
                 <Input
                   id="fiscal_year"
                   type="number"
-                  placeholder="2024"
+                  placeholder={new Date().getFullYear().toString()}
                   value={formData.fiscal_year}
                   onChange={(e) => handleInputChange('fiscal_year', parseInt(e.target.value) || 0)}
                   required

@@ -1,16 +1,17 @@
 'use client';
 
-import React, { useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import React from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { 
   FileText, 
   CheckCircle, 
   Globe,
-  PieChart,
   DollarSign,
-  ChevronDown,
-  ChevronUp
+  TrendingUp,
+  Target,
+  Activity,
+  BarChart3,
+  Users
 } from 'lucide-react';
 
 interface User {
@@ -68,166 +69,162 @@ interface DashboardStatsProps {
 
 export const DashboardStats: React.FC<DashboardStatsProps> = ({ data }) => {
   const stats = data?.statistics;
-  const [isComponentDistributionExpanded, setIsComponentDistributionExpanded] = useState(false);
 
   if (!stats) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        {[...Array(4)].map((_, i) => (
-          <Card key={i} className="animate-pulse">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <div className="h-4 bg-gray-200 rounded w-20"></div>
-              <div className="h-4 w-4 bg-gray-200 rounded"></div>
-            </CardHeader>
-            <CardContent>
-              <div className="h-8 bg-gray-200 rounded w-16 mb-1"></div>
-              <div className="h-3 bg-gray-200 rounded w-24"></div>
-            </CardContent>
-          </Card>
-        ))}
+      <div className="space-y-8">
+        {/* Loading State */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {[...Array(4)].map((_, i) => (
+            <Card key={i} className="animate-pulse border-0 shadow-lg">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <div className="h-4 bg-gray-200 rounded w-20"></div>
+                <div className="h-6 w-6 bg-gray-200 rounded"></div>
+              </CardHeader>
+              <CardContent>
+                <div className="h-8 bg-gray-200 rounded w-16 mb-2"></div>
+                <div className="h-3 bg-gray-200 rounded w-24"></div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+        
+        {/* Additional Loading Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {[...Array(1)].map((_, i) => (
+            <Card key={i} className="animate-pulse border-0 shadow-lg">
+              <CardHeader className="space-y-2">
+                <div className="h-5 bg-gray-200 rounded w-32"></div>
+                <div className="h-3 bg-gray-200 rounded w-48"></div>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="h-4 bg-gray-200 rounded"></div>
+                <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+                <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       </div>
     );
   }
 
+  // Calculate additional metrics for user-specific data
+  const completionRate = stats.total_sessions > 0 ? (stats.completed_sessions / stats.total_sessions * 100) : 0;
+
   return (
-    <div className="space-y-6">
-      {/* Main Statistics Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {/* Total Sessions */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Sessions</CardTitle>
-            <FileText className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.total_sessions}</div>
-            <p className="text-xs text-muted-foreground">
-              {stats.active_sessions} active, {stats.completed_sessions} completed
-            </p>
-          </CardContent>
-        </Card>
-
-        {/* Total Analyses */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Analyses Complete</CardTitle>
-            <CheckCircle className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.total_analyses}</div>
-            <p className="text-xs text-muted-foreground">
-              Vulnerability assessments completed
-            </p>
-          </CardContent>
-        </Card>
-
-        {/* Total Budget Analyzed */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Budget Analyzed</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              ${stats.total_budget_analyzed ? stats.total_budget_analyzed.toFixed(1) : '0'}M
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Average budget per analysis
-            </p>
-          </CardContent>
-        </Card>
-
-        {/* Countries Analyzed */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Countries</CardTitle>
-            <Globe className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.total_countries}</div>
-            <p className="text-xs text-muted-foreground">
-              Unique countries analyzed
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Component Distribution */}
-      {data.component_distribution && data.component_distribution.components && data.component_distribution.components.length > 0 && (
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="flex items-center">
-                  <PieChart className="w-5 h-5 mr-2" />
-                  Component Distribution
-                </CardTitle>
-                <CardDescription>
-                  Budget allocation across food system components for {data.component_distribution.country_name}
-                </CardDescription>
+    <div className="space-y-8">
+      {/* Main Statistics Grid - Enhanced */}
+      <div>
+        <div className="mb-6">
+          <h3 className="text-2xl font-bold text-gray-900">Your Analysis Overview</h3>
+          <p className="text-gray-600 mt-1">Your personal FSFVI analysis sessions and statistics</p>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {/* Total Sessions */}
+          <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 bg-gradient-to-br from-blue-50 to-blue-100">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-semibold text-blue-700 uppercase tracking-wide">Your Sessions</CardTitle>
+              <div className="p-2 bg-blue-200 rounded-lg">
+                <FileText className="h-5 w-5 text-blue-700" />
               </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setIsComponentDistributionExpanded(!isComponentDistributionExpanded)}
-              >
-                {isComponentDistributionExpanded ? (
-                  <ChevronUp className="w-4 h-4" />
-                ) : (
-                  <ChevronDown className="w-4 h-4" />
-                )}
-              </Button>
-            </div>
-          </CardHeader>
-          {isComponentDistributionExpanded && (
+            </CardHeader>
             <CardContent>
-              <div className="mb-4 p-3 bg-blue-50 rounded-lg">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-blue-900">Total Budget</span>
-                  <div className="flex items-center">
-                    <DollarSign className="w-4 h-4 text-blue-600 mr-1" />
-                    <span className="text-lg font-bold text-blue-900">
-                      ${data.component_distribution.total_budget.toFixed(1)}M
-                    </span>
-                  </div>
+              <div className="text-3xl font-bold text-blue-800">{stats.total_sessions}</div>
+              <div className="flex items-center mt-2 space-x-4">
+                <div className="flex items-center space-x-1">
+                  <Activity className="h-3 w-3 text-green-600" />
+                  <span className="text-xs text-green-600 font-medium">{stats.active_sessions} active</span>
+                </div>
+                <div className="flex items-center space-x-1">
+                  <CheckCircle className="h-3 w-3 text-blue-600" />
+                  <span className="text-xs text-blue-600 font-medium">{stats.completed_sessions} completed</span>
                 </div>
               </div>
-              
-              <div className="space-y-3">
-                {data.component_distribution.components.map((component) => (
-                  <div key={component.component_type} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <div className="flex-1">
-                      <div className="mb-1">
-                        <span className="font-medium text-gray-900">
-                          {component.component_name}
-                        </span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm text-gray-600">
-                          ${component.allocation.toFixed(1)}M ({component.percentage}%)
-                        </span>
-                        {component.vulnerability && (
-                          <span className="text-xs text-gray-500">
-                            Vulnerability: {(component.vulnerability * 100).toFixed(1)}%
-                          </span>
-                        )}
-                      </div>
-                      <div className="mt-2 w-full bg-gray-200 rounded-full h-2">
-                        <div 
-                          className="bg-blue-600 h-2 rounded-full"
-                          style={{ width: `${component.percentage}%` }}
-                        ></div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+              <div className="mt-3 w-full bg-blue-200 rounded-full h-2">
+                <div 
+                  className="bg-blue-600 h-2 rounded-full transition-all duration-500" 
+                  style={{ width: `${completionRate}%` }}
+                ></div>
+              </div>
+              <p className="text-xs text-blue-600 mt-1 font-medium">
+                {completionRate.toFixed(1)}% completion rate
+              </p>
+            </CardContent>
+          </Card>
+
+          {/* Total Analyses */}
+          <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 bg-gradient-to-br from-green-50 to-green-100">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-semibold text-green-700 uppercase tracking-wide">Analyses Complete</CardTitle>
+              <div className="p-2 bg-green-200 rounded-lg">
+                <Target className="h-5 w-5 text-green-700" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-green-800">{stats.total_analyses}</div>
+              <p className="text-sm text-green-600 mt-2">
+                Vulnerability assessments completed
+              </p>
+              <div className="flex items-center mt-3 space-x-2">
+                <TrendingUp className="h-4 w-4 text-green-600" />
+                <span className="text-sm font-medium text-green-700">
+                  Analysis dashboard ready
+                </span>
               </div>
             </CardContent>
-          )}
-        </Card>
-      )}
+          </Card>
 
-      
+          {/* Budget Analyzed */}
+          <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 bg-gradient-to-br from-purple-50 to-purple-100">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-semibold text-purple-700 uppercase tracking-wide">Budget Analyzed</CardTitle>
+              <div className="p-2 bg-purple-200 rounded-lg">
+                <DollarSign className="h-5 w-5 text-purple-700" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-purple-800">
+                ${stats.total_budget_analyzed ? stats.total_budget_analyzed.toFixed(1) : '0'}M
+              </div>
+              <p className="text-sm text-purple-600 mt-2">
+                Total budget under analysis
+              </p>
+              <div className="flex items-center mt-3 space-x-2">
+                <BarChart3 className="h-4 w-4 text-purple-600" />
+                <span className="text-sm font-medium text-purple-700">
+                  Multi-session analysis
+                </span>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Countries Analyzed */}
+          <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 bg-gradient-to-br from-orange-50 to-orange-100">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-semibold text-orange-700 uppercase tracking-wide">Countries</CardTitle>
+              <div className="p-2 bg-orange-200 rounded-lg">
+                <Globe className="h-5 w-5 text-orange-700" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-orange-800">{stats.total_countries}</div>
+              <p className="text-sm text-orange-600 mt-2">
+                Countries with your analysis
+              </p>
+              <div className="flex items-center mt-3 space-x-2">
+                <Users className="h-4 w-4 text-orange-600" />
+                <span className="text-sm font-medium text-orange-700">
+                  Multi-country insights
+                </span>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+
     </div>
   );
 }; 

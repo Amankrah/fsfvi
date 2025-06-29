@@ -280,6 +280,7 @@ async def optimize_allocation(
         optimized_budget = current_budget * (1 + budget_change_percent / 100)
         
         # Delegate ALL optimization logic to service layer
+        logger.info(f"Starting optimization: budget=${optimized_budget:.1f}M, method={method}, components={len(components)}")
         optimization_result = optimization_service.optimize_allocation(
             components=components,
             budget=optimized_budget,
@@ -287,6 +288,7 @@ async def optimize_allocation(
             scenario="normal_operations",
             constraints=parsed_constraints
         )
+        logger.info(f"Optimization completed: success={optimization_result.get('success', False)}, iterations={optimization_result.get('iterations', 0)}")
         
         # Save results
         await _save_optimization_results(session_id, optimization_result)
@@ -302,6 +304,370 @@ async def optimize_allocation(
     except Exception as e:
         logger.error(f"Optimization error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Optimization failed: {str(e)}")
+
+
+@app.post("/multi_year_optimization", summary="Multi-Year Budget Planning")
+async def multi_year_optimization(
+    session_id: str = Form(...),
+    budget_scenarios: str = Form(...),  # JSON string of {year: budget}
+    target_fsfvi: Optional[float] = Form(default=None),
+    target_year: Optional[int] = Form(default=None),
+    method: str = Form(default="hybrid"),
+    scenario: str = Form(default="normal_operations"),
+    constraints: Optional[str] = Form(default=None),
+    current_user: dict = Depends(get_current_user)
+):
+    """Multi-year optimization for government fiscal planning"""
+    try:
+        # Get session data
+        session_data = await _get_session_data(session_id, current_user['id'])
+        components = await _get_session_components(session_id)
+        
+        # Parse inputs
+        import json
+        budget_scenarios_dict = json.loads(budget_scenarios)
+        parsed_constraints = json.loads(constraints) if constraints else {}
+        
+        # Convert year keys to integers
+        budget_scenarios_dict = {int(year): budget for year, budget in budget_scenarios_dict.items()}
+        
+        # Delegate to service layer
+        result = optimization_service.multi_year_optimization(
+            components=components,
+            budget_scenarios=budget_scenarios_dict,
+            target_fsfvi=target_fsfvi,
+            target_year=target_year,
+            method=method,
+            scenario=scenario,
+            constraints=parsed_constraints
+        )
+        
+        # Save results and update session
+        await _save_optimization_results(session_id, result)
+        await _update_session_status(session_id, current_user['id'], 'multi_year_planning_completed')
+        
+        return {
+            "session_id": session_id,
+            "country": session_data['country_name'],
+            "multi_year_plan": result,
+            "analysis_type": "multi_year_optimization"
+        }
+        
+    except Exception as e:
+        logger.error(f"Multi-year optimization error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Multi-year optimization failed: {str(e)}")
+
+
+@app.post("/scenario_comparison", summary="Crisis Scenario Comparison")
+async def scenario_comparison(
+    session_id: str = Form(...),
+    scenarios: str = Form(...),  # JSON array of scenario names
+    methods: str = Form(...),    # JSON array of method names
+    budget: Optional[float] = Form(default=None),
+    constraints: Optional[str] = Form(default=None),
+    current_user: dict = Depends(get_current_user)
+):
+    """Compare optimization across different crisis scenarios"""
+    try:
+        # Get session data
+        session_data = await _get_session_data(session_id, current_user['id'])
+        components = await _get_session_components(session_id)
+        
+        # Parse inputs
+        import json
+        scenarios_list = json.loads(scenarios)
+        methods_list = json.loads(methods)
+        parsed_constraints = json.loads(constraints) if constraints else {}
+        
+        # Use session budget if not provided
+        if budget is None:
+            budget = session_data.get('total_budget', 0)
+        
+        # Delegate to service layer
+        result = optimization_service.scenario_comparison_optimization(
+            components=components,
+            budget=budget,
+            scenarios=scenarios_list,
+            methods=methods_list,
+            constraints=parsed_constraints
+        )
+        
+        # Save results and update session
+        await _save_optimization_results(session_id, result)
+        await _update_session_status(session_id, current_user['id'], 'scenario_comparison_completed')
+        
+        return {
+            "session_id": session_id,
+            "country": session_data['country_name'],
+            "scenario_comparison": result,
+            "analysis_type": "scenario_comparison"
+        }
+        
+    except Exception as e:
+        logger.error(f"Scenario comparison error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Scenario comparison failed: {str(e)}")
+
+
+@app.post("/budget_sensitivity_analysis", summary="Budget Impact Analysis")
+async def budget_sensitivity_analysis(
+    session_id: str = Form(...),
+    base_budget: float = Form(...),
+    budget_variations: str = Form(...),  # JSON array of variation percentages
+    method: str = Form(default="hybrid"),
+    scenario: str = Form(default="normal_operations"),
+    constraints: Optional[str] = Form(default=None),
+    current_user: dict = Depends(get_current_user)
+):
+    """Analyze marginal returns and optimal budget levels"""
+    try:
+        # Get session data
+        session_data = await _get_session_data(session_id, current_user['id'])
+        components = await _get_session_components(session_id)
+        
+        # Parse inputs
+        import json
+        variations_list = json.loads(budget_variations)
+        parsed_constraints = json.loads(constraints) if constraints else {}
+        
+        # Delegate to service layer
+        result = optimization_service.budget_sensitivity_analysis(
+            components=components,
+            base_budget=base_budget,
+            budget_variations=variations_list,
+            method=method,
+            scenario=scenario,
+            constraints=parsed_constraints
+        )
+        
+        # Save results and update session
+        await _save_optimization_results(session_id, result)
+        await _update_session_status(session_id, current_user['id'], 'budget_sensitivity_completed')
+        
+        return {
+            "session_id": session_id,
+            "country": session_data['country_name'],
+            "budget_sensitivity": result,
+            "analysis_type": "budget_sensitivity_analysis"
+        }
+        
+    except Exception as e:
+        logger.error(f"Budget sensitivity analysis error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Budget sensitivity analysis failed: {str(e)}")
+
+
+@app.post("/interactive_optimization", summary="Interactive Allocation Adjustment")
+async def interactive_optimization(
+    session_id: str = Form(...),
+    user_adjustments: str = Form(...),  # JSON object of component adjustments
+    method: str = Form(default="hybrid"),
+    scenario: str = Form(default="normal_operations"),
+    constraints: Optional[str] = Form(default=None),
+    current_user: dict = Depends(get_current_user)
+):
+    """Interactive optimization with user allocation adjustments"""
+    try:
+        # Get session data
+        session_data = await _get_session_data(session_id, current_user['id'])
+        components = await _get_session_components(session_id)
+        
+        # Parse inputs
+        import json
+        adjustments_dict = json.loads(user_adjustments)
+        parsed_constraints = json.loads(constraints) if constraints else {}
+        
+        # Delegate to service layer using proper interactive optimization method
+        result = optimization_service.interactive_optimization(
+            components=components,
+            user_adjustments=adjustments_dict,
+            method=method,
+            scenario=scenario,
+            constraints=parsed_constraints
+        )
+        
+        # Save results and update session
+        await _save_optimization_results(session_id, result)
+        await _update_session_status(session_id, current_user['id'], 'interactive_optimization_completed')
+        
+        return {
+            "session_id": session_id,
+            "country": session_data['country_name'],
+            "interactive_optimization": result,
+            "analysis_type": "interactive_optimization"
+        }
+        
+    except Exception as e:
+        logger.error(f"Interactive optimization error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Interactive optimization failed: {str(e)}")
+
+
+@app.post("/target_based_optimization", summary="Target Achievement Optimization")
+async def target_based_optimization(
+    session_id: str = Form(...),
+    target_fsfvi: float = Form(...),
+    target_year: int = Form(...),
+    method: str = Form(default="hybrid"),
+    scenario: str = Form(default="normal_operations"),
+    constraints: Optional[str] = Form(default=None),
+    current_user: dict = Depends(get_current_user)
+):
+    """Optimize to achieve specific FSFVI target by target year"""
+    try:
+        # Get session data
+        session_data = await _get_session_data(session_id, current_user['id'])
+        components = await _get_session_components(session_id)
+        
+        # Parse constraints
+        import json
+        parsed_constraints = json.loads(constraints) if constraints else {}
+        parsed_constraints['target_fsfvi'] = target_fsfvi
+        parsed_constraints['target_year'] = target_year
+        
+        # Use current budget as base
+        budget = session_data.get('total_budget', 0)
+        
+        # Delegate to service layer using proper target-based optimization method
+        result = optimization_service.target_based_optimization(
+            components=components,
+            budget=budget,
+            target_fsfvi=target_fsfvi,
+            target_year=target_year,
+            method=method,
+            scenario=scenario,
+            constraints=parsed_constraints
+        )
+        
+        # Save results and update session
+        await _save_optimization_results(session_id, result)
+        await _update_session_status(session_id, current_user['id'], 'target_optimization_completed')
+        
+        return {
+            "session_id": session_id,
+            "country": session_data['country_name'],
+            "target_optimization": result,
+            "analysis_type": "target_based_optimization"
+        }
+        
+    except Exception as e:
+        logger.error(f"Target-based optimization error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Target-based optimization failed: {str(e)}")
+
+
+@app.post("/crisis_resilience_assessment", summary="Crisis Resilience Assessment")
+async def crisis_resilience_assessment(
+    session_id: str = Form(...),
+    test_scenarios: Optional[str] = Form(default='["climate_shock", "financial_crisis", "pandemic_disruption", "cyber_threats"]'),
+    method: str = Form(default="hybrid"),
+    current_user: dict = Depends(get_current_user)
+):
+    """Assess food system resilience across crisis scenarios"""
+    try:
+        # Get session data
+        session_data = await _get_session_data(session_id, current_user['id'])
+        components = await _get_session_components(session_id)
+        
+        # Parse test scenarios
+        import json
+        scenarios_list = json.loads(test_scenarios)
+        
+        # Calculate baseline FSFVI
+        baseline_result = calculation_service.calculate_fsfvi(
+            components=components,
+            method=method,
+            scenario='normal_operations'
+        )
+        baseline_fsfvi = baseline_result['fsfvi_value']
+        
+        # Test resilience across scenarios
+        scenario_results = {}
+        resilience_scores = []
+        
+        for scenario in scenarios_list:
+            try:
+                scenario_result = calculation_service.calculate_fsfvi(
+                    components=components,
+                    method=method,
+                    scenario=scenario
+                )
+                
+                # Calculate impact and resilience
+                scenario_fsfvi = scenario_result['fsfvi_value']
+                impact = (scenario_fsfvi - baseline_fsfvi) / baseline_fsfvi if baseline_fsfvi > 0 else 0
+                resilience = max(0, 1 - abs(impact))  # Higher resilience = lower impact
+                
+                scenario_results[scenario] = {
+                    'fsfvi_score': scenario_fsfvi,
+                    'impact_percent': impact * 100,
+                    'resilience_score': resilience,
+                    'severity': 'high' if abs(impact) > 0.1 else 'medium' if abs(impact) > 0.05 else 'low'
+                }
+                
+                resilience_scores.append(resilience)
+                
+            except Exception as e:
+                logger.warning(f"Crisis resilience calculation failed for {scenario}: {e}")
+                scenario_results[scenario] = {'error': str(e)}
+        
+        # Overall resilience assessment
+        overall_resilience = sum(resilience_scores) / len(resilience_scores) if resilience_scores else 0.5
+        
+        result = {
+            'baseline_fsfvi': baseline_fsfvi,
+            'scenario_results': scenario_results,
+            'overall_resilience_score': overall_resilience,
+            'resilience_level': 'high' if overall_resilience > 0.7 else 'medium' if overall_resilience > 0.4 else 'low',
+            'most_vulnerable_scenario': min(scenario_results.keys(), 
+                                          key=lambda x: scenario_results[x].get('resilience_score', 0.5)
+                                          if 'error' not in scenario_results[x] else 0.5),
+            'analysis_type': 'crisis_resilience_assessment',
+            'recommendations': _generate_resilience_recommendations(overall_resilience, scenario_results)
+        }
+        
+        # Save results and update session
+        await _save_optimization_results(session_id, result)
+        await _update_session_status(session_id, current_user['id'], 'resilience_assessment_completed')
+        
+        return {
+            "session_id": session_id,
+            "country": session_data['country_name'],
+            "resilience_assessment": result,
+            "analysis_type": "crisis_resilience_assessment"
+        }
+        
+    except Exception as e:
+        logger.error(f"Crisis resilience assessment error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Crisis resilience assessment failed: {str(e)}")
+
+
+def _generate_resilience_recommendations(overall_resilience: float, scenario_results: Dict) -> List[str]:
+    """Generate resilience improvement recommendations"""
+    recommendations = []
+    
+    if overall_resilience < 0.5:
+        recommendations.extend([
+            "Critical: Strengthen food system resilience across all components",
+            "Establish emergency response protocols and contingency funding",
+            "Diversify food system infrastructure to reduce single points of failure"
+        ])
+    elif overall_resilience < 0.7:
+        recommendations.extend([
+            "Moderate resilience: Focus on most vulnerable scenarios",
+            "Develop scenario-specific response strategies",
+            "Improve early warning and monitoring systems"
+        ])
+    else:
+        recommendations.extend([
+            "Strong resilience: Maintain current preparedness levels",
+            "Consider regional leadership role in crisis response",
+            "Share best practices with neighboring food systems"
+        ])
+    
+    # Scenario-specific recommendations
+    for scenario, result in scenario_results.items():
+        if 'error' not in result and result.get('resilience_score', 0) < 0.4:
+            recommendations.append(f"Address specific vulnerabilities to {scenario.replace('_', ' ')}")
+    
+    return recommendations[:5]  # Limit to top 5 recommendations
+
 
 
 @app.post("/analyze_current_distribution", summary="Analyze Current Distribution Only")
@@ -535,7 +901,6 @@ async def get_session_status(
         raise HTTPException(status_code=500, detail=f"Session status retrieval failed: {str(e)}")
 
 
-
 @app.get("/validate_system", summary="Validate System Health")
 async def validate_system():
     """System health validation - DELEGATES TO VALIDATORS"""
@@ -608,8 +973,7 @@ async def explain_sensitivity_parameters():
                 "step_8": "Aggregate to system FSFVI = Σᵢ ωᵢ·υᵢ(fᵢ)"
             },
             "current_configuration": {
-                "primary_method": FSFVI_CONFIG.sensitivity_estimation_method,
-                "fallback_method": FSFVI_CONFIG.sensitivity_estimation_fallback,
+                "primary_method": get_weighting_methods()[0] if get_weighting_methods() else "hybrid",
                 "scaling_fixed": "Yes - parameters scaled for millions USD allocations",
                 "old_scale_detection": "Automatically detects and replaces old scale values > 0.1"
             }
@@ -621,7 +985,7 @@ async def explain_sensitivity_parameters():
                     "agricultural_development": 0.0015,
                     "infrastructure": 0.0018,
                     "nutrition_health": 0.0020,
-                    "social_assistance": 0.0025,
+                    "social_protection_equity": 0.0025,
                     "climate_natural_resources": 0.0008,
                     "governance_institutions": 0.0006
                 },
@@ -644,64 +1008,550 @@ async def explain_sensitivity_parameters():
                 "formula": "αᵢ = weighted_average(historical_αᵢ, cross_sectional_αᵢ, theoretical_αᵢ)",
                 "advantages": ["Data-driven", "Country-specific", "More accurate"],
                 "limitations": ["Requires quality historical data", "Computationally intensive"]
-            },
-            "ml": {
-                "description": "Machine learning prediction from training data",
-                "algorithm": "Gradient Boosting Regressor",
-                "features": [
-                    "Component type (one-hot encoded)",
-                    "Performance gap and ratio",
-                    "Log allocation and normalized intensity",
-                    "Country context variables"
-                ],
-                "advantages": ["Highly accurate", "Learns complex patterns"],
-                "limitations": ["Requires sklearn", "Needs large training dataset"]
-            },
-            "bayesian": {
-                "description": "Probabilistic estimation with uncertainty",
-                "process": [
-                    "Define prior distribution by component type",
-                    "Calculate likelihood from current performance",
-                    "Bayesian update: posterior ∝ prior × likelihood",
-                    "Return mean with confidence intervals"
-                ],
-                "advantages": ["Uncertainty quantification", "Principled updating"],
-                "limitations": ["Complex interpretation", "Computational overhead"]
-            },
-            "adaptive": {
-                "description": "Self-learning from performance history",
-                "algorithm": [
-                    "Exponential smoothing of historical estimates",
-                    "Trend analysis of allocation effectiveness",
-                    "Decay factors by update frequency",
-                    "Performance-based adjustments"
-                ],
-                "advantages": ["Improves over time", "Self-correcting"],
-                "limitations": ["Requires system usage history", "Gradual adaptation"]
             }
-        },
-        "redundancy_elimination": {
-            "previous_issue": "Sensitivity estimation logic was duplicated in calculate_fsfvi() and calculate_component_vulnerabilities()",
-            "solution": "Created centralized _ensure_sensitivity_parameter() method",
-            "benefits": [
-                "Single source of truth for sensitivity estimation",
-                "Consistent old-scale detection across all calculations",
-                "Easier maintenance and debugging",
-                "Unified configuration and method selection"
-            ],
-            "current_flow": "All sensitivity estimation routes through single centralized function"
         },
         "mathematical_validation": {
             "bounds_checking": "All methods enforce αᵢ ∈ [0.0005, 0.005]",
             "dimensionality": "Units verified: αᵢ [1/millions_USD] × fᵢ [millions_USD] = dimensionless",
             "vulnerability_range": "Produces υᵢ ∈ [0,1] for typical allocation ranges",
             "system_properties": "Ensures FSFVI ∈ [0,1] with realistic values [0.01, 0.5]"
+        }
+    }
+
+
+@app.get("/api/developer/integration-guide", summary="Developer Integration Guide")
+async def developer_integration_guide():
+    """
+    Comprehensive integration guide for government developers
+    """
+    return {
+        "integration_guide": {
+            "overview": "Complete guide for integrating FSFVI analysis into national food system management platforms",
+            "target_audience": "Government IT departments, National food security agencies, Development organizations",
+            "prerequisites": {
+                "technical": ["REST API knowledge", "CSV data management", "Authentication handling"],
+                "data": ["Food system budget data", "Component performance metrics", "Target benchmarks"],
+                "infrastructure": ["HTTP client capability", "File upload support", "Data visualization tools"]
+            }
         },
-        "performance_improvements": {
-            "scaling_fix": "Eliminated scale mismatch that caused near-zero vulnerabilities",
-            "old_scale_detection": "Automatically upgrades old parameters (>0.1) to new scale",
-            "method_flexibility": "Configurable estimation methods for different use cases",
-            "fallback_safety": "Robust fallback ensures system always has valid parameters"
+        "quick_start": {
+            "step_1": {
+                "title": "Authentication Setup",
+                "description": "Register your system and obtain access tokens",
+                "endpoints": {
+                    "register": "POST /auth/register/",
+                    "login": "POST /auth/login/",
+                    "profile": "GET /auth/profile/"
+                },
+                "example": {
+                    "curl": 'curl -X POST http://localhost:8000/auth/register/ -H "Content-Type: application/json" -d \'{"username": "your_system", "email": "admin@country.gov", "password": "secure_password"}\''
+                }
+            },
+            "step_2": {
+                "title": "Data Upload",
+                "description": "Upload your food system budget and performance data",
+                "endpoint": "POST /upload_data",
+                "required_data": {
+                    "file": "CSV file with component data",
+                    "country_name": "Your country name",
+                    "fiscal_year": "Budget year (e.g., 2024)",
+                    "currency": "Currency code (e.g., USD)"
+                },
+                "csv_format": {
+                    "required_columns": [
+                        "component_name - Name of food system component",
+                        "financial_allocation - Budget allocation in millions",
+                        "observed_value - Current performance metric",
+                        "benchmark_value - Target/ideal performance"
+                    ]
+                }
+            },
+            "step_3": {
+                "title": "Run Analysis",
+                "description": "Execute comprehensive FSFVI analysis",
+                "endpoints": {
+                    "full_analysis": "POST /analyze_system",
+                    "distribution": "POST /analyze_current_distribution",
+                    "performance": "POST /calculate_performance_gaps",
+                    "vulnerabilities": "POST /calculate_component_vulnerabilities",
+                    "system_fsfvi": "POST /calculate_system_vulnerability"
+                },
+                "parameters": {
+                    "session_id": "Session ID from upload",
+                    "method": "Analysis method (hybrid, equal_weight, etc.)",
+                    "scenario": "Analysis scenario (normal_operations, crisis, etc.)"
+                }
+            },
+            "step_4": {
+                "title": "Optimization",
+                "description": "Optimize resource allocation based on analysis",
+                "endpoint": "POST /optimize_allocation",
+                "options": {
+                    "budget_change": "Percentage change in total budget",
+                    "constraints": "Custom allocation constraints",
+                    "method": "Optimization algorithm"
+                }
+            }
+        },
+        "code_examples": {
+            "python": {
+                "basic_client": '''
+import requests
+import json
+
+class FSFVIClient:
+    def __init__(self, django_url="http://localhost:8000", fastapi_url="http://localhost:8001"):
+        self.django_url = django_url
+        self.fastapi_url = fastapi_url
+        self.token = None
+    
+    def authenticate(self, username, password):
+        """Authenticate with Django backend"""
+        response = requests.post(
+            f"{self.django_url}/auth/login/",
+            json={"username": username, "password": password}
+        )
+        if response.status_code == 200:
+            self.token = response.json()["token"]
+            return True
+        return False
+    
+    def upload_data(self, csv_file_path, country_name, fiscal_year=2024, currency="USD"):
+        """Upload CSV data for analysis"""
+        headers = {"Authorization": f"Bearer {self.token}"}
+        
+        with open(csv_file_path, 'rb') as file:
+            files = {"file": file}
+            data = {
+                "country_name": country_name,
+                "fiscal_year": fiscal_year,
+                "currency": currency
+            }
+            response = requests.post(
+                f"{self.fastapi_url}/upload_data",
+                headers=headers,
+                files=files,
+                data=data
+            )
+        return response.json()
+    
+    def analyze_system(self, session_id, method="hybrid", scenario="normal_operations"):
+        """Run complete system analysis"""
+        headers = {"Authorization": f"Bearer {self.token}"}
+        data = {
+            "session_id": session_id,
+            "method": method,
+            "scenario": scenario
+        }
+        response = requests.post(
+            f"{self.fastapi_url}/analyze_system",
+            headers=headers,
+            data=data
+        )
+        return response.json()
+    
+    def optimize_allocation(self, session_id, budget_change_percent=0):
+        """Optimize resource allocation"""
+        headers = {"Authorization": f"Bearer {self.token}"}
+        data = {
+            "session_id": session_id,
+            "budget_change_percent": budget_change_percent
+        }
+        response = requests.post(
+            f"{self.fastapi_url}/optimize_allocation",
+            headers=headers,
+            data=data
+        )
+        return response.json()
+
+# Usage example
+client = FSFVIClient()
+if client.authenticate("your_username", "your_password"):
+    # Upload data
+    upload_result = client.upload_data("food_system_data.csv", "Your Country")
+    session_id = upload_result["session_id"]
+    
+    # Run analysis
+    analysis_result = client.analyze_system(session_id)
+    
+    # Optimize allocation
+    optimization_result = client.optimize_allocation(session_id)
+                ''',
+                "async_client": '''
+import aiohttp
+import asyncio
+
+class AsyncFSFVIClient:
+    def __init__(self, django_url="http://localhost:8000", fastapi_url="http://localhost:8001"):
+        self.django_url = django_url
+        self.fastapi_url = fastapi_url
+        self.token = None
+    
+    async def authenticate(self, username, password):
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                f"{self.django_url}/auth/login/",
+                json={"username": username, "password": password}
+            ) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    self.token = data["token"]
+                    return True
+                return False
+    
+    async def upload_and_analyze(self, csv_file_path, country_name):
+        """Upload data and run analysis in sequence"""
+        # Upload
+        upload_result = await self.upload_data(csv_file_path, country_name)
+        session_id = upload_result["session_id"]
+        
+        # Run analysis
+        analysis_result = await self.analyze_system(session_id)
+        
+        return {
+            "session_id": session_id,
+            "analysis": analysis_result
+        }
+                '''
+            },
+            "javascript": '''
+class FSFVIClient {
+    constructor(djangoUrl = 'http://localhost:8000', fastapiUrl = 'http://localhost:8001') {
+        this.djangoUrl = djangoUrl;
+        this.fastapiUrl = fastapiUrl;
+        this.token = null;
+    }
+    
+    async authenticate(username, password) {
+        const response = await fetch(`${this.djangoUrl}/auth/login/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password })
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            this.token = data.token;
+            return true;
+        }
+        return false;
+    }
+    
+    async uploadData(file, countryName, fiscalYear = 2024, currency = 'USD') {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('country_name', countryName);
+        formData.append('fiscal_year', fiscalYear);
+        formData.append('currency', currency);
+        
+        const response = await fetch(`${this.fastapiUrl}/upload_data`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${this.token}` },
+            body: formData
+        });
+        
+        return response.json();
+    }
+    
+    async analyzeSystem(sessionId, method = 'hybrid') {
+        const formData = new FormData();
+        formData.append('session_id', sessionId);
+        formData.append('method', method);
+        
+        const response = await fetch(`${this.fastapiUrl}/analyze_system`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${this.token}` },
+            body: formData
+        });
+        
+        return response.json();
+    }
+}
+            '''
+        },
+        "deployment": {
+            "production_considerations": [
+                "Use HTTPS for all API communications",
+                "Implement proper authentication and authorization",
+                "Set up monitoring and logging",
+                "Configure rate limiting",
+                "Implement data backup and recovery",
+                "Use environment variables for configuration"
+            ],
+            "scaling": {
+                "horizontal": "Deploy multiple FastAPI instances behind load balancer",
+                "vertical": "Increase CPU and memory for analysis workloads",
+                "database": "Use PostgreSQL for production Django deployment",
+                "caching": "Implement Redis for session and result caching"
+            },
+            "security": {
+                "authentication": "Token-based authentication with Django",
+                "authorization": "Role-based access control",
+                "data_protection": "Encrypt sensitive data at rest and in transit",
+                "api_security": "Implement CORS, rate limiting, and input validation"
+            }
+        },
+        "support": {
+            "documentation": "Complete API documentation at /docs",
+            "validation": "System health check at /validate_system",
+            "troubleshooting": "Error handling and logging built-in",
+            "contact": "Refer to your implementation team for support"
+        }
+    }
+
+
+@app.get("/api/developer/data-format", summary="Data Format Specification")
+async def data_format_specification():
+    """
+    Detailed specification of expected data formats for FSFVI analysis
+    """
+    return {
+        "csv_format": {
+            "overview": "FSFVI accepts CSV files with food system component data",
+            "encoding": "UTF-8",
+            "separator": "Comma (,)",
+            "header_required": True,
+            "required_columns": {
+                "component_name": {
+                    "description": "Name/identifier of the food system component",
+                    "type": "String",
+                    "example": "Agricultural Research and Development",
+                    "constraints": "Must be unique within the file"
+                },
+                "financial_allocation": {
+                    "description": "Budget allocation for this component",
+                    "type": "Numeric (Float)",
+                    "unit": "Millions in specified currency",
+                    "example": 125.5,
+                    "constraints": "Must be positive number"
+                },
+                "observed_value": {
+                    "description": "Current performance metric value",
+                    "type": "Numeric (Float)",
+                    "example": 75.2,
+                    "constraints": "Must be non-negative"
+                },
+                "benchmark_value": {
+                    "description": "Target or ideal performance value",
+                    "type": "Numeric (Float)",
+                    "example": 95.0,
+                    "constraints": "Should be >= observed_value for meaningful analysis"
+                }
+            },
+            "optional_columns": {
+                "component_type": {
+                    "description": "Standardized component type classification",
+                    "type": "String",
+                    "allowed_values": [
+                        "agricultural_development",
+                        "infrastructure",
+                        "nutrition_health",
+                        "social_protection_equity",
+                        "climate_natural_resources",
+                        "governance_institutions"
+                    ],
+                    "default": "Automatically assigned based on component_name"
+                },
+                "weight": {
+                    "description": "Custom importance weight for this component",
+                    "type": "Numeric (Float)",
+                    "range": "0.0 to 1.0",
+                    "default": "Equal weighting (1/n where n is number of components)"
+                },
+                "sensitivity_parameter": {
+                    "description": "Component-specific sensitivity to financial allocation",
+                    "type": "Numeric (Float)",
+                    "range": "0.0005 to 0.005",
+                    "default": "Automatically estimated based on component type"
+                }
+            }
+        },
+        "data_validation": {
+            "file_checks": [
+                "File size limit: 10MB",
+                "Valid CSV format with UTF-8 encoding",
+                "Minimum 2 components required",
+                "Maximum 50 components supported"
+            ],
+            "data_checks": [
+                "All required columns present",
+                "No missing values in required columns",
+                "Numeric columns contain valid numbers",
+                "Component names are unique",
+                "Financial allocations are positive",
+                "Performance values are non-negative"
+            ],
+            "business_logic_checks": [
+                "Total budget allocation is reasonable (>$1M, <$1T)",
+                "Performance gaps are logical (benchmark >= observed)",
+                "Component types are recognized or can be classified",
+                "Data quality score above minimum threshold"
+            ]
+        },
+        "example_data": {
+            "minimal_csv": '''component_name,financial_allocation,observed_value,benchmark_value
+Agricultural Research,150.5,72.3,85.0
+Food Distribution,89.2,68.5,80.0
+Nutrition Programs,45.8,55.2,75.0
+Rural Infrastructure,203.1,60.1,70.0''',
+            "full_csv": '''component_name,component_type,financial_allocation,observed_value,benchmark_value,weight
+Agricultural Research,agricultural_development,150.5,72.3,85.0,0.3
+Food Distribution,infrastructure,89.2,68.5,80.0,0.2
+Nutrition Programs,nutrition_health,45.8,55.2,75.0,0.2
+Rural Infrastructure,infrastructure,203.1,60.1,70.0,0.15
+Social Safety Nets,social_protection_equity,67.4,45.8,65.0,0.1
+Climate Adaptation,climate_natural_resources,34.2,52.1,60.0,0.05'''
+        },
+        "common_errors": {
+            "missing_columns": "Ensure all required columns are present with exact names",
+            "invalid_numbers": "Check for non-numeric values in numeric columns",
+            "negative_allocations": "All financial allocations must be positive",
+            "duplicate_components": "Each component name must be unique",
+            "empty_file": "File must contain at least 2 data rows",
+            "encoding_issues": "Save file as UTF-8 to avoid character encoding errors"
+        },
+        "best_practices": {
+            "data_preparation": [
+                "Verify data accuracy before upload",
+                "Use consistent units (millions in specified currency)",
+                "Ensure component names are descriptive and unique",
+                "Include realistic benchmark values based on best practices"
+            ],
+            "component_selection": [
+                "Focus on major budget components (>1% of total budget)",
+                "Group small components into logical categories",
+                "Ensure comprehensive coverage of food system domains",
+                "Align with national food security frameworks"
+            ],
+            "performance_metrics": [
+                "Use quantifiable, outcome-based metrics",
+                "Ensure metrics are comparable across components",
+                "Set realistic but ambitious benchmark values",
+                "Document metric definitions and sources"
+            ]
+        }
+    }
+
+
+@app.get("/api/developer/response-format", summary="API Response Format Reference")
+async def response_format_reference():
+    """
+    Comprehensive reference for all API response formats
+    """
+    return {
+        "response_standards": {
+            "http_status_codes": {
+                "200": "Success - Request completed successfully",
+                "201": "Created - Resource created successfully",
+                "400": "Bad Request - Invalid input data",
+                "401": "Unauthorized - Authentication required",
+                "404": "Not Found - Resource not found",
+                "500": "Internal Server Error - Server-side error"
+            },
+            "response_structure": {
+                "success_format": {
+                    "session_id": "string - Unique session identifier",
+                    "country": "string - Country name",
+                    "analysis_type": "string - Type of analysis performed",
+                    "timestamp": "string - ISO format timestamp",
+                    "data": "object - Analysis results and data"
+                },
+                "error_format": {
+                    "error": "string - Error message",
+                    "detail": "string - Detailed error description",
+                    "status_code": "integer - HTTP status code"
+                }
+            }
+        },
+        "endpoint_responses": {
+            "upload_data": {
+                "success": {
+                    "session_id": "uuid-string",
+                    "status": "success", 
+                    "message": "Data uploaded and processed successfully",
+                    "summary": {
+                        "total_components": "integer",
+                        "total_budget": "float",
+                        "data_quality_score": "float"
+                    },
+                    "components": ["array of component objects"]
+                }
+            },
+            "analyze_system": {
+                "success": {
+                    "session_id": "uuid-string",
+                    "country": "string",
+                    "analysis_type": "comprehensive_system_analysis",
+                    "performance_gaps": "object",
+                    "component_vulnerabilities": "object", 
+                    "distribution_analysis": "object",
+                    "system_fsfvi": "object"
+                }
+            },
+            "calculate_system_vulnerability": {
+                "success": {
+                    "session_id": "uuid-string",
+                    "country": "string",
+                    "fsfvi_results": {
+                        "fsfvi_score": "float [0,1]",
+                        "vulnerability_percent": "float [0,100]", 
+                        "risk_level": "string [low|medium|high|critical]",
+                        "financing_efficiency_percent": "float [0,100]"
+                    },
+                    "system_analysis": {
+                        "total_allocation_millions": "float",
+                        "component_statistics": "object",
+                        "critical_components": "array of strings",
+                        "government_insights": "object"
+                    }
+                }
+            }
+        },
+        "data_types": {
+            "fsfvi_score": {
+                "type": "float",
+                "range": "[0, 1]",
+                "interpretation": "0 = no vulnerability, 1 = maximum vulnerability",
+                "typical_range": "[0.01, 0.5] for real systems"
+            },
+            "performance_gap": {
+                "type": "float", 
+                "range": "[0, 1]",
+                "calculation": "(benchmark - observed) / benchmark",
+                "interpretation": "0 = no gap, 1 = maximum gap"
+            },
+            "vulnerability_score": {
+                "type": "float",
+                "range": "[0, 1]", 
+                "calculation": "gap / (1 + sensitivity × allocation)",
+                "interpretation": "Component-level vulnerability considering funding"
+            },
+            "risk_level": {
+                "type": "string",
+                "values": ["low", "medium", "high", "critical"],
+                "thresholds": {
+                    "low": "FSFVI < 0.1",
+                    "medium": "0.1 ≤ FSFVI < 0.2", 
+                    "high": "0.2 ≤ FSFVI < 0.4",
+                    "critical": "FSFVI ≥ 0.4"
+                }
+            }
+        },
+        "mathematical_context": {
+            "formulas": {
+                "performance_gap": "δᵢ = (benchmark_value - observed_value) / benchmark_value",
+                "component_vulnerability": "υᵢ = δᵢ × (1 / (1 + αᵢ × fᵢ))",
+                "system_fsfvi": "FSFVI = Σᵢ (ωᵢ × υᵢ)",
+                "financing_efficiency": "Efficiency = 1 - FSFVI"
+            },
+            "variables": {
+                "δᵢ": "Performance gap for component i [0,1]",
+                "υᵢ": "Vulnerability for component i [0,1]", 
+                "αᵢ": "Sensitivity parameter for component i [0.0005,0.005]",
+                "fᵢ": "Financial allocation for component i (millions USD)",
+                "ωᵢ": "Weight for component i [0,1], Σωᵢ = 1",
+                "FSFVI": "System-level Food System Financing Vulnerability Index [0,1]"
+            }
         }
     }
 

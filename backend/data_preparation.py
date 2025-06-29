@@ -39,7 +39,7 @@ class UniversalFSFVIDataPreparation:
             # Fallback if modules not available
             return [
                 'agricultural_development', 'infrastructure', 'nutrition_health',
-                'social_assistance', 'climate_natural_resources', 'governance_institutions'
+                'social_protection_equity', 'climate_natural_resources', 'governance_institutions'
             ]
     
     def load_and_clean_data(self, file_path: str = None):
@@ -105,7 +105,7 @@ class UniversalFSFVIDataPreparation:
             elif any(word in component_type_lower for word in ['nutrition', 'health', 'feeding', 'safety']):
                 return 'nutrition_health'
             elif any(word in component_type_lower for word in ['social', 'assistance', 'livelihood', 'poverty']):
-                return 'social_assistance'
+                return 'social_protection_equity'
             elif any(word in component_type_lower for word in ['climate', 'environment', 'forestry', 'resilience']):
                 return 'climate_natural_resources'
             elif any(word in component_type_lower for word in ['governance', 'institution', 'policy', 'marketing']):
@@ -207,7 +207,7 @@ class UniversalFSFVIDataPreparation:
             'agricultural_development': 0.70,  # Aligned with fsfvi_core.py
             'infrastructure': 0.65,           # Aligned with fsfvi_core.py
             'nutrition_health': 0.60,         # Aligned with fsfvi_core.py
-            'social_assistance': 0.50,        # Aligned with fsfvi_core.py
+            'social_protection_equity': 0.50,        # Aligned with fsfvi_core.py
             'climate_natural_resources': 0.30, # Aligned with fsfvi_core.py
             'governance_institutions': 0.25    # Aligned with fsfvi_core.py
         }

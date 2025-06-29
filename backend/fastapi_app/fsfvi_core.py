@@ -129,6 +129,11 @@ def calculate_vulnerability(gap: float, allocation: float, sensitivity: float) -
     # Core FSFVI vulnerability calculation: υᵢ(fᵢ) = δᵢ · 1/(1 + αᵢfᵢ)
     financial_effectiveness = sensitivity * allocation  # αᵢfᵢ (dimensionless)
     denominator = 1.0 + financial_effectiveness
+    
+    # Prevent division by zero and ensure denominator is reasonable
+    if denominator <= FSFVI_CONFIG.tolerance:
+        denominator = FSFVI_CONFIG.tolerance
+    
     vulnerability = gap / denominator
     
     # Mathematical verification using config tolerance
@@ -594,7 +599,7 @@ def estimate_sensitivity_parameter(
     - Agricultural Development: 0.0015 (moderate responsiveness)
     - Infrastructure: 0.0018 (higher responsiveness to capital)
     - Nutrition/Health: 0.0020 (high responsiveness to direct funding)
-    - Social Assistance: 0.0025 (very responsive to transfers)
+    - Social Protection Equity: 0.0025 (very responsive to funding)
     - Climate/Natural Resources: 0.0008 (lower responsiveness, long-term)
     - Governance/Institutions: 0.0006 (lowest responsiveness, structural)
     
@@ -616,7 +621,7 @@ def estimate_sensitivity_parameter(
             ComponentType.AGRICULTURAL_DEVELOPMENT.value: 0.0015,  # Increased for meaningful vulnerability
             ComponentType.INFRASTRUCTURE.value: 0.0018,           # Higher sensitivity for infrastructure  
             ComponentType.NUTRITION_HEALTH.value: 0.0020,         # High responsiveness to funding
-            ComponentType.SOCIAL_ASSISTANCE.value: 0.0025,        # Very responsive to funding
+            ComponentType.SOCIAL_PROTECTION_EQUITY.value: 0.0025,     # Very responsive to funding
             ComponentType.CLIMATE_NATURAL_RESOURCES.value: 0.0008, # Lower sensitivity (harder to improve)
             ComponentType.GOVERNANCE_INSTITUTIONS.value: 0.0006   # Lowest sensitivity (structural)
         }
@@ -839,7 +844,7 @@ def _calculate_country_context_adjustment(
     if component_type in ['governance_institutions', 'infrastructure']:
         # These require strong institutions
         adjustment *= (0.5 + institutional_capacity)  # Range: 0.5-1.5
-    elif component_type in ['social_assistance', 'nutrition_health']:
+    elif component_type in ['social_protection_equity', 'nutrition_health']:
         # These are less institution-dependent
         adjustment *= (0.8 + 0.4 * institutional_capacity)  # Range: 0.8-1.2
     
@@ -862,7 +867,7 @@ def _calculate_theoretical_sensitivity_bounds(
         'agricultural_development': {'min': 0.0005, 'max': 0.003, 'expected': 0.0015},
         'infrastructure': {'min': 0.0008, 'max': 0.004, 'expected': 0.002},
         'nutrition_health': {'min': 0.001, 'max': 0.005, 'expected': 0.0025},
-        'social_assistance': {'min': 0.0015, 'max': 0.006, 'expected': 0.003},
+        'social_protection_equity': {'min': 0.0015, 'max': 0.006, 'expected': 0.003},
         'climate_natural_resources': {'min': 0.0003, 'max': 0.002, 'expected': 0.001},
         'governance_institutions': {'min': 0.0002, 'max': 0.0015, 'expected': 0.0008}
     }
@@ -894,7 +899,7 @@ def _get_fallback_sensitivity(component_type: str) -> float:
         'agricultural_development': 0.0015,
         'infrastructure': 0.0018,
         'nutrition_health': 0.0020,
-        'social_assistance': 0.0025,
+        'social_protection_equity': 0.0025,
         'climate_natural_resources': 0.0008,
         'governance_institutions': 0.0006
     }
@@ -1442,7 +1447,7 @@ def _prepare_ml_features(
     # Component type encoding (one-hot)
     component_types = [
         'agricultural_development', 'infrastructure', 'nutrition_health',
-        'social_assistance', 'climate_natural_resources', 'governance_institutions'
+        'social_protection_equity', 'climate_natural_resources', 'governance_institutions'
     ]
     component_encoding = [1.0 if ct == component_type else 0.0 for ct in component_types]
     
@@ -1475,7 +1480,7 @@ def _get_prior_sensitivity_beliefs(component_type: str) -> Dict[str, float]:
         'agricultural_development': {'mean': 0.0015, 'std': 0.0005},
         'infrastructure': {'mean': 0.0018, 'std': 0.0006},
         'nutrition_health': {'mean': 0.0020, 'std': 0.0007},
-        'social_assistance': {'mean': 0.0025, 'std': 0.0008},
+        'social_protection_equity': {'mean': 0.0025, 'std': 0.0008},
         'climate_natural_resources': {'mean': 0.0008, 'std': 0.0003},
         'governance_institutions': {'mean': 0.0006, 'std': 0.0002}
     }

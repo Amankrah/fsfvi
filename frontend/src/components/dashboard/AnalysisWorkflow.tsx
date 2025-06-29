@@ -12,7 +12,6 @@ import {
   TrendingUp, 
   BarChart3, 
   Target,
-  ArrowRight,
   Loader2,
   ChevronDown,
   ChevronUp,
@@ -74,6 +73,13 @@ export const AnalysisWorkflow: React.FC<AnalysisWorkflowProps> = ({
       status: 'pending',
       icon: <Target className="w-5 h-5" />,
     },
+    {
+      id: 'optimization',
+      title: 'Optimize Allocation',
+      description: 'Generate optimal budget reallocation recommendations',
+      status: 'pending',
+      icon: <Activity className="w-5 h-5" />,
+    },
   ]);
 
   const [expandedSteps, setExpandedSteps] = useState<Set<string>>(new Set());
@@ -127,6 +133,9 @@ export const AnalysisWorkflow: React.FC<AnalysisWorkflowProps> = ({
           break;
         case 'system_vulnerability':
           results = await analysisAPI.calculateSystemVulnerability(sessionId, token);
+          break;
+        case 'optimization':
+          results = await analysisAPI.optimizeAllocation(sessionId, token);
           break;
         default:
           throw new Error('Unknown analysis step');
@@ -221,29 +230,18 @@ export const AnalysisWorkflow: React.FC<AnalysisWorkflowProps> = ({
     }
   };
 
-  const getStepIcon = (step: AnalysisStep) => {
-    switch (step.status) {
-      case 'running':
-        return <Loader2 className="w-5 h-5 animate-spin text-blue-600" />;
-      case 'completed':
-        return <CheckCircle className="w-5 h-5 text-green-600" />;
-      case 'error':
-        return <AlertCircle className="w-5 h-5 text-red-600" />;
-      default:
-        return step.icon;
-    }
-  };
+
 
   const getStepBadge = (status: AnalysisStep['status']) => {
     switch (status) {
       case 'completed':
-        return <Badge className="bg-green-100 text-green-800">Completed</Badge>;
+        return <Badge className="bg-green-100 text-green-800 px-3 py-1 font-semibold">✓ Completed</Badge>;
       case 'running':
-        return <Badge className="bg-blue-100 text-blue-800">Running</Badge>;
+        return <Badge className="bg-blue-100 text-blue-800 px-3 py-1 font-semibold">⟳ Running</Badge>;
       case 'error':
-        return <Badge variant="destructive">Error</Badge>;
+        return <Badge className="bg-red-100 text-red-800 px-3 py-1 font-semibold">✗ Error</Badge>;
       default:
-        return <Badge variant="secondary">Pending</Badge>;
+        return <Badge className="bg-gray-100 text-gray-700 px-3 py-1 font-semibold">○ Pending</Badge>;
     }
   };
 
@@ -271,10 +269,9 @@ export const AnalysisWorkflow: React.FC<AnalysisWorkflowProps> = ({
             </div>
 
             {/* Actions */}
-            <div className="flex justify-between items-center">
+            <div className="flex flex-col sm:flex-row gap-3 mt-4">
               <Button
-                variant="outline"
-                size="sm"
+                className="bg-blue-600 hover:bg-blue-700 text-white flex-1"
                 onClick={() => {
                   if (sessionId) {
                     router.push(`/analysis/${sessionId}/budget-distribution`);
@@ -283,15 +280,16 @@ export const AnalysisWorkflow: React.FC<AnalysisWorkflowProps> = ({
                   }
                 }}
               >
-                <Eye className="w-4 h-4 mr-1" />
+                <Eye className="w-4 h-4 mr-2" />
                 View Detailed Analysis
               </Button>
               <Button
-                size="sm"
+                variant="outline"
                 onClick={() => runAnalysisStep('distribution')}
                 disabled={step.status === 'running'}
+                className="border-gray-300 hover:bg-gray-50"
               >
-                <Activity className="w-4 h-4 mr-1" />
+                <Activity className="w-4 h-4 mr-2" />
                 Recalculate
               </Button>
             </div>
@@ -356,10 +354,9 @@ export const AnalysisWorkflow: React.FC<AnalysisWorkflowProps> = ({
             )}
 
             {/* Actions */}
-            <div className="flex justify-between items-center">
+            <div className="flex flex-col sm:flex-row gap-3 mt-4">
               <Button
-                variant="outline"
-                size="sm"
+                className="bg-yellow-600 hover:bg-yellow-700 text-white flex-1"
                 onClick={() => {
                   if (sessionId) {
                     router.push(`/analysis/${sessionId}/performance-gaps`);
@@ -368,15 +365,16 @@ export const AnalysisWorkflow: React.FC<AnalysisWorkflowProps> = ({
                   }
                 }}
               >
-                <Eye className="w-4 h-4 mr-1" />
+                <Eye className="w-4 h-4 mr-2" />
                 View Detailed Analysis
               </Button>
               <Button
-                size="sm"
+                variant="outline"
                 onClick={() => runAnalysisStep('performance_gaps')}
                 disabled={step.status === 'running'}
+                className="border-gray-300 hover:bg-gray-50"
               >
-                <Activity className="w-4 h-4 mr-1" />
+                <Activity className="w-4 h-4 mr-2" />
                 Recalculate
               </Button>
             </div>
@@ -533,27 +531,27 @@ export const AnalysisWorkflow: React.FC<AnalysisWorkflowProps> = ({
             </div>
 
             {/* Actions */}
-            <div className="flex justify-between items-center">
+            <div className="flex flex-col sm:flex-row gap-3 mt-4">
               <Button
-                variant="outline"
-                size="sm"
-                                  onClick={() => {
-                    if (sessionId) {
-                      router.push(`/analysis/${sessionId}/component-vulnerabilities`);
-                    } else {
-                      alert('Session ID not available - Please upload data first or select a recent session');
-                    }
-                  }}
+                className="bg-orange-600 hover:bg-orange-700 text-white flex-1"
+                onClick={() => {
+                  if (sessionId) {
+                    router.push(`/analysis/${sessionId}/component-vulnerabilities`);
+                  } else {
+                    alert('Session ID not available - Please upload data first or select a recent session');
+                  }
+                }}
               >
-                <Eye className="w-4 h-4 mr-1" />
+                <Eye className="w-4 h-4 mr-2" />
                 View Comprehensive Analysis
               </Button>
               <Button
-                size="sm"
+                variant="outline"
                 onClick={() => runAnalysisStep('vulnerabilities')}
                 disabled={step.status === 'running'}
+                className="border-gray-300 hover:bg-gray-50"
               >
-                <Activity className="w-4 h-4 mr-1" />
+                <Activity className="w-4 h-4 mr-2" />
                 Recalculate
               </Button>
             </div>
@@ -663,10 +661,9 @@ export const AnalysisWorkflow: React.FC<AnalysisWorkflowProps> = ({
             </div>
 
             {/* Actions */}
-            <div className="flex justify-between items-center">
+            <div className="flex flex-col sm:flex-row gap-3 mt-4">
               <Button
-                variant="outline"
-                size="sm"
+                className="bg-red-600 hover:bg-red-700 text-white flex-1"
                 onClick={() => {
                   if (sessionId) {
                     router.push(`/analysis/${sessionId}/system-vulnerability`);
@@ -675,16 +672,140 @@ export const AnalysisWorkflow: React.FC<AnalysisWorkflowProps> = ({
                   }
                 }}
               >
-                <Eye className="w-4 h-4 mr-1" />
+                <Eye className="w-4 h-4 mr-2" />
                 View Comprehensive Analysis
               </Button>
               <Button
-                size="sm"
+                variant="outline"
                 onClick={() => runAnalysisStep('system_vulnerability')}
                 disabled={step.status === 'running'}
+                className="border-gray-300 hover:bg-gray-50"
               >
-                <Activity className="w-4 h-4 mr-1" />
+                <Activity className="w-4 h-4 mr-2" />
                 Recalculate
+              </Button>
+            </div>
+          </div>
+        );
+      case 'optimization':
+        return (
+          <div className="mt-3 space-y-3">
+            {/* Optimization Results Summary */}
+            <div className="p-3 bg-green-50 rounded-lg border border-green-200">
+              <h4 className="text-sm font-semibold text-green-900 mb-2">Optimization Results:</h4>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+                <div className="text-center">
+                  <div className="text-lg font-bold text-green-800">
+                    {step.results.optimization_results?.relative_improvement_percent?.toFixed(1) || '0.0'}%
+                  </div>
+                  <div className="text-green-700">FSFVI Improvement</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-lg font-bold text-blue-800">
+                    ${(step.results.optimization_results?.total_reallocation_amount || 0).toFixed(1)}M
+                  </div>
+                  <div className="text-blue-700">Total Reallocation</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-lg font-bold text-purple-800">
+                    {step.results.optimization_results?.efficiency_gain_percent?.toFixed(1) || '0.0'}%
+                  </div>
+                  <div className="text-purple-700">Efficiency Gain</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-lg font-bold text-orange-800">
+                    {step.results.optimization_results?.iterations || 0}
+                  </div>
+                  <div className="text-orange-700">Iterations</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Mathematical Validation */}
+            <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+              <div className="flex items-center justify-between mb-2">
+                <h5 className="text-sm font-semibold text-blue-900">Mathematical Optimization:</h5>
+                <div className="flex items-center space-x-2">
+                  <Badge className="bg-green-100 text-green-800 text-xs">
+                    <CheckCircle className="w-3 h-3 mr-1" />
+                    {step.results.optimization_results?.success ? 'Converged' : 'Failed'}
+                  </Badge>
+                  <Badge className="bg-blue-100 text-blue-800 text-xs">
+                    /optimize_allocation
+                  </Badge>
+                </div>
+              </div>
+              <code className="text-xs font-mono text-blue-800 font-bold">
+                Minimize FSFVI = Σᵢ ωᵢ·υᵢ(fᵢ) subject to budget constraints
+              </code>
+              <p className="text-xs text-blue-700 mt-1">
+                {step.results.optimization_results?.solver || 'Mathematical gradient descent'} with prioritization constraint: fᵢ ≥ fⱼ if δᵢ ≥ δⱼ
+              </p>
+            </div>
+
+            {/* Optimization Impact Assessment */}
+            <div className="p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+              <h5 className="text-sm font-semibold text-yellow-900 mb-2">Impact Assessment:</h5>
+              <div className="text-xs text-yellow-800">
+                {(() => {
+                  const improvement = step.results.optimization_results?.relative_improvement_percent || 0;
+                  const reallocation = step.results.optimization_results?.reallocation_intensity_percent || 0;
+                  
+                  if (improvement > 30) {
+                    return `🎯 High-impact optimization: ${improvement.toFixed(1)}% FSFVI improvement achievable with strategic reallocation`;
+                  } else if (improvement > 15) {
+                    return `📈 Moderate optimization potential: ${improvement.toFixed(1)}% improvement with ${reallocation.toFixed(1)}% budget reallocation`;
+                  } else if (improvement > 5) {
+                    return `✨ Limited but meaningful improvement: ${improvement.toFixed(1)}% FSFVI enhancement possible`;
+                  } else {
+                    return `✅ Current allocation is near-optimal - minimal improvement potential detected`;
+                  }
+                })()}
+              </div>
+            </div>
+
+            {/* Budget Reallocation Insight */}
+            {step.results.optimization_results?.budget_utilization_percent && (
+              <div className="p-3 bg-indigo-50 rounded-lg border border-indigo-200">
+                <div className="flex items-center justify-between text-xs">
+                  <div>
+                    <span className="font-semibold text-indigo-900">Budget Utilization:</span>
+                    <span className="text-indigo-800 ml-2">
+                      {step.results.optimization_results.budget_utilization_percent.toFixed(1)}% of allocated budget
+                    </span>
+                  </div>
+                  <div className="text-indigo-700">
+                    {step.results.optimization_results.reallocation_intensity_percent && 
+                      `${step.results.optimization_results.reallocation_intensity_percent.toFixed(1)}% reallocation intensity`
+                    }
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Actions */}
+            <div className="flex flex-col sm:flex-row gap-3 mt-4">
+              <Button
+                className="bg-green-600 hover:bg-green-700 text-white flex-1"
+                onClick={() => {
+                  if (sessionId) {
+                    router.push(`/analysis/${sessionId}/allocation-optimization`);
+                  } else {
+                    alert('Session ID not available');
+                  }
+                }}
+              >
+                <Eye className="w-4 h-4 mr-2" />
+                View Detailed Optimization
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => runAnalysisStep('optimization')}
+                disabled={step.status === 'running'}
+                className="border-gray-300 hover:bg-gray-50"
+              >
+                <Activity className="w-4 h-4 mr-2" />
+                Re-optimize
               </Button>
             </div>
           </div>
@@ -718,18 +839,53 @@ export const AnalysisWorkflow: React.FC<AnalysisWorkflowProps> = ({
     );
   }
 
+  // Calculate progress for visual indicator
+  const completedSteps = steps.filter(step => step.status === 'completed').length;
+  const progressPercentage = (completedSteps / steps.length) * 100;
+
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <span>FSFVI Analysis Workflow</span>
-            <div className="flex items-center space-x-2">
-              <Button onClick={runComprehensiveAnalysis} className="flex items-center">
+    <div className="space-y-8">
+      {/* Header Card with Progress */}
+      <Card className="border-0 shadow-xl bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
+        <CardHeader className="pb-6">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
+            <div className="flex-1">
+              <CardTitle className="text-2xl font-bold text-gray-900 mb-2">
+                FSFVI Analysis Workflow
+              </CardTitle>
+              <CardDescription className="text-base text-gray-600">
+                Complete vulnerability analysis for <span className="font-semibold text-indigo-700">{countryName || 'your data'}</span>
+              </CardDescription>
+              
+              {/* Progress Indicator */}
+              <div className="mt-4">
+                <div className="flex items-center justify-between text-sm text-gray-600 mb-2">
+                  <span>Analysis Progress</span>
+                  <span className="font-medium">{completedSteps}/{steps.length} steps completed</span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-3">
+                  <div 
+                    className="bg-gradient-to-r from-blue-500 to-indigo-600 h-3 rounded-full transition-all duration-700 ease-out"
+                    style={{ width: `${progressPercentage}%` }}
+                  ></div>
+                </div>
+              </div>
+            </div>
+            
+            {/* Action Buttons */}
+            <div className="flex flex-col sm:flex-row gap-3">
+              <Button 
+                onClick={runComprehensiveAnalysis} 
+                className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-6"
+              >
                 <Target className="w-4 h-4 mr-2" />
                 Comprehensive Analysis
               </Button>
-              <Button onClick={runFullAnalysis} variant="outline" className="flex items-center">
+              <Button 
+                onClick={runFullAnalysis} 
+                variant="outline" 
+                className="border-indigo-300 text-indigo-700 hover:bg-indigo-50"
+              >
                 <PlayCircle className="w-4 h-4 mr-2" />
                 Step-by-Step
               </Button>
@@ -737,7 +893,7 @@ export const AnalysisWorkflow: React.FC<AnalysisWorkflowProps> = ({
                 onClick={handleClearSession} 
                 variant="outline" 
                 disabled={clearingSession}
-                className="flex items-center text-red-600 hover:text-red-700 hover:bg-red-50"
+                className="border-red-300 text-red-600 hover:bg-red-50 hover:border-red-400"
               >
                 {clearingSession ? (
                   <RotateCcw className="w-4 h-4 mr-2 animate-spin" />
@@ -747,65 +903,130 @@ export const AnalysisWorkflow: React.FC<AnalysisWorkflowProps> = ({
                 Clear Session
               </Button>
             </div>
-          </CardTitle>
-          <CardDescription>
-            Complete FSFVI vulnerability analysis for {countryName || 'your data'}. 
-            Choose comprehensive analysis for faster results or step-by-step for detailed workflow.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {steps.map((step) => (
-              <div key={step.id} className="border rounded-lg">
-                <div className="p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center space-x-3">
-                      {getStepIcon(step)}
-                      <div className="flex-1">
-                        <h3 className="font-medium text-gray-900">{step.title}</h3>
-                        <p className="text-sm text-gray-600">{step.description}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      {getStepBadge(step.status)}
-                      {step.results && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => toggleStepExpansion(step.id)}
-                        >
-                          {expandedSteps.has(step.id) ? 
-                            <ChevronUp className="w-4 h-4" /> : 
-                            <ChevronDown className="w-4 h-4" />
-                          }
-                        </Button>
-                      )}
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => runAnalysisStep(step.id)}
-                        disabled={step.status === 'running'}
-                      >
-                        {step.status === 'running' ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : step.status === 'completed' ? (
-                          'Re-run'
-                        ) : (
-                          <ArrowRight className="w-4 h-4" />
-                        )}
-                      </Button>
-                    </div>
-                  </div>
-                  
-                  {/* Expanded Results */}
-                  {expandedSteps.has(step.id) && renderResults(step)}
-                </div>
-              </div>
-            ))}
           </div>
-        </CardContent>
+        </CardHeader>
       </Card>
 
+      {/* Enhanced Steps */}
+      <div className="grid gap-6">
+        {steps.map((step, index) => (
+          <Card 
+            key={step.id} 
+            className={`border-0 shadow-lg hover:shadow-xl transition-all duration-300 ${
+              step.status === 'completed' ? 'bg-gradient-to-br from-green-50 to-emerald-50 border-l-4 border-l-green-500' :
+              step.status === 'running' ? 'bg-gradient-to-br from-blue-50 to-cyan-50 border-l-4 border-l-blue-500' :
+              step.status === 'error' ? 'bg-gradient-to-br from-red-50 to-pink-50 border-l-4 border-l-red-500' :
+              'bg-gradient-to-br from-gray-50 to-slate-50 border-l-4 border-l-gray-300'
+            }`}
+          >
+            <CardHeader className="pb-4">
+              <div className="flex items-center space-x-4">
+                {/* Step Number */}
+                <div className={`w-12 h-12 rounded-full flex items-center justify-center font-bold text-white shadow-lg ${
+                  step.status === 'completed' ? 'bg-gradient-to-br from-green-500 to-emerald-600' :
+                  step.status === 'running' ? 'bg-gradient-to-br from-blue-500 to-cyan-600' :
+                  step.status === 'error' ? 'bg-gradient-to-br from-red-500 to-pink-600' :
+                  'bg-gradient-to-br from-gray-400 to-slate-500'
+                }`}>
+                  {step.status === 'completed' ? <CheckCircle className="w-6 h-6" /> :
+                   step.status === 'running' ? <Loader2 className="w-6 h-6 animate-spin" /> :
+                   step.status === 'error' ? <AlertCircle className="w-6 h-6" /> :
+                   index + 1}
+                </div>
+
+                {/* Step Info */}
+                <div className="flex-1">
+                  <div className="flex items-center space-x-3 mb-1">
+                    <h3 className="text-xl font-semibold text-gray-900">{step.title}</h3>
+                    {getStepBadge(step.status)}
+                  </div>
+                  <p className="text-gray-600">{step.description}</p>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex items-center space-x-2">
+                  {step.results && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => toggleStepExpansion(step.id)}
+                      className="hover:bg-white hover:shadow-md"
+                    >
+                      {expandedSteps.has(step.id) ? 
+                        <ChevronUp className="w-4 h-4" /> : 
+                        <ChevronDown className="w-4 h-4" />
+                      }
+                    </Button>
+                  )}
+                  <Button
+                    size="sm"
+                    onClick={() => runAnalysisStep(step.id)}
+                    disabled={step.status === 'running'}
+                    className={`${
+                      step.status === 'completed' ? 
+                        'bg-green-600 hover:bg-green-700 text-white' :
+                        'bg-blue-600 hover:bg-blue-700 text-white'
+                    }`}
+                  >
+                    {step.status === 'running' ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : step.status === 'completed' ? (
+                      <>
+                        <RotateCcw className="w-4 h-4 mr-1" />
+                        Re-run
+                      </>
+                    ) : (
+                      <>
+                        <PlayCircle className="w-4 h-4 mr-1" />
+                        Start
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </CardHeader>
+            
+            {/* Expanded Results */}
+            {expandedSteps.has(step.id) && (
+              <CardContent className="pt-0">
+                <div className="bg-white rounded-xl p-6 border border-gray-100 shadow-sm">
+                  {renderResults(step)}
+                </div>
+              </CardContent>
+            )}
+          </Card>
+        ))}
+      </div>
+
+      {/* Completion Status */}
+      {completedSteps === steps.length && (
+        <Card className="border-0 shadow-xl bg-gradient-to-br from-green-50 to-emerald-50 border-l-4 border-l-green-500">
+          <CardContent className="p-6">
+            <div className="flex items-center space-x-4">
+              <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full flex items-center justify-center">
+                <CheckCircle className="w-6 h-6 text-white" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-xl font-semibold text-green-900 mb-1">Analysis Complete!</h3>
+                <p className="text-green-700">
+                  All FSFVI analysis steps have been completed successfully. You can now view detailed results in each analysis section.
+                </p>
+              </div>
+              <Button 
+                onClick={() => {
+                  if (sessionId) {
+                    router.push(`/analysis/${sessionId}/system-vulnerability`);
+                  }
+                }}
+                className="bg-green-600 hover:bg-green-700 text-white"
+              >
+                <Eye className="w-4 h-4 mr-2" />
+                View Results
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }; 

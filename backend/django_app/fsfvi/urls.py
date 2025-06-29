@@ -39,6 +39,11 @@ urlpatterns = [
     path('fastapi/save-analysis/', views.save_analysis_results, name='save-analysis-fastapi'),
     path('fastapi/save-optimization/', views.save_optimization_results, name='save-optimization-fastapi'),
     
+    # API Documentation endpoints for developers
+    path('api-docs/', views.api_documentation_overview, name='api-documentation'),
+    path('deployment-guide/', views.deployment_guide, name='deployment-guide'),
+    path('integration-examples/', views.integration_examples, name='integration-examples'),
+    
     # Include router URLs
     path('api/', include(router.urls)),
 ] 
