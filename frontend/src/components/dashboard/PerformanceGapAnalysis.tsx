@@ -15,13 +15,18 @@ import {
   ArrowDown,
   Minus,
   Eye,
-  EyeOff
+  EyeOff,
+  ChevronDown,
+  ChevronRight,
+  Zap,
+  Shield,
+  TrendingUp
 } from 'lucide-react';
 
 interface PerformanceGap {
   component_name: string;
   gap_percent: number;
-  actual_gap_percent?: number;  // Uncapped gap for ranking
+  actual_gap_percent?: number;
   normalized_gap: number;
   priority_level: string;
   debug_observed?: number;
@@ -36,9 +41,9 @@ interface PerformanceGapSummary {
   average_gap_percent: number;
   worst_performer: string;
   largest_gap_percent: number;
-  worst_actual_gap_percent?: number;  // Actual gap of worst performer
-  largest_actual_gap_percent?: number;  // Largest actual gap overall
-  ranking_note?: string;  // Note about ranking methodology
+  worst_actual_gap_percent?: number;
+  largest_actual_gap_percent?: number;
+  ranking_note?: string;
 }
 
 interface MathematicalContext {
@@ -75,31 +80,110 @@ export const PerformanceGapAnalysis: React.FC<PerformanceGapAnalysisProps> = ({
   const [selectedComponent, setSelectedComponent] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<'gap' | 'name' | 'priority'>('gap');
 
-  const getPriorityColor = (priority: string) => {
+  const getPriorityConfig = (priority: string) => {
     switch (priority.toLowerCase()) {
-      case 'critical': return 'bg-red-100 text-red-800 border-red-200';
-      case 'high': return 'bg-orange-100 text-orange-800 border-orange-200';
-      case 'medium': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'low': return 'bg-green-100 text-green-800 border-green-200';
-      default: return 'bg-gray-100 text-gray-800 border-gray-200';
+      case 'critical': 
+        return {
+          color: 'bg-red-50 text-red-700 border-red-200',
+          gradient: 'from-red-500 to-red-600',
+          icon: <AlertTriangle className="w-4 h-4" />,
+          dotColor: 'bg-red-500'
+        };
+      case 'high': 
+        return {
+          color: 'bg-orange-50 text-orange-700 border-orange-200',
+          gradient: 'from-orange-500 to-orange-600',
+          icon: <TrendingDown className="w-4 h-4" />,
+          dotColor: 'bg-orange-500'
+        };
+      case 'medium': 
+        return {
+          color: 'bg-yellow-50 text-yellow-700 border-yellow-200',
+          gradient: 'from-yellow-500 to-yellow-600',
+          icon: <ArrowDown className="w-4 h-4" />,
+          dotColor: 'bg-yellow-500'
+        };
+      case 'low': 
+        return {
+          color: 'bg-green-50 text-green-700 border-green-200',
+          gradient: 'from-green-500 to-green-600',
+          icon: <CheckCircle className="w-4 h-4" />,
+          dotColor: 'bg-green-500'
+        };
+      default: 
+        return {
+          color: 'bg-gray-50 text-gray-700 border-gray-200',
+          gradient: 'from-gray-500 to-gray-600',
+          icon: <Minus className="w-4 h-4" />,
+          dotColor: 'bg-gray-500'
+        };
     }
   };
 
-  const getGapIcon = (gapPercent: number) => {
-    if (gapPercent > 30) return <TrendingDown className="w-5 h-5 text-red-500" />;
-    if (gapPercent > 15) return <ArrowDown className="w-5 h-5 text-orange-500" />;
-    if (gapPercent > 5) return <Minus className="w-5 h-5 text-yellow-500" />;
-    return <CheckCircle className="w-5 h-5 text-green-500" />;
+  const getGapVisualization = (gapPercent: number) => {
+    if (gapPercent === 0) {
+      return {
+        icon: <Shield className="w-6 h-6" />,
+        color: 'text-green-600',
+        bgColor: 'bg-green-100',
+        barColor: 'bg-green-500',
+        status: 'Excellent'
+      };
+    }
+    if (gapPercent >= 100) {
+      return {
+        icon: <AlertTriangle className="w-6 h-6" />,
+        color: 'text-red-600',
+        bgColor: 'bg-red-100',
+        barColor: 'bg-red-500',
+        status: 'Critical'
+      };
+    }
+    if (gapPercent > 30) {
+      return {
+        icon: <TrendingDown className="w-6 h-6" />,
+        color: 'text-red-600',
+        bgColor: 'bg-red-100',
+        barColor: 'bg-red-500',
+        status: 'High Risk'
+      };
+    }
+    if (gapPercent > 15) {
+      return {
+        icon: <ArrowDown className="w-6 h-6" />,
+        color: 'text-orange-600',
+        bgColor: 'bg-orange-100',
+        barColor: 'bg-orange-500',
+        status: 'Medium Risk'
+      };
+    }
+    if (gapPercent > 5) {
+      return {
+        icon: <Minus className="w-6 h-6" />,
+        color: 'text-yellow-600',
+        bgColor: 'bg-yellow-100',
+        barColor: 'bg-yellow-500',
+        status: 'Low Risk'
+      };
+    }
+    return {
+      icon: <TrendingUp className="w-6 h-6" />,
+      color: 'text-green-600',
+      bgColor: 'bg-green-100',
+      barColor: 'bg-green-500',
+      status: 'Good'
+    };
   };
 
   const getGapInterpretation = (gapPercent: number, component?: PerformanceGap) => {
     if (gapPercent === 0) {
       return {
         status: 'excellent',
-        title: 'Excellent Performance - No Gap',
-        description: 'This component is meeting or exceeding its benchmark, indicating resilience and effective resource allocation.',
-        actionNeeded: 'Maintain current approach and consider this as a model for other components.',
-        badge: 'Resilient'
+        title: 'Excellent Performance',
+        description: 'This component is meeting or exceeding its benchmark, indicating strong resilience.',
+        actionNeeded: 'Maintain current approach and consider as a model for other components.',
+        badge: 'Resilient',
+        color: 'green'
       };
     }
     
@@ -110,10 +194,11 @@ export const PerformanceGapAnalysis: React.FC<PerformanceGapAnalysisProps> = ({
       
       return {
         status: 'critical',
-        title: 'Critical Performance Gap (Capped at 100%)',
-        description: `Performance is severely below benchmark. Actual performance gap: ${actualGap.toFixed(1)}% below target.`,
-        actionNeeded: 'Immediate intervention required with comprehensive restructuring and significant resource reallocation.',
+        title: 'Critical Performance Gap',
+        description: `Performance is severely below benchmark. Actual gap: ${actualGap.toFixed(1)}% below target.`,
+        actionNeeded: 'Immediate intervention required with comprehensive restructuring.',
         badge: 'Critical',
+        color: 'red',
         details: `Observed: ${observed.toLocaleString()}, Target: ${benchmark.toLocaleString()}`
       };
     }
@@ -124,7 +209,8 @@ export const PerformanceGapAnalysis: React.FC<PerformanceGapAnalysisProps> = ({
         title: 'High Performance Gap',
         description: 'Significant underperformance requiring targeted intervention.',
         actionNeeded: 'Priority intervention needed with strategic resource allocation.',
-        badge: 'High Priority'
+        badge: 'High Priority',
+        color: 'red'
       };
     }
     
@@ -133,8 +219,9 @@ export const PerformanceGapAnalysis: React.FC<PerformanceGapAnalysisProps> = ({
         status: 'medium',
         title: 'Moderate Performance Gap', 
         description: 'Notable gap that should be addressed with focused investment.',
-        actionNeeded: 'Strategic improvements recommended with targeted resource allocation.',
-        badge: 'Medium Priority'
+        actionNeeded: 'Strategic improvements recommended.',
+        badge: 'Medium Priority',
+        color: 'orange'
       };
     }
     
@@ -143,8 +230,9 @@ export const PerformanceGapAnalysis: React.FC<PerformanceGapAnalysisProps> = ({
         status: 'low',
         title: 'Minor Performance Gap',
         description: 'Small gap with room for improvement through optimization.',
-        actionNeeded: 'Fine-tuning and optimization opportunities available.',
-        badge: 'Low Priority'
+        actionNeeded: 'Fine-tuning opportunities available.',
+        badge: 'Low Priority',
+        color: 'yellow'
       };
     }
     
@@ -153,7 +241,8 @@ export const PerformanceGapAnalysis: React.FC<PerformanceGapAnalysisProps> = ({
       title: 'Good Performance',
       description: 'Performance is close to benchmark with minimal improvement needed.',
       actionNeeded: 'Monitor and maintain current performance levels.',
-      badge: 'Good'
+      badge: 'Good',
+      color: 'green'
     };
   };
 
@@ -168,7 +257,6 @@ export const PerformanceGapAnalysis: React.FC<PerformanceGapAnalysisProps> = ({
     return components.sort((a, b) => {
       switch (sortBy) {
         case 'gap':
-          // Sort by actual gap first, then by displayed gap
           const aActualGap = a.actual_gap_percent ?? a.gap_percent;
           const bActualGap = b.actual_gap_percent ?? b.gap_percent;
           return bActualGap - aActualGap;
@@ -186,21 +274,23 @@ export const PerformanceGapAnalysis: React.FC<PerformanceGapAnalysisProps> = ({
 
   if (isLoading) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center">
-            <Activity className="w-5 h-5 mr-2 animate-pulse" />
-            Calculating Performance Gaps...
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {[...Array(3)].map((_, i) => (
-              <div key={i} className="animate-pulse">
-                <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
-                <div className="h-3 bg-gray-200 rounded w-1/2"></div>
-              </div>
-            ))}
+      <Card className="shadow-xl border-0 bg-white/95 backdrop-blur-sm">
+        <CardContent className="p-12">
+          <div className="text-center">
+            <div className="bg-blue-100 p-4 rounded-full w-fit mx-auto mb-6">
+              <Activity className="w-12 h-12 text-blue-600 animate-pulse" />
+            </div>
+            <h3 className="text-xl font-bold text-gray-900 mb-4">
+              Calculating Performance Gaps...
+            </h3>
+            <div className="space-y-4 max-w-md mx-auto">
+              {[...Array(3)].map((_, i) => (
+                <div key={i} className="animate-pulse">
+                  <div className="h-4 bg-gray-200 rounded w-full mb-2"></div>
+                  <div className="h-3 bg-gray-100 rounded w-2/3"></div>
+                </div>
+              ))}
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -209,32 +299,23 @@ export const PerformanceGapAnalysis: React.FC<PerformanceGapAnalysisProps> = ({
 
   if (!results) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center">
-            <Target className="w-5 h-5 mr-2" />
-            Performance Gap Analysis
-          </CardTitle>
-          <CardDescription>
-            Calculate performance gaps to see detailed component-level gaps
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="text-center py-8">
-            <BarChart3 className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">
-              No Performance Gap Data
-            </h3>
-            <p className="text-gray-600 mb-4">
-              Run the performance gap analysis to see detailed component-level gaps
-            </p>
-            {onRecalculate && (
-              <Button onClick={onRecalculate}>
-                <Calculator className="w-4 h-4 mr-2" />
-                Calculate Performance Gaps
-              </Button>
-            )}
+      <Card className="shadow-xl border-0 bg-gradient-to-br from-blue-50 to-indigo-50">
+        <CardContent className="p-12 text-center">
+          <div className="bg-blue-100 p-4 rounded-full w-fit mx-auto mb-6">
+            <Target className="h-12 w-12 text-blue-600" />
           </div>
+          <h3 className="text-2xl font-bold text-gray-900 mb-4">
+            Performance Gap Analysis
+          </h3>
+          <p className="text-gray-600 mb-8 max-w-md mx-auto leading-relaxed">
+            Calculate performance gaps to see detailed component-level analysis against international benchmarks
+          </p>
+          {onRecalculate && (
+            <Button onClick={onRecalculate} size="lg" className="bg-blue-600 hover:bg-blue-700">
+              <Calculator className="w-5 h-5 mr-2" />
+              Calculate Performance Gaps
+            </Button>
+          )}
         </CardContent>
       </Card>
     );
@@ -243,31 +324,95 @@ export const PerformanceGapAnalysis: React.FC<PerformanceGapAnalysisProps> = ({
   const sortedComponents = getSortedComponents();
 
   return (
-    <div className="space-y-6">
-      {/* Overview Card */}
-      <Card>
-        <CardHeader>
+    <div className="space-y-8">
+      {/* Overview Dashboard */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        <Card className="shadow-lg border-0 bg-gradient-to-br from-blue-50 to-blue-100 hover:shadow-xl transition-all duration-300">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-blue-600 text-sm font-medium">Total Components</p>
+                <p className="text-3xl font-bold text-blue-900">{results.summary?.total_components || 0}</p>
+              </div>
+              <div className="bg-blue-200 p-3 rounded-full">
+                <BarChart3 className="w-8 h-8 text-blue-700" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-lg border-0 bg-gradient-to-br from-orange-50 to-orange-100 hover:shadow-xl transition-all duration-300">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-orange-600 text-sm font-medium">Significant Gaps</p>
+                <p className="text-3xl font-bold text-orange-900">{results.summary?.components_with_significant_gaps || 0}</p>
+                <p className="text-xs text-orange-700">Above 15%</p>
+              </div>
+              <div className="bg-orange-200 p-3 rounded-full">
+                <AlertTriangle className="w-8 h-8 text-orange-700" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-lg border-0 bg-gradient-to-br from-yellow-50 to-yellow-100 hover:shadow-xl transition-all duration-300">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-yellow-600 text-sm font-medium">Average Gap</p>
+                <p className="text-3xl font-bold text-yellow-900">{results.summary?.average_gap_percent?.toFixed(1) || '0.0'}%</p>
+              </div>
+              <div className="bg-yellow-200 p-3 rounded-full">
+                <Target className="w-8 h-8 text-yellow-700" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-lg border-0 bg-gradient-to-br from-red-50 to-red-100 hover:shadow-xl transition-all duration-300">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-red-600 text-sm font-medium">Largest Gap</p>
+                <p className="text-3xl font-bold text-red-900">{results.summary?.largest_gap_percent?.toFixed(1) || '0.0'}%</p>
+                {results.summary?.largest_actual_gap_percent && results.summary.largest_actual_gap_percent > (results.summary.largest_gap_percent || 0) && (
+                  <p className="text-xs text-red-700">Actual: {results.summary.largest_actual_gap_percent.toFixed(1)}%</p>
+                )}
+              </div>
+              <div className="bg-red-200 p-3 rounded-full">
+                <TrendingDown className="w-8 h-8 text-red-700" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Main Analysis Card */}
+      <Card className="shadow-xl border-0 bg-white">
+        <CardHeader className="bg-gradient-to-r from-gray-50 to-blue-50 border-b">
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle className="flex items-center">
-                <Target className="w-5 h-5 mr-2" />
+              <CardTitle className="flex items-center text-2xl">
+                <Target className="w-6 h-6 mr-3 text-blue-600" />
                 Performance Gap Analysis
               </CardTitle>
-              <CardDescription>
-                Performance gaps for {countryName} - Performance gap analysis
+              <CardDescription className="text-lg mt-1">
+                Component-level performance gaps for {countryName}
               </CardDescription>
             </div>
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-3">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => setShowMathematicalDetails(!showMathematicalDetails)}
+                className="shadow-sm"
               >
-                {showMathematicalDetails ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                {showMathematicalDetails ? <EyeOff className="w-4 h-4 mr-2" /> : <Eye className="w-4 h-4 mr-2" />}
                 {showMathematicalDetails ? 'Hide' : 'Show'} Details
               </Button>
               {onRecalculate && (
-                <Button size="sm" onClick={onRecalculate}>
+                <Button size="sm" onClick={onRecalculate} className="bg-blue-600 hover:bg-blue-700 shadow-sm">
                   <Calculator className="w-4 h-4 mr-2" />
                   Recalculate
                 </Button>
@@ -275,50 +420,28 @@ export const PerformanceGapAnalysis: React.FC<PerformanceGapAnalysisProps> = ({
             </div>
           </div>
         </CardHeader>
-        <CardContent>
-          {/* Summary Statistics */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-            <div className="bg-blue-50 p-4 rounded-lg">
-              <div className="text-2xl font-bold text-blue-900">{results.summary?.total_components || 0}</div>
-              <div className="text-sm text-blue-700">Total Components</div>
-            </div>
-            <div className="bg-orange-50 p-4 rounded-lg">
-              <div className="text-2xl font-bold text-orange-900">{results.summary?.components_with_significant_gaps || 0}</div>
-              <div className="text-sm text-orange-700">Significant Gaps ({'>'}15%)</div>
-            </div>
-            <div className="bg-yellow-50 p-4 rounded-lg">
-              <div className="text-2xl font-bold text-yellow-900">{results.summary?.average_gap_percent?.toFixed(1) || '0.0'}%</div>
-              <div className="text-sm text-yellow-700">Average Gap</div>
-            </div>
-            <div className="bg-red-50 p-4 rounded-lg">
-              <div className="text-2xl font-bold text-red-900">{results.summary?.largest_gap_percent?.toFixed(1) || '0.0'}%</div>
-              <div className="text-sm text-red-700">Largest Gap (Display)</div>
-              {results.summary?.largest_actual_gap_percent && results.summary.largest_actual_gap_percent > (results.summary.largest_gap_percent || 0) && (
-                <div className="text-xs text-red-600 font-medium">
-                  Actual: {results.summary.largest_actual_gap_percent.toFixed(1)}%
-                </div>
-              )}
-            </div>
-          </div>
 
-          {/* Worst Performer Highlight */}
+        <CardContent className="p-8">
+          {/* Worst Performer Alert */}
           {results.summary?.worst_performer && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-              <div className="flex items-center">
-                <AlertTriangle className="w-5 h-5 text-red-600 mr-2" />
-                <div>
-                  <h4 className="font-semibold text-red-900">Attention Required (Ranked by Actual Gaps)</h4>
-                  <p className="text-sm text-red-700">
-                    <strong>{results.summary.worst_performer}</strong> has the largest performance gap 
+            <div className="bg-gradient-to-r from-red-50 to-pink-50 border-l-4 border-red-400 rounded-lg p-6 mb-8">
+              <div className="flex items-start">
+                <div className="bg-red-100 p-2 rounded-full mr-4">
+                  <AlertTriangle className="w-6 h-6 text-red-600" />
+                </div>
+                <div className="flex-1">
+                  <h4 className="font-bold text-red-900 text-lg mb-2">Priority Attention Required</h4>
+                  <p className="text-red-800 mb-2">
+                    <strong>{results.summary.worst_performer}</strong> shows the largest performance gap 
                     {results.summary.worst_actual_gap_percent ? (
-                      <>(<strong>{results.summary.worst_actual_gap_percent.toFixed(1)}%</strong> actual gap)</>
+                      <> (<strong>{results.summary.worst_actual_gap_percent.toFixed(1)}%</strong> actual gap)</>
                     ) : (
-                      <>({results.summary?.largest_gap_percent?.toFixed(1) || '0.0'}%)</>
-                    )} and requires immediate attention.
+                      <> ({results.summary?.largest_gap_percent?.toFixed(1) || '0.0'}%)</>
+                    )} and requires immediate intervention.
                   </p>
                   {results.summary.ranking_note && (
-                    <p className="text-xs text-red-600 mt-1 italic">
-                      Note: {results.summary.ranking_note}
+                    <p className="text-sm text-red-700 italic bg-red-100 p-2 rounded">
+                      <strong>Note:</strong> {results.summary.ranking_note}
                     </p>
                   )}
                 </div>
@@ -326,280 +449,228 @@ export const PerformanceGapAnalysis: React.FC<PerformanceGapAnalysisProps> = ({
             </div>
           )}
 
-          {/* Analysis Details (Expandable) */}
+          {/* Mathematical Details */}
           {showMathematicalDetails && (
-            <Card className="mb-6 border-blue-200 bg-blue-50">
+            <Card className="mb-8 border-blue-200 bg-gradient-to-br from-blue-50 to-indigo-50">
               <CardHeader>
-                <CardTitle className="text-base flex items-center">
-                  <Calculator className="w-4 h-4 mr-2" />
-                  Analysis Details
+                <CardTitle className="text-lg flex items-center">
+                  <Calculator className="w-5 h-5 mr-2 text-blue-600" />
+                  Mathematical Context & Validation
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  <div className="bg-white p-4 rounded-lg border">
-                    <h5 className="font-semibold text-sm mb-2">Performance Gap Analysis:</h5>
-                    <p className="text-sm text-gray-600 mt-2">
-                      {results.mathematical_context?.formula_description || 'Performance gap analysis measures deviation from benchmark values'}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <div className="bg-white p-4 rounded-lg shadow-sm">
+                    <h5 className="font-bold text-gray-900 mb-3">Analysis Method</h5>
+                    <p className="text-sm text-gray-700 leading-relaxed">
+                      {results.mathematical_context?.formula_description || 'Performance gap analysis measures deviation from benchmark values using validated FSFVI methodology'}
                     </p>
                   </div>
                   
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="bg-white p-3 rounded-lg border">
-                      <div className="text-sm font-semibold text-blue-600">Performance Gap</div>
-                      <div className="text-xs text-gray-600 mt-1">Normalized performance gap (dimensionless, [0,1])</div>
+                  <div className="bg-white p-4 rounded-lg shadow-sm">
+                    <h5 className="font-bold text-gray-900 mb-3">Validation Status</h5>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-600">Method: {results.mathematical_context?.calculation_method || 'core_fsfvi_functions'}</span>
+                      <Badge className="bg-green-100 text-green-800 border border-green-200">
+                        <CheckCircle className="w-3 h-3 mr-1" />
+                        {results.mathematical_context?.validation_status?.replace(/_/g, ' ') || 'Validated'}
+                      </Badge>
                     </div>
-                    <div className="bg-white p-3 rounded-lg border">
-                      <div className="text-sm font-semibold text-blue-600">Observed Value</div>
-                      <div className="text-xs text-gray-600 mt-1">Current performance measurement</div>
-                    </div>
-                    <div className="bg-white p-3 rounded-lg border">
-                      <div className="text-sm font-semibold text-blue-600">Benchmark</div>
-                      <div className="text-xs text-gray-600 mt-1">Target performance value</div>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-600">Calculation Method: {results.mathematical_context?.calculation_method || 'core_fsfvi_functions'}</span>
-                    <Badge className="bg-green-100 text-green-800">
-                      <CheckCircle className="w-3 h-3 mr-1" />
-                      {results.mathematical_context?.validation_status?.replace(/_/g, ' ') || 'Validated'}
-                    </Badge>
                   </div>
                 </div>
               </CardContent>
             </Card>
           )}
 
-          {/* Special Cases Alert */}
-          {sortedComponents.some(c => c.gap_percent === 0 || c.gap_percent >= 100) && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
-              {/* 0% Gap Components */}
-              {sortedComponents.filter(c => c.gap_percent === 0).map(component => (
-                <div key={`zero-${component.type}`} className="bg-green-50 border border-green-200 rounded-lg p-4">
-                  <div className="flex items-center mb-2">
-                    <CheckCircle className="w-5 h-5 text-green-600 mr-2" />
-                    <h4 className="font-semibold text-green-900">Resilient Component</h4>
-                  </div>
-                  <p className="text-sm text-green-800 mb-2">
-                    <strong>{component.component_name}</strong> shows 0% gap
-                  </p>
-                  <p className="text-xs text-green-700">
-                    Observed: {component.debug_observed?.toLocaleString() || 'N/A'} | 
-                    Benchmark: {component.debug_benchmark?.toLocaleString() || 'N/A'}
-                  </p>
-                  <p className="text-xs text-green-600 mt-1 font-medium">
-                    ✓ Performing {component.debug_observed && component.debug_benchmark ? 
-                      `${((component.debug_observed - component.debug_benchmark) / component.debug_benchmark * 100).toFixed(1)}% above benchmark` : 
-                      'above benchmark'}
-                  </p>
-                </div>
-              ))}
-
-              {/* 100% Gap Components */}
-              {sortedComponents.filter(c => c.gap_percent >= 100).map(component => (
-                <div key={`hundred-${component.type}`} className="bg-red-50 border border-red-200 rounded-lg p-4">
-                  <div className="flex items-center mb-2">
-                    <AlertTriangle className="w-5 h-5 text-red-600 mr-2" />
-                    <h4 className="font-semibold text-red-900">Critical Gap (Capped)</h4>
-                  </div>
-                  <p className="text-sm text-red-800 mb-2">
-                    <strong>{component.component_name}</strong> shows 100% gap (capped)
-                  </p>
-                  <p className="text-xs text-red-700">
-                    Observed: {component.debug_observed?.toLocaleString() || 'N/A'} | 
-                    Benchmark: {component.debug_benchmark?.toLocaleString() || 'N/A'}
-                  </p>
-                  {component.debug_observed && component.debug_benchmark && (
-                    <p className="text-xs text-red-600 mt-1 font-medium">
-                      ⚠️ Actually {((component.debug_benchmark - component.debug_observed) / component.debug_observed * 100).toFixed(1)}% below benchmark
-                    </p>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Component Analysis */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>Component-Level Analysis</CardTitle>
-              <CardDescription>
-                Detailed performance gaps by food system component
-              </CardDescription>
-            </div>
-            <div className="flex items-center space-x-2">
+          {/* Component Analysis */}
+          <div className="mb-8">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-bold text-gray-900">Component Performance Analysis</h3>
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as 'gap' | 'name' | 'priority')}
-                className="text-sm border rounded px-2 py-1"
-                aria-label="Sort components by"
+                className="px-4 py-2 border border-gray-200 rounded-lg text-sm bg-white shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               >
                 <option value="gap">Sort by Gap Size</option>
                 <option value="priority">Sort by Priority</option>
                 <option value="name">Sort by Name</option>
               </select>
             </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {sortedComponents.map((component) => (
-              <div
-                key={component.type}
-                className={`border rounded-lg p-4 transition-all duration-200 hover:shadow-md cursor-pointer ${
-                  selectedComponent === component.type ? 'ring-2 ring-blue-500 bg-blue-50' : 'hover:bg-gray-50'
-                }`}
-                onClick={() => setSelectedComponent(
-                  selectedComponent === component.type ? null : component.type
-                )}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    {getGapIcon(component.gap_percent)}
-                    <div>
-                      <h4 className="font-semibold text-gray-900">{component.component_name}</h4>
-                      <p className="text-sm text-gray-600">
-                        Performance Gap: {component.gap_percent?.toFixed(1) || '0.0'}%
-                        {component.actual_gap_percent && component.actual_gap_percent > component.gap_percent && (
-                          <span className="text-red-600 font-medium"> (Actually {component.actual_gap_percent.toFixed(1)}% below)</span>
-                        )}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-3">
-                    <Badge className={`${getPriorityColor(component.priority_level)} border`}>
-                      {component.priority_level.charAt(0).toUpperCase() + component.priority_level.slice(1)} Priority
-                    </Badge>
-                    <div className="text-right">
-                      <div className="text-sm font-semibold text-gray-900">
-                        {component.normalized_gap?.toFixed(4) || '0.0000'}
-                      </div>
-                      <div className="text-xs text-gray-500">Normalized Gap</div>
-                    </div>
-                  </div>
-                </div>
 
-                {/* Gap Visualization Bar */}
-                <div className="mt-3">
-                  <div className="flex items-center justify-between text-xs text-gray-600 mb-1">
-                    <span>Performance Gap</span>
-                    <span>{component.gap_percent?.toFixed(1) || '0.0'}%</span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div
-                      className={`h-2 rounded-full transition-all duration-300 ${
-                        (component.gap_percent || 0) > 30 ? 'bg-red-500' :
-                        (component.gap_percent || 0) > 15 ? 'bg-orange-500' :
-                        (component.gap_percent || 0) > 5 ? 'bg-yellow-500' : 'bg-green-500'
-                      }`}
-                      style={{ width: `${Math.min(100, component.gap_percent || 0)}%` }}
-                    />
-                  </div>
-                </div>
+            <div className="grid grid-cols-1 gap-4">
+              {sortedComponents.map((component) => {
+                const visualization = getGapVisualization(component.gap_percent);
+                const interpretation = getGapInterpretation(component.gap_percent, component);
+                const priorityConfig = getPriorityConfig(component.priority_level);
+                const isExpanded = selectedComponent === component.type;
 
-                {/* Expanded Details */}
-                {selectedComponent === component.type && (
-                  <div className="mt-4 pt-4 border-t border-gray-200">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="bg-white p-3 rounded-lg border">
-                        <h5 className="font-semibold text-sm mb-2">Gap Analysis</h5>
-                        <div className="space-y-2 text-sm">
-                          <div className="flex justify-between">
-                            <span className="text-gray-600">Gap Percentage:</span>
-                            <span className="font-medium">{component.gap_percent?.toFixed(2) || '0.00'}%</span>
-                          </div>
-                          {component.actual_gap_percent && component.actual_gap_percent !== component.gap_percent && (
-                            <div className="flex justify-between">
-                              <span className="text-gray-600">Actual Gap (Uncapped):</span>
-                              <span className="font-medium text-red-600">{component.actual_gap_percent.toFixed(2)}%</span>
+                return (
+                  <Card
+                    key={component.type}
+                    className={`transition-all duration-200 hover:shadow-lg cursor-pointer border-0 ${
+                      isExpanded ? 'ring-2 ring-blue-500 shadow-lg' : 'hover:shadow-md'
+                    }`}
+                    onClick={() => setSelectedComponent(isExpanded ? null : component.type)}
+                  >
+                    <CardContent className="p-6">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-4 flex-1">
+                          <div className={`p-3 rounded-xl ${visualization.bgColor}`}>
+                            <div className={visualization.color}>
+                              {visualization.icon}
                             </div>
-                          )}
-                          <div className="flex justify-between">
-                            <span className="text-gray-600">Normalized Gap:</span>
-                            <span className="font-medium font-mono">{component.normalized_gap?.toFixed(6) || '0.000000'}</span>
                           </div>
-                          <div className="flex justify-between">
-                            <span className="text-gray-600">Priority Level:</span>
-                            <Badge className={`${getPriorityColor(component.priority_level)} text-xs`}>
-                              {component.priority_level}
-                            </Badge>
+                          
+                          <div className="flex-1">
+                            <div className="flex items-center space-x-3 mb-2">
+                              <h4 className="font-bold text-gray-900 text-lg">{component.component_name}</h4>
+                              <Badge className={`${priorityConfig.color} border`}>
+                                {priorityConfig.icon}
+                                <span className="ml-1">{component.priority_level.charAt(0).toUpperCase() + component.priority_level.slice(1)}</span>
+                              </Badge>
+                            </div>
+                            
+                            <div className="flex items-center space-x-4">
+                              <div>
+                                <p className="text-sm text-gray-600">Performance Gap</p>
+                                <p className="text-xl font-bold text-gray-900">
+                                  {component.gap_percent?.toFixed(1) || '0.0'}%
+                                  {component.actual_gap_percent && component.actual_gap_percent > component.gap_percent && (
+                                    <span className="text-red-600 text-sm font-medium ml-2">
+                                      (Actually {component.actual_gap_percent.toFixed(1)}%)
+                                    </span>
+                                  )}
+                                </p>
+                              </div>
+                              
+                              <div>
+                                <p className="text-sm text-gray-600">Status</p>
+                                <p className={`text-sm font-semibold ${visualization.color}`}>
+                                  {visualization.status}
+                                </p>
+                              </div>
+                            </div>
                           </div>
                         </div>
+
+                        <div className="flex items-center space-x-4">
+                          <div className="text-right">
+                            <p className="text-sm text-gray-600">Normalized Gap</p>
+                            <p className="font-mono text-sm font-medium text-gray-900">
+                              {component.normalized_gap?.toFixed(4) || '0.0000'}
+                            </p>
+                          </div>
+                          {isExpanded ? <ChevronDown className="w-5 h-5 text-gray-400" /> : <ChevronRight className="w-5 h-5 text-gray-400" />}
+                        </div>
                       </div>
-                      
-                      <div className="bg-white p-3 rounded-lg border">
-                        <h5 className="font-semibold text-sm mb-2">Interpretation</h5>
-                        {(() => {
-                          const interpretation = getGapInterpretation(component.gap_percent || 0, component);
-                          return (
-                            <div className="space-y-2">
-                              <div className="flex items-center justify-between">
-                                <h6 className="font-medium text-sm">{interpretation.title}</h6>
-                                <Badge className={`text-xs ${
-                                  interpretation.status === 'excellent' ? 'bg-green-100 text-green-800' :
-                                  interpretation.status === 'critical' ? 'bg-red-100 text-red-800' :
-                                  interpretation.status === 'high' ? 'bg-orange-100 text-orange-800' :
-                                  interpretation.status === 'medium' ? 'bg-yellow-100 text-yellow-800' :
-                                  'bg-blue-100 text-blue-800'
-                                }`}>
-                                  {interpretation.badge}
-                                </Badge>
-                              </div>
-                              <p className="text-sm text-gray-700">{interpretation.description}</p>
-                              <p className="text-xs text-gray-600 font-medium">{interpretation.actionNeeded}</p>
-                              {interpretation.details && (
-                                <div className="mt-2 p-2 bg-gray-50 rounded text-xs">
-                                  <strong>Values:</strong> {interpretation.details}
+
+                      {/* Gap Visualization Bar */}
+                      <div className="mt-4">
+                        <div className="flex items-center justify-between text-sm text-gray-600 mb-2">
+                          <span>Performance Gap Visualization</span>
+                          <span>{component.gap_percent?.toFixed(1) || '0.0'}%</span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-3 shadow-inner">
+                          <div
+                            className={`h-3 rounded-full transition-all duration-500 ${visualization.barColor}`}
+                            style={{ width: `${Math.min(100, component.gap_percent || 0)}%` }}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Expanded Details */}
+                      {isExpanded && (
+                        <div className="mt-6 pt-6 border-t border-gray-100">
+                          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            {/* Performance Data */}
+                            <div className="bg-gray-50 p-4 rounded-lg">
+                              <h5 className="font-bold text-gray-900 mb-4 flex items-center">
+                                <BarChart3 className="w-4 h-4 mr-2" />
+                                Performance Data
+                              </h5>
+                              <div className="space-y-3">
+                                <div className="flex justify-between items-center">
+                                  <span className="text-gray-600">Observed Value:</span>
+                                  <span className="font-medium">{component.debug_observed?.toLocaleString() || 'N/A'}</span>
                                 </div>
-                              )}
+                                <div className="flex justify-between items-center">
+                                  <span className="text-gray-600">Benchmark Value:</span>
+                                  <span className="font-medium">{component.debug_benchmark?.toLocaleString() || 'N/A'}</span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                  <span className="text-gray-600">Gap Percentage:</span>
+                                  <span className="font-bold text-red-600">{component.gap_percent?.toFixed(2) || '0.00'}%</span>
+                                </div>
+                                {component.actual_gap_percent && component.actual_gap_percent !== component.gap_percent && (
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-gray-600">Actual Gap (Uncapped):</span>
+                                    <span className="font-bold text-red-700">{component.actual_gap_percent.toFixed(2)}%</span>
+                                  </div>
+                                )}
+                              </div>
                             </div>
-                          );
-                        })()}
+                            
+                            {/* Action Recommendations */}
+                            <div className="bg-blue-50 p-4 rounded-lg">
+                              <h5 className="font-bold text-gray-900 mb-4 flex items-center">
+                                <Zap className="w-4 h-4 mr-2" />
+                                {interpretation.title}
+                              </h5>
+                              <div className="space-y-3">
+                                <p className="text-sm text-gray-700 leading-relaxed">{interpretation.description}</p>
+                                <div className="bg-white p-3 rounded border-l-4 border-blue-400">
+                                  <p className="text-sm font-medium text-blue-900">Recommended Action:</p>
+                                  <p className="text-sm text-blue-800 mt-1">{interpretation.actionNeeded}</p>
+                                </div>
+                                {interpretation.details && (
+                                  <div className="bg-gray-100 p-2 rounded text-xs font-mono">
+                                    {interpretation.details}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Priority Actions */}
+          {results.priority_actions.length > 0 && (
+            <Card className="bg-gradient-to-r from-orange-50 to-red-50 border-orange-200">
+              <CardHeader>
+                <CardTitle className="flex items-center text-xl">
+                  <AlertTriangle className="w-6 h-6 mr-3 text-orange-600" />
+                  Priority Action Plan
+                </CardTitle>
+                <CardDescription>
+                  Immediate recommendations based on performance gap analysis
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {results.priority_actions.map((action, index) => (
+                    <div key={index} className="bg-white p-4 rounded-lg shadow-sm border-l-4 border-orange-400">
+                      <div className="flex items-start space-x-3">
+                        <div className="bg-orange-100 rounded-full p-2 mt-1">
+                          <span className="text-sm font-bold text-orange-700 w-5 h-5 flex items-center justify-center">
+                            {index + 1}
+                          </span>
+                        </div>
+                        <p className="text-sm font-medium text-gray-900 leading-relaxed">{action}</p>
                       </div>
                     </div>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </CardContent>
       </Card>
-
-      {/* Priority Actions */}
-      {results.priority_actions.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <AlertTriangle className="w-5 h-5 mr-2" />
-              Priority Actions
-            </CardTitle>
-            <CardDescription>
-              Recommended immediate actions based on performance gap analysis
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {results.priority_actions.map((action, index) => (
-                <div key={index} className="flex items-start space-x-3 p-3 bg-orange-50 rounded-lg border border-orange-200">
-                  <div className="bg-orange-100 rounded-full p-1 mt-0.5">
-                    <span className="text-xs font-bold text-orange-700 w-4 h-4 flex items-center justify-center">
-                      {index + 1}
-                    </span>
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-orange-900">{action}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 }; 
