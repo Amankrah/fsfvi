@@ -115,7 +115,7 @@ export const AnalysisNavigation: React.FC<AnalysisNavigationProps> = ({
                     <>
                       {sessionInfo.country} • FY {sessionInfo.fiscal_year || new Date().getFullYear()} • 
                       {sessionInfo.total_budget && sessionInfo.currency ? 
-                        ` $${(sessionInfo.total_budget / 1e6).toFixed(1)}M ${sessionInfo.currency}` : 
+                        ` $${sessionInfo.total_budget.toFixed(1)}M ${sessionInfo.currency}` : 
                         ` Session: ${sessionId.substring(0, 8)}...`
                       }
                     </>

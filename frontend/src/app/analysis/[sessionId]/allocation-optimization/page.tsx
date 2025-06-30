@@ -438,32 +438,7 @@ export default function AllocationOptimizationPage() {
               </CardHeader>
               <CardContent className="space-y-3">
                 
-                {/* Basic Optimization - Auto-run */}
-                <div className={`p-4 rounded-lg border-2 ${activeResultsView === 'optimization' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-gray-50'}`}>
-                  <div className="flex items-center justify-between mb-2">
-                    <h4 className="font-semibold text-gray-900">Current Optimization</h4>
-                    {optimizationResults.basic && <CheckCircle className="w-4 h-4 text-green-600" />}
-                  </div>
-                  <p className="text-xs text-gray-600 mb-3">Optimize current allocations to reduce vulnerabilities</p>
-                  <Button
-                    onClick={() => handleRunAnalysis('optimization')}
-                    disabled={analysisInProgress.optimization}
-                    className="w-full text-sm"
-                    variant={activeResultsView === 'optimization' ? 'default' : 'outline'}
-                  >
-                    {analysisInProgress.optimization ? (
-                      <>
-                        <Loader2 className="w-3 h-3 mr-2 animate-spin" />
-                        Optimizing...
-                      </>
-                    ) : (
-                      <>
-                        <Target className="w-3 h-3 mr-2" />
-                        {optimizationResults.basic ? 'Update Analysis' : 'Run Optimization'}
-                      </>
-                    )}
-                  </Button>
-                </div>
+
 
                 {/* Budget Planning Simulations */}
                 <div className="space-y-2">
