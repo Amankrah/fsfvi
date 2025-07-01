@@ -4,7 +4,6 @@ Handles CSV upload, processing, and database storage
 """
 
 import os
-import sys
 import uuid
 import tempfile
 from typing import Dict, List, Any, Optional, Tuple
@@ -15,10 +14,9 @@ from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
 import logging
 
-# Import the data preparation logic
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
+# Import the data preparation logic from local module
 try:
-    from data_preparation import UniversalFSFVIDataPreparation
+    from .data_preparation import UniversalFSFVIDataPreparation
     DATA_PREPARATION_AVAILABLE = True
     print("✅ Data preparation module loaded successfully")
 except ImportError:
