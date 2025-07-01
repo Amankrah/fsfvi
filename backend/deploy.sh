@@ -195,7 +195,7 @@ cd $FRONTEND_DIR
 print_status "Clearing frontend cache and old builds..."
 rm -rf .next
 rm -rf node_modules/.cache
-npm cache clean --force
+npm cache clean 2>/dev/null || rm -rf ~/.npm/_cacache 2>/dev/null || true
 
 # Create production environment file
 if [ ! -f "$FRONTEND_DIR/.env.production" ]; then
@@ -206,7 +206,7 @@ fi
 # Install frontend dependencies (fresh install)
 print_status "Installing frontend dependencies (fresh install)..."
 rm -rf node_modules
-npm ci --production=false
+npm ci
 
 # Build the frontend
 print_status "Building frontend for production..."

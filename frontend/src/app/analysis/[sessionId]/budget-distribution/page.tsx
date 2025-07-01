@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -118,7 +118,7 @@ export default function BudgetDistributionPage() {
 
   const getToken = () => localStorage.getItem('auth_token') || '';
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     if (!sessionId || !user) return;
 
     setLoading(true);
@@ -134,7 +134,7 @@ export default function BudgetDistributionPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [sessionId, user]);
 
   const refreshData = async () => {
     setRefreshing(true);
@@ -144,7 +144,7 @@ export default function BudgetDistributionPage() {
 
   useEffect(() => {
     loadData();
-  }, [sessionId, user]);
+  }, [loadData]);
 
   const getConcentrationColor = (level: string) => {
     switch (level.toLowerCase()) {
