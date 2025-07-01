@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // API Base URL - Django backend on port 8000
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || (typeof window !== 'undefined' && window.location.origin) || 'http://localhost:8000';
 
 // Create axios instance
 export const api = axios.create({
@@ -38,22 +38,22 @@ api.interceptors.response.use(
 // Auth API endpoints
 export const authAPI = {
   register: async (userData: RegisterData) => {
-    const response = await api.post('/api/auth/register/', userData);
+    const response = await api.post('/auth/register/', userData);
     return response.data;
   },
 
   login: async (credentials: LoginData) => {
-    const response = await api.post('/api/auth/login/', credentials);
+    const response = await api.post('/auth/login/', credentials);
     return response.data;
   },
 
   logout: async () => {
-    const response = await api.post('/api/auth/logout/');
+    const response = await api.post('/auth/logout/');
     return response.data;
   },
 
   getProfile: async () => {
-    const response = await api.get('/api/auth/profile/');
+    const response = await api.get('/auth/profile/');
     return response.data;
   },
 
@@ -107,7 +107,7 @@ export const dataAPI = {
 };
 
 // FastAPI Analysis endpoints - DEDICATED + COMPREHENSIVE API
-const FASTAPI_BASE_URL = process.env.NEXT_PUBLIC_FASTAPI_URL || 'http://localhost:8001';
+const FASTAPI_BASE_URL = process.env.NEXT_PUBLIC_FASTAPI_URL || (typeof window !== 'undefined' ? `${window.location.origin}/api` : 'http://localhost:8001');
 
 export const analysisAPI = {
   /*
