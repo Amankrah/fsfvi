@@ -364,19 +364,6 @@ stdout_logfile=/var/log/fsfvi-fastapi.log
 environment=ENVIRONMENT="production"
 EOF
 
-# Celery worker configuration
-sudo tee /etc/supervisor/conf.d/fsfvi-celery.conf > /dev/null << EOF
-[program:fsfvi-celery]
-command=$VENV_DIR/bin/celery -A fsfvi worker --loglevel=info
-directory=$DJANGO_DIR
-user=$USER
-autostart=true
-autorestart=true
-redirect_stderr=true
-stdout_logfile=/var/log/fsfvi-celery.log
-environment=ENVIRONMENT="production",DJANGO_SETTINGS_MODULE="settings"
-EOF
-
 # Next.js frontend configuration
 sudo tee /etc/supervisor/conf.d/fsfvi-frontend.conf > /dev/null << EOF
 [program:fsfvi-frontend]
@@ -584,7 +571,6 @@ print_status "- sudo supervisorctl status"
 print_status "- sudo supervisorctl restart fsfvi-frontend"
 print_status "- sudo supervisorctl restart fsfvi-django"
 print_status "- sudo supervisorctl restart fsfvi-fastapi"
-print_status "- sudo supervisorctl restart fsfvi-celery"
 print_status "- sudo systemctl reload nginx"
 print_status ""
 print_status "Database backup:"
