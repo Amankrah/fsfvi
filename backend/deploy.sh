@@ -205,6 +205,7 @@ sudo chown $USER:www-data /var/www/html/fsfvi
 # Copy built files to web directory
 print_status "Deploying frontend files..."
 sudo cp -r $FRONTEND_DIR/.next/standalone/* /var/www/html/fsfvi/
+sudo cp -r $FRONTEND_DIR/.next/standalone/.next /var/www/html/fsfvi/
 sudo cp -r $FRONTEND_DIR/.next/static /var/www/html/fsfvi/.next/
 sudo cp -r $FRONTEND_DIR/public /var/www/html/fsfvi/
 
@@ -220,8 +221,6 @@ sudo tee /etc/nginx/sites-available/fsfvi.ai > /dev/null << EOF
 server {
     listen 80;
     server_name fsfvi.ai www.fsfvi.ai 16.170.24.245;
-    root /var/www/html/fsfvi;
-    index index.html;
     
     # Frontend static files
     location /_next/static/ {
@@ -317,12 +316,8 @@ server {
         proxy_connect_timeout 300;
     }
     
-    # Next.js frontend - serve all other routes
+    # Next.js frontend - proxy all other routes
     location / {
-        try_files \$uri \$uri/ @nextjs;
-    }
-    
-    location @nextjs {
         proxy_pass http://127.0.0.1:3000;
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
@@ -413,8 +408,6 @@ server {
 server {
     listen 443 ssl http2;
     server_name fsfvi.ai www.fsfvi.ai;
-    root /var/www/html/fsfvi;
-    index index.html;
     
     # SSL Configuration (handled by certbot)
     ssl_certificate /etc/letsencrypt/live/fsfvi.ai/fullchain.pem;
@@ -520,12 +513,8 @@ server {
         proxy_connect_timeout 300;
     }
     
-    # Next.js frontend - serve all other routes
+    # Next.js frontend - proxy all other routes
     location / {
-        try_files \$uri \$uri/ @nextjs;
-    }
-    
-    location @nextjs {
         proxy_pass http://127.0.0.1:3000;
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
