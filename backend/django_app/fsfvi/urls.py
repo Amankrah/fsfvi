@@ -17,11 +17,11 @@ router.register(r'uploaded-files', views.UploadedFileViewSet, basename='uploaded
 
 urlpatterns = [
     # Authentication endpoints
-    path('auth/register/', views.RegisterView.as_view(), name='register'),
-    path('auth/login/', views.LoginView.as_view(), name='login'),
-    path('auth/logout/', views.logout_view, name='logout'),
-    path('auth/profile/', views.user_profile, name='user-profile'),
-    path('auth/token/', obtain_auth_token, name='api-token-auth'),  # Alternative token endpoint
+    path('api/auth/register/', views.RegisterView.as_view(), name='register'),
+    path('api/auth/login/', views.LoginView.as_view(), name='login'),
+    path('api/auth/logout/', views.logout_view, name='logout'),
+    path('api/auth/profile/', views.user_profile, name='user-profile'),
+    path('api/auth/token/', obtain_auth_token, name='api-token-auth'),  # Alternative token endpoint
     
     # Dashboard and Analytics
     path('dashboard/', views.dashboard_summary, name='dashboard'),

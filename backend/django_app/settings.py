@@ -249,7 +249,7 @@ os.makedirs(BASE_DIR / 'logs', exist_ok=True)
 if IS_PRODUCTION:
     CACHES = {
         'default': {
-            'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+            'BACKEND': 'django_redis.cache.RedisCache',
             'LOCATION': os.getenv('REDIS_URL', 'redis://127.0.0.1:6379/1'),
             'TIMEOUT': 300,
             'OPTIONS': {
