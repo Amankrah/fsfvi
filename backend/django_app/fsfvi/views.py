@@ -1,5 +1,7 @@
 from django.contrib.auth.models import User
 from django.contrib.auth import login, logout
+from django.views.decorators.csrf import csrf_exempt
+from django.utils.decorators import method_decorator
 from rest_framework import generics, status, viewsets, permissions
 from rest_framework.decorators import api_view, permission_classes, action
 from rest_framework.response import Response
@@ -24,6 +26,7 @@ from .serializers import (
 )
 
 # Authentication Views
+@method_decorator(csrf_exempt, name='dispatch')
 class RegisterView(generics.CreateAPIView):
     queryset = User.objects.all()
     serializer_class = UserRegistrationSerializer
@@ -41,6 +44,7 @@ class RegisterView(generics.CreateAPIView):
             'message': 'User registered successfully'
         }, status=status.HTTP_201_CREATED)
 
+@method_decorator(csrf_exempt, name='dispatch')
 class LoginView(generics.GenericAPIView):
     serializer_class = UserLoginSerializer
     permission_classes = [AllowAny]
@@ -59,6 +63,7 @@ class LoginView(generics.GenericAPIView):
             'message': 'Login successful'
         })
 
+@csrf_exempt
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def logout_view(request):
@@ -331,6 +336,7 @@ def analytics_overview(request):
     })
 
 # File Upload and Processing Views
+@csrf_exempt
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def upload_csv_file(request):
@@ -413,6 +419,7 @@ def get_session_with_file(request, session_id):
         return Response({'error': f'Failed to retrieve session: {str(e)}'}, 
                        status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+@csrf_exempt
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def reprocess_uploaded_file(request, session_id):
@@ -462,6 +469,7 @@ class UploadedFileViewSet(viewsets.ReadOnlyModelViewSet):
         return UploadedFile.objects.filter(user=self.request.user)
 
 # Utility Functions for FastAPI Integration
+@csrf_exempt
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def create_session_from_fastapi(request):
@@ -497,6 +505,7 @@ def create_session_from_fastapi(request):
         'session': FSFVISessionSerializer(session).data
     })
 
+@csrf_exempt
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def save_analysis_results(request):
@@ -531,6 +540,7 @@ def save_analysis_results(request):
         return Response({'error': 'Session not found'}, 
                        status=status.HTTP_404_NOT_FOUND)
 
+@csrf_exempt
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def save_optimization_results(request):
