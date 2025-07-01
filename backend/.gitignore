@@ -1,0 +1,16 @@
+# Python cache files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.so
+.Python
+
+# Logs
+logs/
+*.log
+
+# Django
+db.sqlite3
+media/
+staticfiles/
