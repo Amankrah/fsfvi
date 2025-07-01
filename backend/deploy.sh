@@ -10,6 +10,7 @@ echo "🚀 Starting FSFVI Production Deployment for fsfvi.ai"
 # Configuration
 PROJECT_DIR="/var/www/fsfvi"
 BACKEND_DIR="$PROJECT_DIR/backend"
+FRONTEND_DIR="$PROJECT_DIR/frontend"
 VENV_DIR="$BACKEND_DIR/venv"
 DJANGO_DIR="$BACKEND_DIR/django_app"
 FASTAPI_DIR="$BACKEND_DIR/fastapi_app"
@@ -59,7 +60,14 @@ fi
 # 1. System Dependencies
 print_status "Installing system dependencies..."
 sudo apt update
-sudo apt install -y python3-pip python3-venv python3-dev nginx redis-server supervisor certbot python3-certbot-nginx sqlite3
+sudo apt install -y python3-pip python3-venv python3-dev nginx redis-server supervisor certbot python3-certbot-nginx sqlite3 curl
+
+# Install Node.js 18.x for frontend
+print_status "Installing Node.js for frontend..."
+curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+sudo apt install -y nodejs
+node --version
+npm --version
 
 # 2. Verify project structure
 print_status "Verifying project structure..."
@@ -172,15 +180,64 @@ else:
     print("Superuser already exists")
 EOF
 
+# 9.1. Frontend Build and Deployment
+print_status "Building and deploying frontend..."
+cd $FRONTEND_DIR
+
+# Create production environment file
+if [ ! -f "$FRONTEND_DIR/.env.production" ]; then
+    print_status "Creating frontend production environment file..."
+    cp $FRONTEND_DIR/production.env.template $FRONTEND_DIR/.env.production
+fi
+
+# Install frontend dependencies
+print_status "Installing frontend dependencies..."
+npm ci --production=false
+
+# Build the frontend
+print_status "Building frontend for production..."
+npm run build:production
+
+# Create directory for built frontend
+sudo mkdir -p /var/www/html/fsfvi
+sudo chown $USER:www-data /var/www/html/fsfvi
+
+# Copy built files to web directory
+print_status "Deploying frontend files..."
+sudo cp -r $FRONTEND_DIR/.next/standalone/* /var/www/html/fsfvi/
+sudo cp -r $FRONTEND_DIR/.next/static /var/www/html/fsfvi/.next/
+sudo cp -r $FRONTEND_DIR/public /var/www/html/fsfvi/
+
+# Set proper permissions
+sudo chown -R $USER:www-data /var/www/html/fsfvi
+sudo chmod -R 755 /var/www/html/fsfvi
+
+print_status "Frontend build and deployment completed ✓"
+
 # 10. Nginx configuration - Initial HTTP-only setup
 print_status "Configuring Nginx (HTTP-only first)..."
 sudo tee /etc/nginx/sites-available/fsfvi.ai > /dev/null << EOF
 server {
     listen 80;
     server_name fsfvi.ai www.fsfvi.ai 16.170.24.245;
+    root /var/www/html/fsfvi;
+    index index.html;
     
-    # Static files
+    # Frontend static files
+    location /_next/static/ {
+        alias /var/www/html/fsfvi/.next/static/;
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+    
     location /static/ {
+        alias /var/www/html/fsfvi/public/;
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+    
+    # Django static files (for admin, etc.)
+    location /django-static/ {
         alias $DJANGO_DIR/staticfiles/;
         expires 1y;
         add_header Cache-Control "public, immutable";
@@ -192,8 +249,52 @@ server {
         add_header Cache-Control "public, immutable";
     }
     
-    # Django backend
-    location / {
+    # Django API endpoints
+    location /auth/ {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_redirect off;
+        proxy_read_timeout 300;
+        proxy_connect_timeout 300;
+    }
+    
+    location /dashboard/ {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_redirect off;
+        proxy_read_timeout 300;
+        proxy_connect_timeout 300;
+    }
+    
+    location /upload-csv/ {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_redirect off;
+        proxy_read_timeout 300;
+        proxy_connect_timeout 300;
+    }
+    
+    location /analytics/ {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_redirect off;
+        proxy_read_timeout 300;
+        proxy_connect_timeout 300;
+    }
+    
+    location /admin/ {
         proxy_pass http://127.0.0.1:8000;
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
@@ -207,6 +308,22 @@ server {
     # FastAPI service
     location /api/ {
         proxy_pass http://127.0.0.1:8001;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_redirect off;
+        proxy_read_timeout 300;
+        proxy_connect_timeout 300;
+    }
+    
+    # Next.js frontend - serve all other routes
+    location / {
+        try_files \$uri \$uri/ @nextjs;
+    }
+    
+    location @nextjs {
+        proxy_pass http://127.0.0.1:3000;
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
@@ -265,6 +382,19 @@ stdout_logfile=/var/log/fsfvi-celery.log
 environment=ENVIRONMENT="production",DJANGO_SETTINGS_MODULE="settings"
 EOF
 
+# Next.js frontend configuration
+sudo tee /etc/supervisor/conf.d/fsfvi-frontend.conf > /dev/null << EOF
+[program:fsfvi-frontend]
+command=/usr/bin/node server.js
+directory=/var/www/html/fsfvi
+user=$USER
+autostart=true
+autorestart=true
+redirect_stderr=true
+stdout_logfile=/var/log/fsfvi-frontend.log
+environment=NODE_ENV="production",PORT="3000"
+EOF
+
 # 12. SSL Certificate with Let's Encrypt
 print_status "Setting up SSL certificate with Let's Encrypt..."
 sudo certbot --nginx -d fsfvi.ai -d www.fsfvi.ai --non-interactive --agree-tos --email dishdevinfo@gmail.com
@@ -283,6 +413,8 @@ server {
 server {
     listen 443 ssl http2;
     server_name fsfvi.ai www.fsfvi.ai;
+    root /var/www/html/fsfvi;
+    index index.html;
     
     # SSL Configuration (handled by certbot)
     ssl_certificate /etc/letsencrypt/live/fsfvi.ai/fullchain.pem;
@@ -294,8 +426,21 @@ server {
     add_header X-XSS-Protection "1; mode=block";
     add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload";
     
-    # Static files
+    # Frontend static files
+    location /_next/static/ {
+        alias /var/www/html/fsfvi/.next/static/;
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+    
     location /static/ {
+        alias /var/www/html/fsfvi/public/;
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+    
+    # Django static files (for admin, etc.)
+    location /django-static/ {
         alias $DJANGO_DIR/staticfiles/;
         expires 1y;
         add_header Cache-Control "public, immutable";
@@ -307,8 +452,52 @@ server {
         add_header Cache-Control "public, immutable";
     }
     
-    # Django backend
-    location / {
+    # Django API endpoints
+    location /auth/ {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_redirect off;
+        proxy_read_timeout 300;
+        proxy_connect_timeout 300;
+    }
+    
+    location /dashboard/ {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_redirect off;
+        proxy_read_timeout 300;
+        proxy_connect_timeout 300;
+    }
+    
+    location /upload-csv/ {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_redirect off;
+        proxy_read_timeout 300;
+        proxy_connect_timeout 300;
+    }
+    
+    location /analytics/ {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_redirect off;
+        proxy_read_timeout 300;
+        proxy_connect_timeout 300;
+    }
+    
+    location /admin/ {
         proxy_pass http://127.0.0.1:8000;
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
@@ -322,6 +511,22 @@ server {
     # FastAPI service
     location /api/ {
         proxy_pass http://127.0.0.1:8001;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_redirect off;
+        proxy_read_timeout 300;
+        proxy_connect_timeout 300;
+    }
+    
+    # Next.js frontend - serve all other routes
+    location / {
+        try_files \$uri \$uri/ @nextjs;
+    }
+    
+    location @nextjs {
+        proxy_pass http://127.0.0.1:3000;
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
@@ -373,16 +578,24 @@ echo "0 2 * * * /usr/local/bin/fsfvi-backup.sh" | sudo crontab -
 print_status "✅ FSFVI Production Deployment Complete!"
 print_status "Your FSFVI application is now running at https://fsfvi.ai"
 print_status ""
+print_status "Services deployed:"
+print_status "- Frontend (Next.js): https://fsfvi.ai → port 3000"
+print_status "- Backend (Django): https://fsfvi.ai/auth/, /dashboard/, /admin/ → port 8000"
+print_status "- API (FastAPI): https://fsfvi.ai/api/ → port 8001"
+print_status ""
 print_status "Next steps:"
-print_status "1. Update your .env file with actual production values"
-print_status "2. Change default superuser password: python manage.py changepassword admin"
-print_status "3. Test the deployment: curl -k https://fsfvi.ai"
-print_status "4. Monitor logs: sudo tail -f /var/log/fsfvi-*.log"
+print_status "1. Update backend/.env with actual production values"
+print_status "2. Update frontend/.env.production if needed"
+print_status "3. Change default superuser password: python manage.py changepassword admin"
+print_status "4. Test the deployment: curl -k https://fsfvi.ai"
+print_status "5. Monitor logs: sudo tail -f /var/log/fsfvi-*.log"
 print_status ""
 print_status "Service management commands:"
 print_status "- sudo supervisorctl status"
+print_status "- sudo supervisorctl restart fsfvi-frontend"
 print_status "- sudo supervisorctl restart fsfvi-django"
 print_status "- sudo supervisorctl restart fsfvi-fastapi"
+print_status "- sudo supervisorctl restart fsfvi-celery"
 print_status "- sudo systemctl reload nginx"
 print_status ""
 print_status "Database backup:"
