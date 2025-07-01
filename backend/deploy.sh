@@ -172,30 +172,12 @@ else:
     print("Superuser already exists")
 EOF
 
-# 10. Nginx configuration
-print_status "Configuring Nginx..."
+# 10. Nginx configuration - Initial HTTP-only setup
+print_status "Configuring Nginx (HTTP-only first)..."
 sudo tee /etc/nginx/sites-available/fsfvi.ai > /dev/null << EOF
 server {
     listen 80;
     server_name fsfvi.ai www.fsfvi.ai 16.170.24.245;
-    
-    # Redirect HTTP to HTTPS
-    return 301 https://\$server_name\$request_uri;
-}
-
-server {
-    listen 443 ssl http2;
-    server_name fsfvi.ai www.fsfvi.ai;
-    
-    # SSL Configuration (will be handled by certbot)
-    ssl_certificate /etc/letsencrypt/live/fsfvi.ai/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/fsfvi.ai/privkey.pem;
-    
-    # Security headers
-    add_header X-Frame-Options DENY;
-    add_header X-Content-Type-Options nosniff;
-    add_header X-XSS-Protection "1; mode=block";
-    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload";
     
     # Static files
     location /static/ {
@@ -285,7 +267,73 @@ EOF
 
 # 12. SSL Certificate with Let's Encrypt
 print_status "Setting up SSL certificate with Let's Encrypt..."
-sudo certbot --nginx -d fsfvi.ai -d www.fsfvi.ai --non-interactive --agree-tos --email admin@fsfvi.ai
+sudo certbot --nginx -d fsfvi.ai -d www.fsfvi.ai --non-interactive --agree-tos --email dishdevinfo@gmail.com
+
+# 12.1. Update Nginx configuration for HTTPS after SSL certificate is obtained
+print_status "Updating Nginx configuration for HTTPS..."
+sudo tee /etc/nginx/sites-available/fsfvi.ai > /dev/null << EOF
+server {
+    listen 80;
+    server_name fsfvi.ai www.fsfvi.ai 16.170.24.245;
+    
+    # Redirect HTTP to HTTPS
+    return 301 https://\$server_name\$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name fsfvi.ai www.fsfvi.ai;
+    
+    # SSL Configuration (handled by certbot)
+    ssl_certificate /etc/letsencrypt/live/fsfvi.ai/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/fsfvi.ai/privkey.pem;
+    
+    # Security headers
+    add_header X-Frame-Options DENY;
+    add_header X-Content-Type-Options nosniff;
+    add_header X-XSS-Protection "1; mode=block";
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload";
+    
+    # Static files
+    location /static/ {
+        alias $DJANGO_DIR/staticfiles/;
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+    
+    location /media/ {
+        alias $DJANGO_DIR/media/;
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+    
+    # Django backend
+    location / {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_redirect off;
+        proxy_read_timeout 300;
+        proxy_connect_timeout 300;
+    }
+    
+    # FastAPI service
+    location /api/ {
+        proxy_pass http://127.0.0.1:8001;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_redirect off;
+        proxy_read_timeout 300;
+        proxy_connect_timeout 300;
+    }
+}
+EOF
+
+sudo nginx -t && sudo systemctl reload nginx
 
 # 13. Start services
 print_status "Starting services..."
