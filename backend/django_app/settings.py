@@ -31,7 +31,7 @@ DEVELOPMENT_HOSTS = [
     '0.0.0.0',
 ]
 
-ALLOWED_HOSTS = PRODUCTION_HOSTS + DEVELOPMENT_HOSTS if DEBUG else PRODUCTION_HOSTS
+ALLOWED_HOSTS = PRODUCTION_HOSTS + DEVELOPMENT_HOSTS if DEBUG else PRODUCTION_HOSTS + ['127.0.0.1', 'localhost']
 
 # Application definition
 INSTALLED_APPS = [
@@ -171,6 +171,11 @@ else:
 
 # Production Security Settings
 if IS_PRODUCTION:
+    # Proxy trust settings - Django is behind Nginx reverse proxy
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    USE_X_FORWARDED_HOST = True
+    USE_X_FORWARDED_PORT = True
+    
     # Security middleware settings
     SECURE_BROWSER_XSS_FILTER = True
     SECURE_CONTENT_TYPE_NOSNIFF = True
