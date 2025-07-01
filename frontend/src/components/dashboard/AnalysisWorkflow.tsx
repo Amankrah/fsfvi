@@ -11,7 +11,6 @@ import {
   AlertCircle, 
   TrendingUp, 
   BarChart3, 
-  Target,
   Loader2,
   ChevronDown,
   ChevronUp,
@@ -71,7 +70,7 @@ export const AnalysisWorkflow: React.FC<AnalysisWorkflowProps> = ({
       title: 'System FSFVI Score',
       description: 'Calculate overall system vulnerability index',
       status: 'pending',
-      icon: <Target className="w-5 h-5" />,
+      icon: <TrendingUp className="w-5 h-5" />,
     },
     {
       id: 'optimization',
@@ -188,47 +187,7 @@ export const AnalysisWorkflow: React.FC<AnalysisWorkflowProps> = ({
     }
   };
 
-  const runComprehensiveAnalysis = async () => {
-    if (!sessionId) {
-      alert('No session selected. Please upload data first.');
-      return;
-    }
 
-    const token = getToken();
-    
-    try {
-      // Mark all steps as running
-      steps.forEach(step => updateStepStatus(step.id, 'running'));
-      
-      // Call the comprehensive analysis endpoint
-      const comprehensiveResult = await analysisAPI.analyzeSystem(sessionId, token);
-      
-      // Extract and update results for each step - auto-expansion handled by updateStepStatus
-      updateStepStatus('distribution', 'completed', {
-        key_insights: [
-          `Total budget: $${comprehensiveResult.distribution_analysis?.total_budget_usd_millions?.toFixed(1) || '0.0'}M`,
-          `Budget utilization: ${comprehensiveResult.distribution_analysis?.budget_utilization_percent?.toFixed(1) || '0.0'}%`,
-          `Components analyzed: ${comprehensiveResult.distribution_analysis?.component_allocations ? Object.keys(comprehensiveResult.distribution_analysis.component_allocations).length : 0}`,
-          `Concentration level: ${comprehensiveResult.distribution_analysis?.concentration_analysis?.concentration_level || 'Unknown'}`
-        ]
-      });
-      
-      updateStepStatus('performance_gaps', 'completed', comprehensiveResult.performance_gaps || {});
-      
-      updateStepStatus('vulnerabilities', 'completed', comprehensiveResult.component_vulnerabilities || {});
-      
-      updateStepStatus('system_vulnerability', 'completed', comprehensiveResult);
-
-      if (onAnalysisComplete) {
-        onAnalysisComplete();
-      }
-      
-    } catch (error) {
-      console.error('Comprehensive analysis failed:', error);
-      steps.forEach(step => updateStepStatus(step.id, 'error'));
-      alert(`Comprehensive analysis failed: ${error}`);
-    }
-  };
 
 
 
@@ -534,7 +493,7 @@ export const AnalysisWorkflow: React.FC<AnalysisWorkflowProps> = ({
                 }}
               >
                 <Eye className="w-4 h-4 mr-2" />
-                View Comprehensive Analysis
+                View Detailed Analysis
               </Button>
               <Button
                 variant="outline"
@@ -658,7 +617,7 @@ export const AnalysisWorkflow: React.FC<AnalysisWorkflowProps> = ({
                 }}
               >
                 <Eye className="w-4 h-4 mr-2" />
-                View Comprehensive Analysis
+                View Detailed Analysis
               </Button>
               <Button
                 variant="outline"
@@ -858,19 +817,11 @@ export const AnalysisWorkflow: React.FC<AnalysisWorkflowProps> = ({
             {/* Action Buttons */}
             <div className="flex flex-col sm:flex-row gap-3">
               <Button 
-                onClick={runComprehensiveAnalysis} 
+                onClick={runFullAnalysis} 
                 className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-6"
               >
-                <Target className="w-4 h-4 mr-2" />
-                Comprehensive Analysis
-              </Button>
-              <Button 
-                onClick={runFullAnalysis} 
-                variant="outline" 
-                className="border-indigo-300 text-indigo-700 hover:bg-indigo-50"
-              >
                 <PlayCircle className="w-4 h-4 mr-2" />
-                Step-by-Step
+                Run Full Analysis
               </Button>
               <Button 
                 onClick={handleClearSession} 
