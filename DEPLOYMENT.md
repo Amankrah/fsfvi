@@ -1,145 +1,106 @@
-# FSFVI Deployment Guide
+# FSFVI Production Deployment Guide for fsfvi.ai
 
-## Quick Setup
+## Prerequisites
 
-### Development Environment
+- AWS EC2 instance (Ubuntu 20.04+) at **16.170.24.245**
+- Domain **fsfvi.ai** pointed to your Elastic IP
+- RSA key pair `fsfvi_aws_key` (located in `backend/` directory)
 
-1. **Clone and setup:**
-   ```bash
-   git clone <repository-url>
-   cd fsfvi
-   cp development.env.template backend/.env
-   ```
+## Step 1: SSH into AWS Server
 
-2. **Backend setup:**
-   ```bash
-   cd backend
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   pip install -r requirements.txt
-   ```
+```bash
+# Navigate to backend directory where the key is located
+cd backend
 
-3. **Django setup:**
-   ```bash
-   cd django_app
-   python manage.py migrate
-   python manage.py createsuperuser
-   python manage.py runserver 8000
-   ```
+# Set proper permissions for the SSH key
+chmod 400 fsfvi_aws_key
 
-4. **FastAPI setup (new terminal):**
-   ```bash
-   cd backend/fastapi_app
-   source ../venv/bin/activate
-   uvicorn main:app --host 127.0.0.1 --port 8001 --reload
-   ```
+# SSH into your AWS instance
+ssh -i fsfvi_aws_key ubuntu@16.170.24.245
+```
 
-5. **Frontend setup (new terminal):**
-   ```bash
-   cd frontend
-   npm install
-   npm run dev
-   ```
+## Step 2: Clone Repository and Setup
 
-**Access:**
-- Frontend: http://localhost:3000
-- Django Admin: http://localhost:8000/admin
-- FastAPI Docs: http://localhost:8001/docs
+```bash
+# On your AWS server
+sudo mkdir -p /var/www/fsfvi
+sudo chown $USER:$USER /var/www/fsfvi
+cd /var/www/fsfvi
 
----
+# Clone the repository
+git clone https://github.com/Amankrah/fsfvi.git .
 
-## Production Deployment on AWS (fsfvi.ai)
+# Configure production environment
+cp production.env.template backend/.env
 
-### Prerequisites
+# Edit the .env file with your production values
+nano backend/.env
+```
 
-- AWS EC2 instance (Ubuntu 20.04+)
-- Domain pointed to your Elastic IP (16.170.24.245)
-- SSH access to the server
+**Important:** Update these values in `backend/.env`:
+- `DJANGO_SECRET_KEY` - Generate a new secure key
+- `EMAIL_HOST_USER` and `EMAIL_HOST_PASSWORD` - Your email credentials
+- Other production-specific settings
 
-### Automated Deployment
+## Step 3: Run Automated Deployment
 
-1. **Upload your code to server:**
-   ```bash
-   # On your server
-   sudo mkdir -p /var/www/fsfvi
-   sudo chown $USER:$USER /var/www/fsfvi
-   cd /var/www/fsfvi
-   
-   # Upload/clone your code here
-   git clone <your-repository> .
-   ```
+```bash
+cd backend
+chmod +x deploy.sh
+./deploy.sh
+```
 
-2. **Configure production environment:**
-   ```bash
-   cd /var/www/fsfvi
-   cp production.env.template backend/.env
-   
-   # Edit the .env file with your production values
-   nano backend/.env
-   ```
-
-3. **Run deployment script:**
-   ```bash
-   cd backend
-   chmod +x deploy.sh
-   ./deploy.sh
-   ```
-
-The script will automatically:
-- Install system dependencies (Python, Nginx, Redis, etc.)
-- Setup virtual environment and install Python packages
+The deployment script will automatically:
+- Install system dependencies (Python, Nginx, Redis, SQLite, etc.)
+- Setup Python virtual environment and install packages
 - Configure SQLite database with proper permissions
-- Setup Nginx with SSL (Let's Encrypt)
+- Setup Nginx with SSL certificates (Let's Encrypt)
 - Configure Supervisor for process management
-- Setup automated backups
-- Configure firewall
+- Setup automated daily database backups
+- Configure firewall (UFW)
+- Start all services
 
-### Manual Configuration Steps
+## Step 4: Post-Deployment Security
 
-**Important:** After deployment, update these manually:
+**After deployment completes, immediately:**
 
-1. **Change Django secret key** in `backend/.env`:
-   ```bash
-   python -c 'from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())'
-   ```
-
-2. **Change admin password:**
+1. **Generate and set a new Django secret key:**
    ```bash
    cd /var/www/fsfvi/backend/django_app
    source ../venv/bin/activate
+   python -c 'from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())'
+   ```
+   Copy the output and update `DJANGO_SECRET_KEY` in `backend/.env`
+
+2. **Change the default admin password:**
+   ```bash
    python manage.py changepassword admin
    ```
 
-3. **Test deployment:**
+3. **Restart services to apply changes:**
    ```bash
-   curl -k https://fsfvi.ai
+   sudo supervisorctl restart all
    ```
 
-### Service Management
+## Step 5: Verify Deployment
 
 ```bash
+# Test HTTPS connection
+curl -I https://fsfvi.ai
+
 # Check service status
 sudo supervisorctl status
 
-# Restart services
-sudo supervisorctl restart fsfvi-django
-sudo supervisorctl restart fsfvi-fastapi
-sudo supervisorctl restart fsfvi-celery
-
-# Nginx
-sudo systemctl reload nginx
-
-# View logs
+# View logs if needed
 sudo tail -f /var/log/fsfvi-django.log
 sudo tail -f /var/log/fsfvi-fastapi.log
 ```
 
-### Database Backup
+**Your FSFVI application should now be live at:** `https://fsfvi.ai`
 
-- **Automatic:** Daily backups at 2 AM to `/var/backups/fsfvi/`
-- **Manual:** Run `/usr/local/bin/fsfvi-backup.sh`
+---
 
-### Architecture
+## Production Architecture
 
 ```
 Internet → Nginx (443/80) → Django (8000) + FastAPI (8001)
@@ -147,49 +108,87 @@ Internet → Nginx (443/80) → Django (8000) + FastAPI (8001)
                    SQLite Database + Redis Cache
 ```
 
-**Security Features:**
-- HTTPS with Let's Encrypt SSL
-- Security headers (HSTS, XSS protection, etc.)
-- Firewall configuration
-- Proper file permissions
-- Rate limiting
+## Service Management Commands
 
----
+```bash
+# Check all services
+sudo supervisorctl status
 
-## Environment Variables
+# Restart individual services
+sudo supervisorctl restart fsfvi-django
+sudo supervisorctl restart fsfvi-fastapi
+sudo supervisorctl restart fsfvi-celery
 
-### Development
-```env
-ENVIRONMENT=development
-DEBUG=True
-DJANGO_SECRET_KEY=development-key
+# Reload Nginx
+sudo systemctl reload nginx
+
+# View real-time logs
+sudo tail -f /var/log/fsfvi-django.log
+sudo tail -f /var/log/fsfvi-fastapi.log
+sudo tail -f /var/log/fsfvi-celery.log
 ```
 
-### Production
-```env
-ENVIRONMENT=production
-DEBUG=False
-DJANGO_SECRET_KEY=your-secure-production-key
-AUTH_SERVICE_URL=https://fsfvi.ai
+## Database Backup
+
+- **Automatic:** Daily backups at 2:00 AM to `/var/backups/fsfvi/`
+- **Manual backup:** `/usr/local/bin/fsfvi-backup.sh`
+- **View backups:** `ls -la /var/backups/fsfvi/`
+
+## SSL Certificate Management
+
+Certificates auto-renew via cron job. Manual renewal:
+```bash
+sudo certbot renew --dry-run
+sudo systemctl reload nginx
 ```
+
+## Security Features Enabled
+
+✅ HTTPS with Let's Encrypt SSL certificates  
+✅ Security headers (HSTS, XSS protection, etc.)  
+✅ Firewall configured (UFW)  
+✅ Proper file permissions for SQLite  
+✅ Rate limiting on API endpoints  
+✅ Production-only CORS origins  
 
 ## Troubleshooting
 
-1. **SSL Certificate Issues:**
-   ```bash
-   sudo certbot renew --dry-run
-   ```
+**SSL Issues:**
+```bash
+sudo certbot certificates
+sudo certbot renew --force-renewal
+```
 
-2. **Permission Issues:**
-   ```bash
-   sudo chown -R $USER:www-data /var/www/fsfvi/backend/django_app/
-   sudo chmod -R 775 /var/www/fsfvi/backend/django_app/media/
-   ```
+**Permission Issues:**
+```bash
+sudo chown -R $USER:www-data /var/www/fsfvi/backend/django_app/
+sudo chmod 664 /var/www/fsfvi/backend/django_app/db.sqlite3
+```
 
-3. **Database Issues:**
-   ```bash
-   cd /var/www/fsfvi/backend/django_app
-   python manage.py migrate
-   ```
+**Service Issues:**
+```bash
+sudo supervisorctl reread
+sudo supervisorctl update
+sudo supervisorctl restart all
+```
 
-For issues, check logs: `sudo tail -f /var/log/fsfvi-*.log` 
+**View detailed logs:**
+```bash
+sudo journalctl -u supervisor -f
+sudo nginx -t  # Test nginx configuration
+```
+
+---
+
+## Future Updates
+
+To deploy updates:
+```bash
+cd /var/www/fsfvi
+git pull origin main
+cd backend/django_app
+source ../venv/bin/activate
+python manage.py migrate
+python manage.py collectstatic --noinput
+sudo supervisorctl restart all
+``` 
