@@ -135,13 +135,15 @@ cd $DJANGO_DIR
 # Ensure virtual environment is still activated
 activate_venv
 
-# Verify Django can be imported
+# Set Django settings module and verify Django can be imported
+export DJANGO_SETTINGS_MODULE="settings"
 python -c "import django; django.setup()" || {
     print_error "Django setup failed - virtual environment issue"
     exit 1
 }
 
-# Run Django commands
+# Set Django settings and run Django commands
+export DJANGO_SETTINGS_MODULE="settings"
 python manage.py collectstatic --noinput
 python manage.py migrate
 python manage.py loaddata fixtures/initial_data.json 2>/dev/null || print_warning "No initial data fixtures found"
@@ -157,6 +159,9 @@ print_status "Creating Django superuser (if needed)..."
 
 # Ensure virtual environment is activated
 activate_venv
+
+# Set Django settings module
+export DJANGO_SETTINGS_MODULE="settings"
 
 python manage.py shell << EOF
 from django.contrib.auth.models import User
@@ -249,7 +254,7 @@ autostart=true
 autorestart=true
 redirect_stderr=true
 stdout_logfile=/var/log/fsfvi-django.log
-environment=ENVIRONMENT="production"
+environment=ENVIRONMENT="production",DJANGO_SETTINGS_MODULE="settings"
 EOF
 
 # FastAPI configuration
@@ -275,7 +280,7 @@ autostart=true
 autorestart=true
 redirect_stderr=true
 stdout_logfile=/var/log/fsfvi-celery.log
-environment=ENVIRONMENT="production"
+environment=ENVIRONMENT="production",DJANGO_SETTINGS_MODULE="settings"
 EOF
 
 # 12. SSL Certificate with Let's Encrypt
