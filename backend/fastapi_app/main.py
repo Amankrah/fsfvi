@@ -23,6 +23,7 @@ import uuid
 import requests
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
+import os
 
 # Import service layer and schemas - SINGLE SOURCE OF TRUTH
 from fsfvi_service import create_fsfvi_services
@@ -33,7 +34,6 @@ from validators import validate_system_health
 
 # Import Django integration
 import sys
-import os
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'django_app'))
 try:
     from fsfvi.django_integration import django_integration
@@ -43,8 +43,12 @@ except ImportError as e:
     print(f"⚠️ Django integration not available: {e}")
     DJANGO_INTEGRATION = False
 
+# Environment detection
+ENVIRONMENT = os.getenv('ENVIRONMENT', 'development')
+IS_PRODUCTION = ENVIRONMENT == 'production'
+
 # Configure logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO if IS_PRODUCTION else logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 # Initialize FastAPI app
@@ -52,18 +56,53 @@ app = FastAPI(
     title="FSFVI Analysis Service",
     description="Streamlined FSFVI Analysis API - All business logic in service layer",
     version="3.1.0",
-    docs_url="/docs",
-    redoc_url="/redoc"
+    docs_url="/docs" if not IS_PRODUCTION else None,  # Disable docs in production
+    redoc_url="/redoc" if not IS_PRODUCTION else None,
 )
 
-# Configure CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:8000"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# Environment-specific CORS configuration
+if IS_PRODUCTION:
+    # Production CORS - Strict settings for fsfvi.ai
+    allowed_origins = [
+        "https://fsfvi.ai",
+        "https://www.fsfvi.ai",
+        f"https://{os.getenv('BACKEND_PORT', '8000')}.fsfvi.ai",
+        f"https://{os.getenv('API_PORT', '8001')}.fsfvi.ai",
+    ]
+    
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=allowed_origins,
+        allow_credentials=True,
+        allow_methods=["GET", "POST", "PUT", "DELETE"],
+        allow_headers=["Authorization", "Content-Type"],
+        max_age=3600,  # Cache preflight requests for 1 hour
+    )
+    
+    # Production authentication service URL
+    AUTH_SERVICE_URL = os.getenv('AUTH_SERVICE_URL', 'https://fsfvi.ai')
+    
+    logger.info(f"🔒 Production mode: CORS configured for {allowed_origins}")
+    
+else:
+    # Development CORS - Permissive for local development
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=[
+            "http://localhost:3000",
+            "http://localhost:8000", 
+            "http://127.0.0.1:3000",
+            "http://127.0.0.1:8000"
+        ],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+    
+    # Development authentication service URL
+    AUTH_SERVICE_URL = 'http://localhost:8000'
+    
+    logger.info("🔧 Development mode: Permissive CORS enabled")
 
 # Security
 security = HTTPBearer()
@@ -79,16 +118,17 @@ async def run_django_operation(operation, *args, **kwargs):
     loop = asyncio.get_event_loop()
     return await loop.run_in_executor(thread_pool, operation, *args, **kwargs)
 
-# Authentication dependency
+# Authentication dependency with environment-aware URL
 async def get_current_user(authorization: HTTPAuthorizationCredentials = Depends(security)):
     """Validate token with Django backend"""
     token = authorization.credentials
     
     try:
         response = requests.get(
-            'http://localhost:8000/auth/profile/',
+            f'{AUTH_SERVICE_URL}/auth/profile/',
             headers={'Authorization': f'Token {token}'},
-            timeout=5
+            timeout=10 if IS_PRODUCTION else 5,
+            verify=IS_PRODUCTION  # SSL verification in production only
         )
         
         if response.status_code == 200:
@@ -96,7 +136,8 @@ async def get_current_user(authorization: HTTPAuthorizationCredentials = Depends
         else:
             raise HTTPException(status_code=401, detail="Invalid token")
             
-    except requests.RequestException:
+    except requests.RequestException as e:
+        logger.error(f"Authentication service error: {e}")
         raise HTTPException(status_code=503, detail="Authentication service unavailable")
 
 

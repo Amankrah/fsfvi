@@ -97,6 +97,9 @@ jspm_packages/
 # dotenv environment variables file
 .env
 .env.test
+.env.production
+.env.local
+backend/.env
 
 # Security and certificates
 *.pem
