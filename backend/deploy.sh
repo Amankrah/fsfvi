@@ -143,6 +143,13 @@ cd $DJANGO_DIR
 # Ensure virtual environment is still activated
 activate_venv
 
+# Clear Django cache and old static files
+print_status "Clearing Django cache and static files..."
+rm -rf staticfiles
+rm -rf __pycache__
+find . -name "*.pyc" -delete
+find . -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
+
 # Set Django settings module and verify Django can be imported
 export DJANGO_SETTINGS_MODULE="settings"
 python -c "import django; django.setup()" || {
@@ -152,7 +159,7 @@ python -c "import django; django.setup()" || {
 
 # Set Django settings and run Django commands
 export DJANGO_SETTINGS_MODULE="settings"
-python manage.py collectstatic --noinput
+python manage.py collectstatic --noinput --clear
 python manage.py migrate
 python manage.py loaddata fixtures/initial_data.json 2>/dev/null || print_warning "No initial data fixtures found"
 
@@ -184,21 +191,30 @@ EOF
 print_status "Building and deploying frontend..."
 cd $FRONTEND_DIR
 
+# Clear existing cache and builds
+print_status "Clearing frontend cache and old builds..."
+rm -rf .next
+rm -rf node_modules/.cache
+npm cache clean --force
+
 # Create production environment file
 if [ ! -f "$FRONTEND_DIR/.env.production" ]; then
     print_status "Creating frontend production environment file..."
     cp $FRONTEND_DIR/production.env.template $FRONTEND_DIR/.env.production
 fi
 
-# Install frontend dependencies
-print_status "Installing frontend dependencies..."
+# Install frontend dependencies (fresh install)
+print_status "Installing frontend dependencies (fresh install)..."
+rm -rf node_modules
 npm ci --production=false
 
 # Build the frontend
 print_status "Building frontend for production..."
 npm run build:production
 
-# Create directory for built frontend
+# Clear and recreate directory for built frontend
+print_status "Preparing frontend deployment directory..."
+sudo rm -rf /var/www/html/fsfvi
 sudo mkdir -p /var/www/html/fsfvi
 sudo chown $USER:www-data /var/www/html/fsfvi
 
@@ -523,6 +539,12 @@ sudo supervisorctl update
 sudo supervisorctl start all
 sudo systemctl enable nginx redis-server supervisor
 sudo systemctl start nginx redis-server supervisor
+
+# Clear nginx cache
+print_status "Clearing nginx cache..."
+sudo systemctl reload nginx
+# Clear any nginx proxy cache if configured
+sudo rm -rf /var/cache/nginx/* 2>/dev/null || true
 
 # 14. Firewall configuration
 print_status "Configuring firewall..."
