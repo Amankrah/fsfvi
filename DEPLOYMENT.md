@@ -4,7 +4,7 @@
 
 - AWS EC2 instance (Ubuntu 20.04+) at **16.170.24.245**
 - Domain **fsfvi.ai** pointed to your Elastic IP
-- RSA key pair `fsfvi_aws_key` (located in `backend/` directory)
+- RSA key pair `fsfvi_aws_key.pem` (located in `backend/` directory)
 
 ## Step 1: SSH into AWS Server
 
@@ -13,10 +13,10 @@
 cd backend
 
 # Set proper permissions for the SSH key
-chmod 400 fsfvi_aws_key
+chmod 400 fsfvi_aws_key.pem
 
 # SSH into your AWS instance
-ssh -i fsfvi_aws_key ubuntu@16.170.24.245
+ssh -i fsfvi_aws_key.pem ubuntu@16.170.24.245
 ```
 
 ## Step 2: Clone Repository and Setup

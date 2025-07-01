@@ -33,6 +33,23 @@ print_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
+# Function to ensure virtual environment is activated
+activate_venv() {
+    if [ ! -f "$VENV_DIR/bin/activate" ]; then
+        print_error "Virtual environment not found at $VENV_DIR"
+        exit 1
+    fi
+    
+    source $VENV_DIR/bin/activate
+    
+    if [ "$VIRTUAL_ENV" != "$VENV_DIR" ]; then
+        print_error "Failed to activate virtual environment"
+        exit 1
+    fi
+    
+    print_status "Virtual environment active: $VIRTUAL_ENV"
+}
+
 # Check if running as root
 if [[ $EUID -eq 0 ]]; then
    print_error "This script should not be run as root for security reasons"
@@ -44,23 +61,59 @@ print_status "Installing system dependencies..."
 sudo apt update
 sudo apt install -y python3-pip python3-venv python3-dev nginx redis-server supervisor certbot python3-certbot-nginx sqlite3
 
-# 2. Create project directory
-print_status "Setting up project directory..."
-sudo mkdir -p $PROJECT_DIR
-sudo chown $USER:$USER $PROJECT_DIR
+# 2. Verify project structure
+print_status "Verifying project structure..."
 
-# 3. Setup Python virtual environment
+# Check if we're in the right directory
+if [ ! -f "$PROJECT_DIR/backend/requirements.txt" ]; then
+    print_error "Project structure not found. Make sure you're in /var/www/fsfvi and the repository is cloned."
+    print_error "Expected file: $PROJECT_DIR/backend/requirements.txt"
+    exit 1
+fi
+
+if [ ! -f "$PROJECT_DIR/production.env.template" ]; then
+    print_error "Production environment template not found at $PROJECT_DIR/production.env.template"
+    exit 1
+fi
+
+print_status "Project structure verified ✓"
+
+# 3. Create project directory permissions
+print_status "Setting up project directory permissions..."
+sudo chown -R $USER:$USER $PROJECT_DIR
+
+# 4. Setup Python virtual environment
 print_status "Creating Python virtual environment..."
 cd $BACKEND_DIR
-python3 -m venv $VENV_DIR
-source $VENV_DIR/bin/activate
 
-# 4. Install Python dependencies
+# Remove existing venv if it exists
+if [ -d "$VENV_DIR" ]; then
+    print_warning "Removing existing virtual environment..."
+    rm -rf $VENV_DIR
+fi
+
+# Create new virtual environment
+python3 -m venv $VENV_DIR
+
+# Verify venv was created
+if [ ! -f "$VENV_DIR/bin/activate" ]; then
+    print_error "Failed to create virtual environment"
+    exit 1
+fi
+
+# Activate virtual environment
+activate_venv
+
+# 5. Install Python dependencies
 print_status "Installing Python dependencies..."
 pip install --upgrade pip
 pip install -r requirements.txt
 
-# 5. Environment configuration
+# Verify key packages are installed
+python -c "import django; print(f'Django {django.get_version()} installed')"
+python -c "import fastapi; print(f'FastAPI installed')"
+
+# 6. Environment configuration
 print_status "Setting up environment configuration..."
 if [ ! -f "$BACKEND_DIR/.env" ]; then
     print_warning "No .env file found. Creating from production template..."
@@ -69,15 +122,26 @@ if [ ! -f "$BACKEND_DIR/.env" ]; then
     read -p "Press enter when you've updated the .env file..."
 fi
 
-# 6. Setup SQLite database directory with proper permissions
+# 7. Setup SQLite database directory with proper permissions
 print_status "Setting up SQLite database..."
 mkdir -p $DJANGO_DIR/data
 chown $USER:www-data $DJANGO_DIR/data
 chmod 775 $DJANGO_DIR/data
 
-# 7. Django setup
+# 8. Django setup
 print_status "Running Django migrations and setup..."
 cd $DJANGO_DIR
+
+# Ensure virtual environment is still activated
+activate_venv
+
+# Verify Django can be imported
+python -c "import django; django.setup()" || {
+    print_error "Django setup failed - virtual environment issue"
+    exit 1
+}
+
+# Run Django commands
 python manage.py collectstatic --noinput
 python manage.py migrate
 python manage.py loaddata fixtures/initial_data.json 2>/dev/null || print_warning "No initial data fixtures found"
@@ -88,8 +152,12 @@ if [ -f "$DJANGO_DIR/db.sqlite3" ]; then
     chmod 664 $DJANGO_DIR/db.sqlite3
 fi
 
-# 8. Create Django superuser (if needed)
+# 9. Create Django superuser (if needed)
 print_status "Creating Django superuser (if needed)..."
+
+# Ensure virtual environment is activated
+activate_venv
+
 python manage.py shell << EOF
 from django.contrib.auth.models import User
 if not User.objects.filter(username='admin').exists():
@@ -99,7 +167,7 @@ else:
     print("Superuser already exists")
 EOF
 
-# 9. Nginx configuration
+# 10. Nginx configuration
 print_status "Configuring Nginx..."
 sudo tee /etc/nginx/sites-available/fsfvi.ai > /dev/null << EOF
 server {
@@ -168,7 +236,7 @@ sudo ln -sf /etc/nginx/sites-available/fsfvi.ai /etc/nginx/sites-enabled/
 sudo rm -f /etc/nginx/sites-enabled/default
 sudo nginx -t && sudo systemctl reload nginx
 
-# 10. Supervisor configuration for services
+# 11. Supervisor configuration for services
 print_status "Configuring Supervisor for service management..."
 
 # Django/Gunicorn configuration
@@ -210,11 +278,11 @@ stdout_logfile=/var/log/fsfvi-celery.log
 environment=ENVIRONMENT="production"
 EOF
 
-# 11. SSL Certificate with Let's Encrypt
+# 12. SSL Certificate with Let's Encrypt
 print_status "Setting up SSL certificate with Let's Encrypt..."
 sudo certbot --nginx -d fsfvi.ai -d www.fsfvi.ai --non-interactive --agree-tos --email admin@fsfvi.ai
 
-# 12. Start services
+# 13. Start services
 print_status "Starting services..."
 sudo supervisorctl reread
 sudo supervisorctl update
@@ -222,17 +290,17 @@ sudo supervisorctl start all
 sudo systemctl enable nginx redis-server supervisor
 sudo systemctl start nginx redis-server supervisor
 
-# 13. Firewall configuration
+# 14. Firewall configuration
 print_status "Configuring firewall..."
 sudo ufw allow 'Nginx Full'
 sudo ufw allow ssh
 sudo ufw --force enable
 
-# 14. Setup automatic SSL renewal
+# 15. Setup automatic SSL renewal
 print_status "Setting up automatic SSL certificate renewal..."
 echo "0 12 * * * /usr/bin/certbot renew --quiet" | sudo crontab -
 
-# 15. Create backup script for SQLite database
+# 16. Create backup script for SQLite database
 print_status "Setting up database backup..."
 sudo tee /usr/local/bin/fsfvi-backup.sh > /dev/null << EOF
 #!/bin/bash
