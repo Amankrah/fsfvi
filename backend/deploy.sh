@@ -125,8 +125,8 @@ fi
 # 7. Setup SQLite database directory with proper permissions
 print_status "Setting up SQLite database..."
 mkdir -p $DJANGO_DIR/data
-chown $USER:www-data $DJANGO_DIR/data
-chmod 775 $DJANGO_DIR/data
+sudo chown $USER:www-data $DJANGO_DIR/data
+sudo chmod 775 $DJANGO_DIR/data
 
 # 8. Django setup
 print_status "Running Django migrations and setup..."
@@ -148,8 +148,8 @@ python manage.py loaddata fixtures/initial_data.json 2>/dev/null || print_warnin
 
 # Set proper permissions for SQLite database
 if [ -f "$DJANGO_DIR/db.sqlite3" ]; then
-    chown $USER:www-data $DJANGO_DIR/db.sqlite3
-    chmod 664 $DJANGO_DIR/db.sqlite3
+    sudo chown $USER:www-data $DJANGO_DIR/db.sqlite3
+    sudo chmod 664 $DJANGO_DIR/db.sqlite3
 fi
 
 # 9. Create Django superuser (if needed)
@@ -312,7 +312,7 @@ sqlite3 $DJANGO_DIR/db.sqlite3 ".backup \$BACKUP_DIR/fsfvi_backup_\$DATE.sqlite3
 find \$BACKUP_DIR -name "fsfvi_backup_*.sqlite3" -mtime +7 -delete
 EOF
 
-chmod +x /usr/local/bin/fsfvi-backup.sh
+sudo chmod +x /usr/local/bin/fsfvi-backup.sh
 
 # Setup daily backup
 echo "0 2 * * * /usr/local/bin/fsfvi-backup.sh" | sudo crontab -
