@@ -16,13 +16,6 @@ router.register(r'weight-adjustments', views.WeightAdjustmentViewSet, basename='
 router.register(r'uploaded-files', views.UploadedFileViewSet, basename='uploaded-file')
 
 urlpatterns = [
-    # Authentication endpoints
-    path('auth/register/', views.RegisterView.as_view(), name='register'),
-    path('auth/login/', views.LoginView.as_view(), name='login'),
-    path('auth/logout/', views.logout_view, name='logout'),
-    path('auth/profile/', views.user_profile, name='user-profile'),
-    path('auth/token/', obtain_auth_token, name='api-token-auth'),  # Alternative token endpoint
-    
     # Dashboard and Analytics
     path('dashboard/', views.dashboard_summary, name='dashboard'),
     path('analytics/', views.analytics_overview, name='analytics'),
@@ -42,7 +35,17 @@ urlpatterns = [
     # Health check endpoint
     path('health/', views.health_check, name='health-check'),
     
-    # Django REST Framework API endpoints (separated from FastAPI)
+    # Django REST Framework API endpoints (includes auth)
     # Changed from 'api/' to 'django-api/' to avoid conflicts with FastAPI
-    path('django-api/', include(router.urls)),
+    path('django-api/', include([
+        # Authentication endpoints (moved here to avoid frontend conflicts)
+        path('auth/register/', views.RegisterView.as_view(), name='register'),
+        path('auth/login/', views.LoginView.as_view(), name='login'),
+        path('auth/logout/', views.logout_view, name='logout'),
+        path('auth/profile/', views.user_profile, name='user-profile'),
+        path('auth/token/', obtain_auth_token, name='api-token-auth'),
+        
+        # Include router URLs
+        path('', include(router.urls)),
+    ])),
 ] 
