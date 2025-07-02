@@ -38,22 +38,22 @@ api.interceptors.response.use(
 // Auth API endpoints
 export const authAPI = {
   register: async (userData: RegisterData) => {
-    const response = await api.post('/auth/register/', userData);
+    const response = await api.post('/django-api/auth/register/', userData);
     return response.data;
   },
 
   login: async (credentials: LoginData) => {
-    const response = await api.post('/auth/login/', credentials);
+    const response = await api.post('/django-api/auth/login/', credentials);
     return response.data;
   },
 
   logout: async () => {
-    const response = await api.post('/auth/logout/');
+    const response = await api.post('/django-api/auth/logout/');
     return response.data;
   },
 
   getProfile: async () => {
-    const response = await api.get('/auth/profile/');
+    const response = await api.get('/django-api/auth/profile/');
     return response.data;
   },
 

@@ -299,17 +299,12 @@ server {
         proxy_pass http://django_backend;
     }
     
-    # Authentication routes (Django)
-    location /auth/ {
-        proxy_pass http://django_backend;
-    }
-    
     # Dashboard and analytics (Django)
     location ~ ^/(dashboard|analytics|upload-csv)/ {
         proxy_pass http://django_backend;
     }
     
-    # Django REST Framework API (separated from FastAPI)
+    # Django REST Framework API (includes auth at /django-api/auth/)
     location /django-api/ {
         proxy_pass http://django_backend;
     }
@@ -328,7 +323,7 @@ server {
         proxy_pass http://fastapi_backend/;
     }
     
-    # Frontend - all other routes go to Next.js
+    # Frontend - all other routes go to Next.js (including /auth/)
     location / {
         proxy_pass http://frontend_backend;
         
