@@ -1,7 +1,10 @@
 import axios from 'axios';
 
-// API Base URL - Django backend on port 8000
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || (typeof window !== 'undefined' && window.location.origin) || 'http://localhost:8000';
+// API Base URL - Django backend
+// In production, requests go through nginx to the same domain
+// In development, direct to Django on port 8000
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 
+  (process.env.NODE_ENV === 'production' ? '' : 'http://localhost:8000');
 
 // Create axios instance
 export const api = axios.create({
@@ -17,19 +20,28 @@ api.interceptors.request.use((config) => {
   const token = localStorage.getItem('auth_token');
   if (token) {
     config.headers.Authorization = `Token ${token}`;
+    console.log('🔑 API: Adding token to request:', config.url);
+  } else {
+    console.log('ℹ️ API: No token found for request:', config.url);
   }
   return config;
 });
 
 // Response interceptor for error handling
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    console.log('✅ API: Successful response from:', response.config.url);
+    return response;
+  },
   (error) => {
+    console.log('❌ API: Error response from:', error.config?.url, 'Status:', error.response?.status);
     if (error.response?.status === 401) {
-      // Clear token and redirect to login
+      console.log('🚫 API: 401 Unauthorized - clearing auth data');
+      // Clear token but don't redirect here - let components handle it
       localStorage.removeItem('auth_token');
       localStorage.removeItem('user');
-      window.location.href = '/auth/login';
+      // Don't use window.location.href as it causes redirect loops
+      // Let the AuthContext and components handle the redirect
     }
     return Promise.reject(error);
   }
@@ -108,7 +120,10 @@ export const dataAPI = {
 };
 
 // FastAPI Analysis endpoints - DEDICATED + COMPREHENSIVE API
-const FASTAPI_BASE_URL = process.env.NEXT_PUBLIC_FASTAPI_URL || (typeof window !== 'undefined' ? `${window.location.origin}/api` : 'http://localhost:8001');
+// In production, requests go through nginx to /api path
+// In development, direct to FastAPI on port 8001
+const FASTAPI_BASE_URL = process.env.NEXT_PUBLIC_FASTAPI_URL || 
+  (process.env.NODE_ENV === 'production' ? '/api' : 'http://localhost:8001');
 
 export const analysisAPI = {
   /*

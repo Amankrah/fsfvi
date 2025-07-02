@@ -192,3 +192,12 @@ python manage.py migrate
 python manage.py collectstatic --noinput
 sudo supervisorctl restart all
 ``` 
+
+
+curl -X POST https://fsfvi.ai/django-api/auth/login/ \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "testuser",
+    "password": "SecurePassword123!"
+  }' \
+  -v

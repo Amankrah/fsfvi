@@ -71,7 +71,9 @@ export const Dashboard: React.FC = () => {
 
   // Redirect if not authenticated
   useEffect(() => {
+    console.log('🏁 Dashboard: Auth state check - isLoading:', isLoading, 'user:', !!user);
     if (!isLoading && !user) {
+      console.log('🔄 Dashboard: Redirecting to login - no authenticated user');
       router.push('/auth/login');
     }
   }, [user, isLoading, router]);
