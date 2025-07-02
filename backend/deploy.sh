@@ -272,6 +272,15 @@ server {
         access_log off;
     }
     
+    # Django static files (REST Framework expects /static/ path)
+    location ~ ^/static/(rest_framework|admin)/ {
+        alias $DJANGO_DIR/staticfiles/;
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+        access_log off;
+    }
+    
+    # Frontend static files (everything else under /static/)
     location /static/ {
         alias /var/www/html/fsfvi/public/;
         expires 1y;
@@ -279,7 +288,7 @@ server {
         access_log off;
     }
     
-    # Django static and media files
+    # Django static and media files (alternative path)
     location /django-static/ {
         alias $DJANGO_DIR/staticfiles/;
         expires 1y;
