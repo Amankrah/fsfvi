@@ -249,42 +249,10 @@ upstream frontend_backend {
     server 127.0.0.1:3000;
 }
 
-# HTTP server - will redirect to HTTPS after SSL setup
+# HTTP server - will be updated by certbot for SSL
 server {
     listen 80;
     server_name fsfvi.ai www.fsfvi.ai 16.170.24.245;
-    
-    # Allow Let's Encrypt challenges
-    location /.well-known/acme-challenge/ {
-        root /var/www/html;
-    }
-    
-    # Redirect all other HTTP traffic to HTTPS (will be updated after SSL)
-    location / {
-        return 301 https://$server_name$request_uri;
-    }
-}
-
-# HTTPS server (will be activated after SSL certificate)
-server {
-    listen 443 ssl http2;
-    server_name fsfvi.ai www.fsfvi.ai;
-    
-    # SSL Configuration (will be managed by certbot)
-    # ssl_certificate and ssl_certificate_key will be added by certbot
-    
-    # Security headers
-    add_header X-Frame-Options DENY always;
-    add_header X-Content-Type-Options nosniff always;
-    add_header X-XSS-Protection "1; mode=block" always;
-    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
-    
-    # Gzip compression
-    gzip on;
-    gzip_vary on;
-    gzip_min_length 1024;
-    gzip_types text/plain text/css text/xml text/javascript application/javascript application/xml+rss application/json;
     
     # Common proxy settings
     proxy_set_header Host $host;
@@ -296,7 +264,7 @@ server {
     proxy_connect_timeout 300;
     proxy_send_timeout 300;
     
-    # Static files with long cache
+    # Static files with cache
     location /_next/static/ {
         alias /var/www/html/fsfvi/.next/static/;
         expires 1y;
@@ -465,23 +433,16 @@ print_status "Setting up SSL certificate with Let's Encrypt..."
 print_status "Testing HTTP configuration before SSL..."
 curl -I http://fsfvi.ai/ || print_warning "HTTP test failed - continuing with SSL setup"
 
-# Get SSL certificate
-sudo certbot --nginx -d fsfvi.ai -d www.fsfvi.ai --non-interactive --agree-tos --email dishdevinfo@gmail.com --no-redirect
+# Get SSL certificate - let certbot modify nginx configuration automatically
+sudo certbot --nginx -d fsfvi.ai -d www.fsfvi.ai --non-interactive --agree-tos --email dishdevinfo@gmail.com
 
 # Verify SSL certificate was installed
 if [ -f "/etc/letsencrypt/live/fsfvi.ai/fullchain.pem" ]; then
     print_status "SSL certificate installed successfully ✓"
     
-    # Update HTTP server to redirect to HTTPS now that SSL is ready
-    sudo sed -i '/# Redirect all other HTTP traffic to HTTPS/,/}/c\
-    # Redirect all other HTTP traffic to HTTPS\
-    location / {\
-        return 301 https://$server_name$request_uri;\
-    }' /etc/nginx/sites-available/fsfvi.ai
-    
     # Test configuration and reload
     sudo nginx -t && sudo systemctl reload nginx
-    print_status "HTTP to HTTPS redirect activated ✓"
+    print_status "HTTPS configuration activated ✓"
 else
     print_error "SSL certificate installation failed"
     print_warning "Continuing with HTTP-only configuration"
