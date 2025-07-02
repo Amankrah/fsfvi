@@ -53,11 +53,7 @@ const nextConfig: NextConfig = {
   // Redirects
   async redirects() {
     return [
-      {
-        source: '/dashboard',
-        destination: '/dashboard',
-        permanent: true,
-      },
+      // Dashboard redirects removed - let it serve normally
     ];
   },
   

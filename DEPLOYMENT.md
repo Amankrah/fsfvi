@@ -202,3 +202,8 @@ curl -X POST https://fsfvi.ai/django-api/auth/login/ \
     "password": "SecurePassword123!"
   }' \
   -v
+
+
+  sudo certbot --nginx -d fsfvi.ai -d www.fsfvi.ai --non-interactive
+
+  sudo netstat -tlnp | grep nginx
