@@ -294,7 +294,11 @@ server {
         access_log off;
     }
     
-    # Django Admin (always through Django)
+    # Django Admin - handle both with and without trailing slash
+    location ~ ^/admin/?$ {
+        proxy_pass http://django_backend;
+    }
+    
     location /admin/ {
         proxy_pass http://django_backend;
     }
@@ -304,22 +308,30 @@ server {
         proxy_pass http://django_backend;
     }
     
-    # Django REST Framework API (includes auth at /django-api/auth/)
+    # Django REST Framework API - handle both with and without trailing slash
+    location ~ ^/django-api/?$ {
+        proxy_pass http://django_backend;
+    }
+    
     location /django-api/ {
         proxy_pass http://django_backend;
     }
     
-    # FastAPI routes (all analysis endpoints)
+    # FastAPI routes - handle both with and without trailing slash
+    location ~ ^/api/?$ {
+        proxy_pass http://fastapi_backend/;
+    }
+    
     location /api/ {
         proxy_pass http://fastapi_backend/;
     }
     
-    # Health checks
-    location /health {
+    # Health checks - handle both with and without trailing slash
+    location ~ ^/health/?$ {
         proxy_pass http://django_backend;
     }
     
-    location /api/health {
+    location ~ ^/api/health/?$ {
         proxy_pass http://fastapi_backend/;
     }
     
