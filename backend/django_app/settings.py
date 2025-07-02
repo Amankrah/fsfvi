@@ -160,6 +160,19 @@ if IS_PRODUCTION:
         f"https://{os.getenv('API_PORT', '8001')}.fsfvi.ai",    # API subdomain
     ]
     CORS_ALLOW_ALL_ORIGINS = False
+    # Allow same-origin requests in production (nginx proxy)
+    CORS_ALLOW_CREDENTIALS = True
+    CORS_ALLOWED_HEADERS = [
+        'accept',
+        'accept-encoding',
+        'authorization',
+        'content-type',
+        'dnt',
+        'origin',
+        'user-agent',
+        'x-csrftoken',
+        'x-requested-with',
+    ]
 else:
     CORS_ALLOWED_ORIGINS = [
         "http://localhost:3000",
@@ -168,6 +181,7 @@ else:
         "http://127.0.0.1:8001",
     ]
     CORS_ALLOW_ALL_ORIGINS = True
+    CORS_ALLOW_CREDENTIALS = True
 
 # Production Security Settings
 if IS_PRODUCTION:
