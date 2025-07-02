@@ -585,4 +585,56 @@ def save_optimization_results(request):
         return Response({'error': 'Session not found'}, 
                        status=status.HTTP_404_NOT_FOUND)
 
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def health_check(request):
+    """Simple health check endpoint for monitoring and load balancer"""
+    from django.db import connection
+    from django.core.cache import cache
+    import redis
+    from datetime import datetime
+    
+    health_status = {
+        'status': 'healthy',
+        'timestamp': datetime.now().isoformat(),
+        'service': 'django-backend',
+        'version': '1.0.0',
+        'checks': {}
+    }
+    
+    try:
+        # Database check
+        with connection.cursor() as cursor:
+            cursor.execute('SELECT 1')
+            health_status['checks']['database'] = 'healthy'
+    except Exception as e:
+        health_status['checks']['database'] = f'unhealthy: {str(e)}'
+        health_status['status'] = 'degraded'
+    
+    try:
+        # Cache/Redis check
+        cache.set('health_check', 'ok', 10)
+        if cache.get('health_check') == 'ok':
+            health_status['checks']['cache'] = 'healthy'
+        else:
+            health_status['checks']['cache'] = 'unhealthy: cache test failed'
+            health_status['status'] = 'degraded'
+    except Exception as e:
+        health_status['checks']['cache'] = f'unhealthy: {str(e)}'
+        health_status['status'] = 'degraded'
+    
+    try:
+        # Django models check
+        from .models import FSFVISession
+        session_count = FSFVISession.objects.count()
+        health_status['checks']['models'] = 'healthy'
+        health_status['data'] = {'total_sessions': session_count}
+    except Exception as e:
+        health_status['checks']['models'] = f'unhealthy: {str(e)}'
+        health_status['status'] = 'degraded'
+    
+    # Return appropriate HTTP status
+    status_code = 200 if health_status['status'] == 'healthy' else 503
+    return Response(health_status, status=status_code)
+
 

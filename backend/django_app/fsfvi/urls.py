@@ -39,8 +39,10 @@ urlpatterns = [
     path('fastapi/save-analysis/', views.save_analysis_results, name='save-analysis-fastapi'),
     path('fastapi/save-optimization/', views.save_optimization_results, name='save-optimization-fastapi'),
     
-    # API Documentation endpoints removed as requested
+    # Health check endpoint
+    path('health/', views.health_check, name='health-check'),
     
-    # Include router URLs
-    path('api/', include(router.urls)),
+    # Django REST Framework API endpoints (separated from FastAPI)
+    # Changed from 'api/' to 'django-api/' to avoid conflicts with FastAPI
+    path('django-api/', include(router.urls)),
 ] 

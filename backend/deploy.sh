@@ -231,125 +231,190 @@ sudo chmod -R 755 /var/www/html/fsfvi
 
 print_status "Frontend build and deployment completed ✓"
 
-# 10. Nginx configuration - Initial HTTP-only setup
-print_status "Configuring Nginx (HTTP-only first)..."
-sudo tee /etc/nginx/sites-available/fsfvi.ai > /dev/null << EOF
+# 10. Nginx configuration - Single unified configuration
+print_status "Configuring Nginx with unified configuration..."
+
+# Create upstream definitions for better load balancing and maintenance
+sudo tee /etc/nginx/sites-available/fsfvi.ai > /dev/null << 'EOF'
+# Upstream definitions for better maintainability
+upstream django_backend {
+    server 127.0.0.1:8000;
+}
+
+upstream fastapi_backend {
+    server 127.0.0.1:8001;
+}
+
+upstream frontend_backend {
+    server 127.0.0.1:3000;
+}
+
+# HTTP server - will redirect to HTTPS after SSL setup
 server {
     listen 80;
     server_name fsfvi.ai www.fsfvi.ai 16.170.24.245;
     
-    # Frontend static files
+    # Allow Let's Encrypt challenges
+    location /.well-known/acme-challenge/ {
+        root /var/www/html;
+    }
+    
+    # Redirect all other HTTP traffic to HTTPS (will be updated after SSL)
+    location / {
+        return 301 https://$server_name$request_uri;
+    }
+}
+
+# HTTPS server (will be activated after SSL certificate)
+server {
+    listen 443 ssl http2;
+    server_name fsfvi.ai www.fsfvi.ai;
+    
+    # SSL Configuration (will be managed by certbot)
+    # ssl_certificate and ssl_certificate_key will be added by certbot
+    
+    # Security headers
+    add_header X-Frame-Options DENY always;
+    add_header X-Content-Type-Options nosniff always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
+    
+    # Gzip compression
+    gzip on;
+    gzip_vary on;
+    gzip_min_length 1024;
+    gzip_types text/plain text/css text/xml text/javascript application/javascript application/xml+rss application/json;
+    
+    # Common proxy settings
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_redirect off;
+    proxy_read_timeout 300;
+    proxy_connect_timeout 300;
+    proxy_send_timeout 300;
+    
+    # Static files with long cache
     location /_next/static/ {
         alias /var/www/html/fsfvi/.next/static/;
         expires 1y;
         add_header Cache-Control "public, immutable";
+        access_log off;
     }
     
     location /static/ {
         alias /var/www/html/fsfvi/public/;
         expires 1y;
         add_header Cache-Control "public, immutable";
+        access_log off;
     }
     
-    # Django static files (for admin, etc.)
+    # Django static and media files
     location /django-static/ {
         alias $DJANGO_DIR/staticfiles/;
         expires 1y;
         add_header Cache-Control "public, immutable";
+        access_log off;
     }
     
     location /media/ {
         alias $DJANGO_DIR/media/;
         expires 1y;
         add_header Cache-Control "public, immutable";
+        access_log off;
     }
     
-    # Django API endpoints
-    location /auth/ {
-        proxy_pass http://127.0.0.1:8000;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-        proxy_redirect off;
-        proxy_read_timeout 300;
-        proxy_connect_timeout 300;
-    }
-    
-    location /dashboard/ {
-        proxy_pass http://127.0.0.1:8000;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-        proxy_redirect off;
-        proxy_read_timeout 300;
-        proxy_connect_timeout 300;
-    }
-    
-    location /upload-csv/ {
-        proxy_pass http://127.0.0.1:8000;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-        proxy_redirect off;
-        proxy_read_timeout 300;
-        proxy_connect_timeout 300;
-    }
-    
-    location /analytics/ {
-        proxy_pass http://127.0.0.1:8000;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-        proxy_redirect off;
-        proxy_read_timeout 300;
-        proxy_connect_timeout 300;
-    }
-    
+    # Django Admin (always through Django)
     location /admin/ {
-        proxy_pass http://127.0.0.1:8000;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-        proxy_redirect off;
-        proxy_read_timeout 300;
-        proxy_connect_timeout 300;
+        proxy_pass http://django_backend;
     }
     
-    # FastAPI service
+    # Authentication routes (Django)
+    location /auth/ {
+        proxy_pass http://django_backend;
+    }
+    
+    # Dashboard and analytics (Django)
+    location ~ ^/(dashboard|analytics|upload-csv)/ {
+        proxy_pass http://django_backend;
+    }
+    
+    # Django REST Framework API (separated from FastAPI)
+    location /django-api/ {
+        proxy_pass http://django_backend;
+    }
+    
+    # FastAPI routes (all analysis endpoints)
     location /api/ {
-        proxy_pass http://127.0.0.1:8001;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-        proxy_redirect off;
-        proxy_read_timeout 300;
-        proxy_connect_timeout 300;
+        proxy_pass http://fastapi_backend/;
     }
     
-    # Next.js frontend - proxy all other routes
+    # Health checks
+    location /health {
+        proxy_pass http://django_backend;
+    }
+    
+    location /api/health {
+        proxy_pass http://fastapi_backend/;
+    }
+    
+    # Frontend - all other routes go to Next.js
     location / {
-        proxy_pass http://127.0.0.1:3000;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-        proxy_redirect off;
-        proxy_read_timeout 300;
-        proxy_connect_timeout 300;
+        proxy_pass http://frontend_backend;
+        
+        # WebSocket support for Next.js dev features
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_cache_bypass $http_upgrade;
+    }
+    
+    # Error pages
+    error_page 502 503 504 /50x.html;
+    location = /50x.html {
+        root /var/www/html;
+        internal;
     }
 }
 EOF
 
-# Enable the site
+# Enable the site and test configuration
 sudo ln -sf /etc/nginx/sites-available/fsfvi.ai /etc/nginx/sites-enabled/
 sudo rm -f /etc/nginx/sites-enabled/default
-sudo nginx -t && sudo systemctl reload nginx
+
+# Test nginx configuration
+if ! sudo nginx -t; then
+    print_error "Nginx configuration test failed"
+    exit 1
+fi
+
+print_status "Nginx configuration completed ✓"
+
+# Create a simple error page
+sudo mkdir -p /var/www/html
+sudo tee /var/www/html/50x.html > /dev/null << 'EOF'
+<!DOCTYPE html>
+<html>
+<head>
+    <title>FSFVI - Service Temporarily Unavailable</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; margin-top: 100px; }
+        h1 { color: #333; }
+        p { color: #666; }
+    </style>
+</head>
+<body>
+    <h1>Service Temporarily Unavailable</h1>
+    <p>FSFVI services are starting up. Please try again in a moment.</p>
+    <p>If this problem persists, please contact support.</p>
+</body>
+</html>
+EOF
+
+# Start nginx with initial configuration
+sudo systemctl reload nginx
 
 # 11. Supervisor configuration for services
 print_status "Configuring Supervisor for service management..."
@@ -395,142 +460,32 @@ EOF
 
 # 12. SSL Certificate with Let's Encrypt
 print_status "Setting up SSL certificate with Let's Encrypt..."
-sudo certbot --nginx -d fsfvi.ai -d www.fsfvi.ai --non-interactive --agree-tos --email dishdevinfo@gmail.com
 
-# 12.1. Update Nginx configuration for HTTPS after SSL certificate is obtained
-print_status "Updating Nginx configuration for HTTPS..."
-sudo tee /etc/nginx/sites-available/fsfvi.ai > /dev/null << EOF
-server {
-    listen 80;
-    server_name fsfvi.ai www.fsfvi.ai 16.170.24.245;
-    
-    # Redirect HTTP to HTTPS
-    return 301 https://\$server_name\$request_uri;
-}
+# First, ensure nginx is running with HTTP config for Let's Encrypt challenge
+print_status "Testing HTTP configuration before SSL..."
+curl -I http://fsfvi.ai/ || print_warning "HTTP test failed - continuing with SSL setup"
 
-server {
-    listen 443 ssl http2;
-    server_name fsfvi.ai www.fsfvi.ai;
-    
-    # SSL Configuration (handled by certbot)
-    ssl_certificate /etc/letsencrypt/live/fsfvi.ai/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/fsfvi.ai/privkey.pem;
-    
-    # Security headers
-    add_header X-Frame-Options DENY;
-    add_header X-Content-Type-Options nosniff;
-    add_header X-XSS-Protection "1; mode=block";
-    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload";
-    
-    # Frontend static files
-    location /_next/static/ {
-        alias /var/www/html/fsfvi/.next/static/;
-        expires 1y;
-        add_header Cache-Control "public, immutable";
-    }
-    
-    location /static/ {
-        alias /var/www/html/fsfvi/public/;
-        expires 1y;
-        add_header Cache-Control "public, immutable";
-    }
-    
-    # Django static files (for admin, etc.)
-    location /django-static/ {
-        alias $DJANGO_DIR/staticfiles/;
-        expires 1y;
-        add_header Cache-Control "public, immutable";
-    }
-    
-    location /media/ {
-        alias $DJANGO_DIR/media/;
-        expires 1y;
-        add_header Cache-Control "public, immutable";
-    }
-    
-    # Django API endpoints
-    location /auth/ {
-        proxy_pass http://127.0.0.1:8000;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-        proxy_redirect off;
-        proxy_read_timeout 300;
-        proxy_connect_timeout 300;
-    }
-    
-    location /dashboard/ {
-        proxy_pass http://127.0.0.1:8000;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-        proxy_redirect off;
-        proxy_read_timeout 300;
-        proxy_connect_timeout 300;
-    }
-    
-    location /upload-csv/ {
-        proxy_pass http://127.0.0.1:8000;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-        proxy_redirect off;
-        proxy_read_timeout 300;
-        proxy_connect_timeout 300;
-    }
-    
-    location /analytics/ {
-        proxy_pass http://127.0.0.1:8000;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-        proxy_redirect off;
-        proxy_read_timeout 300;
-        proxy_connect_timeout 300;
-    }
-    
-    location /admin/ {
-        proxy_pass http://127.0.0.1:8000;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-        proxy_redirect off;
-        proxy_read_timeout 300;
-        proxy_connect_timeout 300;
-    }
-    
-    # FastAPI service
-    location /api/ {
-        proxy_pass http://127.0.0.1:8001;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-        proxy_redirect off;
-        proxy_read_timeout 300;
-        proxy_connect_timeout 300;
-    }
-    
-    # Next.js frontend - proxy all other routes
-    location / {
-        proxy_pass http://127.0.0.1:3000;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-        proxy_redirect off;
-        proxy_read_timeout 300;
-        proxy_connect_timeout 300;
-    }
-}
-EOF
+# Get SSL certificate
+sudo certbot --nginx -d fsfvi.ai -d www.fsfvi.ai --non-interactive --agree-tos --email dishdevinfo@gmail.com --no-redirect
 
-sudo nginx -t && sudo systemctl reload nginx
+# Verify SSL certificate was installed
+if [ -f "/etc/letsencrypt/live/fsfvi.ai/fullchain.pem" ]; then
+    print_status "SSL certificate installed successfully ✓"
+    
+    # Update HTTP server to redirect to HTTPS now that SSL is ready
+    sudo sed -i '/# Redirect all other HTTP traffic to HTTPS/,/}/c\
+    # Redirect all other HTTP traffic to HTTPS\
+    location / {\
+        return 301 https://$server_name$request_uri;\
+    }' /etc/nginx/sites-available/fsfvi.ai
+    
+    # Test configuration and reload
+    sudo nginx -t && sudo systemctl reload nginx
+    print_status "HTTP to HTTPS redirect activated ✓"
+else
+    print_error "SSL certificate installation failed"
+    print_warning "Continuing with HTTP-only configuration"
+fi
 
 # 13. Start services
 print_status "Starting services..."

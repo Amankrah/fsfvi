@@ -38,28 +38,28 @@ api.interceptors.response.use(
 // Auth API endpoints
 export const authAPI = {
   register: async (userData: RegisterData) => {
-    const response = await api.post('/api/auth/register/', userData);
+    const response = await api.post('/auth/register/', userData);
     return response.data;
   },
 
   login: async (credentials: LoginData) => {
-    const response = await api.post('/api/auth/login/', credentials);
+    const response = await api.post('/auth/login/', credentials);
     return response.data;
   },
 
   logout: async () => {
-    const response = await api.post('/api/auth/logout/');
+    const response = await api.post('/auth/logout/');
     return response.data;
   },
 
   getProfile: async () => {
-    const response = await api.get('/api/auth/profile/');
+    const response = await api.get('/auth/profile/');
     return response.data;
   },
 
-  // Session management
+  // Session management - Updated to use django-api prefix
   getUserSessions: async () => {
-    const response = await api.get('/api/sessions/');
+    const response = await api.get('/django-api/sessions/');
     return response.data;
   },
 };
@@ -85,13 +85,14 @@ export const dataAPI = {
     return response.data;
   },
 
+  // Updated to use django-api prefix for DRF endpoints
   getUserSessions: async () => {
-    const response = await api.get('/api/sessions/');
+    const response = await api.get('/django-api/sessions/');
     return response.data;
   },
 
   getSessionDetails: async (sessionId: string) => {
-    const response = await api.get(`/api/sessions/${sessionId}/`);
+    const response = await api.get(`/django-api/sessions/${sessionId}/`);
     return response.data;
   },
 
@@ -101,7 +102,7 @@ export const dataAPI = {
   },
 
   listUserSessions: async () => {
-    const response = await api.get('/api/sessions/');
+    const response = await api.get('/django-api/sessions/');
     return response.data;
   },
 };
