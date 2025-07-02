@@ -94,6 +94,7 @@ sudo supervisorctl status
 # View logs if needed
 sudo tail -f /var/log/fsfvi-django.log
 sudo tail -f /var/log/fsfvi-fastapi.log
+sudo tail -f /var/log/fsvi-frontend.log
 ```
 
 **Your FSFVI application should now be live at:** `https://fsfvi.ai`
@@ -117,7 +118,7 @@ sudo supervisorctl status
 # Restart individual services
 sudo supervisorctl restart fsfvi-django
 sudo supervisorctl restart fsfvi-fastapi
-sudo supervisorctl restart fsfvi-celery
+sudo supervisorctl restart fsfvi-frontend
 
 # Reload Nginx
 sudo systemctl reload nginx

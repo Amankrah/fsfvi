@@ -249,11 +249,40 @@ upstream frontend_backend {
     server 127.0.0.1:3000;
 }
 
-# HTTP server - will be updated by certbot for SSL
+# HTTP server - redirect to HTTPS
 server {
     listen 80;
     server_name fsfvi.ai www.fsfvi.ai 16.170.24.245;
-    
+
+    # Allow Let's Encrypt challenges
+    location /.well-known/acme-challenge/ {
+        root /var/www/html;
+    }
+
+    # Redirect all other HTTP traffic to HTTPS
+    location / {
+        return 301 https://\$server_name\$request_uri;
+    }
+}
+
+# HTTPS server with complete routing
+server {
+    listen 443 ssl http2;
+    server_name fsfvi.ai www.fsfvi.ai;
+
+    # SSL configuration - will be managed by certbot
+    ssl_certificate /etc/letsencrypt/live/fsfvi.ai/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/fsfvi.ai/privkey.pem;
+    include /etc/letsencrypt/options-ssl-nginx.conf;
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+
+    # Security headers
+    add_header X-Frame-Options DENY always;
+    add_header X-Content-Type-Options nosniff always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
+
     # Common proxy settings
     proxy_set_header Host \$host;
     proxy_set_header X-Real-IP \$remote_addr;
