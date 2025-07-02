@@ -128,8 +128,8 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # Django REST Framework
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework.authentication.SessionAuthentication',
         'rest_framework.authentication.TokenAuthentication',
+        # 'rest_framework.authentication.SessionAuthentication',  # Temporarily disabled for debugging
     ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticatedOrReadOnly',
@@ -151,37 +151,29 @@ REST_FRAMEWORK = {
     }
 }
 
-# CORS settings - Environment specific
-if IS_PRODUCTION:
-    CORS_ALLOWED_ORIGINS = [
-        "https://fsfvi.ai",
-        "https://www.fsfvi.ai",
-        f"https://{os.getenv('BACKEND_PORT', '8000')}.fsfvi.ai",  # Backend subdomain
-        f"https://{os.getenv('API_PORT', '8001')}.fsfvi.ai",    # API subdomain
-    ]
-    CORS_ALLOW_ALL_ORIGINS = False
-    # Allow same-origin requests in production (nginx proxy)
-    CORS_ALLOW_CREDENTIALS = True
-    CORS_ALLOWED_HEADERS = [
-        'accept',
-        'accept-encoding',
-        'authorization',
-        'content-type',
-        'dnt',
-        'origin',
-        'user-agent',
-        'x-csrftoken',
-        'x-requested-with',
-    ]
-else:
+# CORS settings - Environment specific  
+# Temporarily allow all origins in production for debugging
+CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOWED_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+]
+
+if not IS_PRODUCTION:
     CORS_ALLOWED_ORIGINS = [
         "http://localhost:3000",
         "http://localhost:8001",
         "http://127.0.0.1:3000",
         "http://127.0.0.1:8001",
     ]
-    CORS_ALLOW_ALL_ORIGINS = True
-    CORS_ALLOW_CREDENTIALS = True
 
 # Production Security Settings
 if IS_PRODUCTION:
