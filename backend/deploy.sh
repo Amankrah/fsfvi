@@ -299,8 +299,8 @@ server {
         proxy_pass http://django_backend;
     }
     
-    # Dashboard and analytics (Django) - handle both with and without trailing slash
-    location ~ ^/(dashboard|analytics|upload-csv)/?$ {
+    # Analytics and upload endpoints (Django) - handle both with and without trailing slash
+    location ~ ^/(analytics|upload-csv)/?$ {
         proxy_pass http://django_backend;
     }
     
