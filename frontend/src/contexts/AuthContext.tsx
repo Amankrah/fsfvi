@@ -34,21 +34,42 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const isAuthenticated = !!user;
 
   const initializeAuth = async () => {
+    console.log('🔄 AuthContext: Initializing authentication...');
     try {
       const token = localStorage.getItem('auth_token');
       const storedUser = localStorage.getItem('user');
 
+      console.log('🔑 AuthContext: Token exists:', !!token);
+      console.log('👤 AuthContext: Stored user exists:', !!storedUser);
+
       if (token && storedUser) {
-        setUser(JSON.parse(storedUser));
-        // Verify token is still valid
-        await refreshUser();
+        const userData = JSON.parse(storedUser);
+        console.log('✅ AuthContext: Setting user from localStorage:', userData.username);
+        setUser(userData);
+        
+        // Verify token is still valid - but don't throw on failure during init
+        try {
+          console.log('🔍 AuthContext: Validating token...');
+          await refreshUser();
+          console.log('✅ AuthContext: Token validation successful');
+        } catch (error) {
+          console.error('❌ AuthContext: Token validation failed during initialization:', error);
+          // Clear invalid token and user data
+          localStorage.removeItem('auth_token');
+          localStorage.removeItem('user');
+          setUser(null);
+        }
+      } else {
+        console.log('ℹ️ AuthContext: No stored authentication data found');
       }
     } catch (error) {
-      console.error('Auth initialization error:', error);
+      console.error('❌ AuthContext: Auth initialization error:', error);
       // Clear invalid data
       localStorage.removeItem('auth_token');
       localStorage.removeItem('user');
+      setUser(null);
     } finally {
+      console.log('✅ AuthContext: Initialization complete, setting loading to false');
       setIsLoading(false);
     }
   };
@@ -61,16 +82,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const login = async (credentials: LoginData) => {
     try {
+      console.log('🔐 AuthContext: Attempting login for user:', credentials.username);
       setIsLoading(true);
       const response = await authAPI.login(credentials);
       
+      console.log('✅ AuthContext: Login successful, storing auth data');
       // Store auth data
       localStorage.setItem('auth_token', response.token);
       localStorage.setItem('user', JSON.stringify(response.user));
       
       setUser(response.user);
+      console.log('👤 AuthContext: User set in context:', response.user.username);
     } catch (error: unknown) {
-      console.error('Login error:', error);
+      console.error('❌ AuthContext: Login error:', error);
       throw new Error(error instanceof Error ? error.message : 'Login failed');
     } finally {
       setIsLoading(false);
