@@ -295,7 +295,7 @@ server {
     }
     
     # Django Admin - handle both with and without trailing slash
-    location ~ ^/admin/?$ {
+    location /admin {
         proxy_pass http://django_backend;
     }
     
@@ -304,12 +304,24 @@ server {
     }
     
     # Analytics and upload endpoints (Django) - handle both with and without trailing slash
-    location ~ ^/(analytics|upload-csv)/?$ {
+    location /analytics {
+        proxy_pass http://django_backend;
+    }
+    
+    location /analytics/ {
+        proxy_pass http://django_backend;
+    }
+    
+    location /upload-csv {
+        proxy_pass http://django_backend;
+    }
+    
+    location /upload-csv/ {
         proxy_pass http://django_backend;
     }
     
     # Django REST Framework API - handle both with and without trailing slash
-    location ~ ^/django-api/?$ {
+    location /django-api {
         proxy_pass http://django_backend;
     }
     
@@ -318,8 +330,8 @@ server {
     }
     
     # FastAPI routes - handle both with and without trailing slash
-    location ~ ^/api/?$ {
-        proxy_pass http://fastapi_backend/;
+    location /api {
+        proxy_pass http://fastapi_backend;
     }
     
     location /api/ {
@@ -327,12 +339,12 @@ server {
     }
     
     # Health checks - handle both with and without trailing slash
-    location ~ ^/health/?$ {
+    location /health {
         proxy_pass http://django_backend;
     }
     
-    location ~ ^/api/health/?$ {
-        proxy_pass http://fastapi_backend/;
+    location /api/health {
+        proxy_pass http://fastapi_backend;
     }
     
     # Frontend - all other routes go to Next.js (including /auth/)
