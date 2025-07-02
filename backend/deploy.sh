@@ -235,7 +235,7 @@ print_status "Frontend build and deployment completed ✓"
 print_status "Configuring Nginx with unified configuration..."
 
 # Create upstream definitions for better load balancing and maintenance
-sudo tee /etc/nginx/sites-available/fsfvi.ai > /dev/null << 'EOF'
+sudo tee /etc/nginx/sites-available/fsfvi.ai > /dev/null << EOF
 # Upstream definitions for better maintainability
 upstream django_backend {
     server 127.0.0.1:8000;
@@ -255,10 +255,10 @@ server {
     server_name fsfvi.ai www.fsfvi.ai 16.170.24.245;
     
     # Common proxy settings
-    proxy_set_header Host $host;
-    proxy_set_header X-Real-IP $remote_addr;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header Host \$host;
+    proxy_set_header X-Real-IP \$remote_addr;
+    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto \$scheme;
     proxy_redirect off;
     proxy_read_timeout 300;
     proxy_connect_timeout 300;
@@ -334,9 +334,9 @@ server {
         
         # WebSocket support for Next.js dev features
         proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Upgrade \$http_upgrade;
         proxy_set_header Connection 'upgrade';
-        proxy_cache_bypass $http_upgrade;
+        proxy_cache_bypass \$http_upgrade;
     }
     
     # Error pages
