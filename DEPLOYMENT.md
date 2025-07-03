@@ -192,6 +192,7 @@ source ../venv/bin/activate
 python manage.py migrate
 python manage.py collectstatic --noinput
 sudo supervisorctl restart all
+sudo systemctl reload nginx
 ``` 
 
 
@@ -207,3 +208,5 @@ curl -X POST https://fsfvi.ai/django-api/auth/login/ \
   sudo certbot --nginx -d fsfvi.ai -d www.fsfvi.ai --non-interactive
 
   sudo netstat -tlnp | grep nginx
+
+  sudo cat /etc/nginx/sites-available/fsfvi.ai

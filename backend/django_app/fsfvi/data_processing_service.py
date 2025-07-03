@@ -18,9 +18,9 @@ import logging
 try:
     from .data_preparation import UniversalFSFVIDataPreparation
     DATA_PREPARATION_AVAILABLE = True
-    print("✅ Data preparation module loaded successfully")
+    print("Data preparation module loaded successfully")
 except ImportError:
-    print("⚠️ Warning: data_preparation module not available")
+    print("Warning: data_preparation module not available")
     DATA_PREPARATION_AVAILABLE = False
 
 from .models import FSFVISession, Component, UploadedFile

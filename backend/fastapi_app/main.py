@@ -24,6 +24,7 @@ import requests
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 import os
+import sys
 
 # Import service layer and schemas - SINGLE SOURCE OF TRUTH
 from fsfvi_service import create_fsfvi_services
@@ -33,22 +34,36 @@ from config import get_weighting_methods, get_scenarios
 from validators import validate_system_health
 
 # Import Django integration
-import sys
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'django_app'))
+django_app_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'django_app'))
+if django_app_path not in sys.path:
+    sys.path.insert(0, django_app_path)
+
 try:
     from fsfvi.django_integration import django_integration
     DJANGO_INTEGRATION = True
-    print("✅ Django integration loaded successfully")
+    print("Django integration loaded successfully")
 except ImportError as e:
-    print(f"⚠️ Django integration not available: {e}")
+    print(f"Warning: Django integration not available: {e}")
     DJANGO_INTEGRATION = False
 
 # Environment detection
 ENVIRONMENT = os.getenv('ENVIRONMENT', 'development')
 IS_PRODUCTION = ENVIRONMENT == 'production'
 
-# Configure logging
-logging.basicConfig(level=logging.INFO if IS_PRODUCTION else logging.DEBUG)
+# Configure logging with UTF-8 encoding for Windows compatibility
+if sys.platform == "win32":
+    # Set console to UTF-8 on Windows to handle Unicode characters
+    import codecs
+    sys.stdout = codecs.getwriter('utf-8')(sys.stdout.buffer, 'strict')
+    sys.stderr = codecs.getwriter('utf-8')(sys.stderr.buffer, 'strict')
+
+logging.basicConfig(
+    level=logging.INFO if IS_PRODUCTION else logging.DEBUG,
+    format='%(levelname)s %(message)s',
+    handlers=[
+        logging.StreamHandler(sys.stdout)
+    ]
+)
 logger = logging.getLogger(__name__)
 
 # Initialize FastAPI app
@@ -82,7 +97,7 @@ if IS_PRODUCTION:
     # Production authentication service URL
     AUTH_SERVICE_URL = os.getenv('AUTH_SERVICE_URL', 'https://fsfvi.ai')
     
-    logger.info(f"🔒 Production mode: CORS configured for {allowed_origins}")
+    logger.info(f"Production mode: CORS configured for {allowed_origins}")
     
 else:
     # Development CORS - Permissive for local development
@@ -102,13 +117,24 @@ else:
     # Development authentication service URL
     AUTH_SERVICE_URL = 'http://localhost:8000'
     
-    logger.info("🔧 Development mode: Permissive CORS enabled")
+    logger.info("Development mode: Permissive CORS enabled")
 
 # Security
 security = HTTPBearer()
 
-# Initialize services - SINGLE POINT OF INITIALIZATION
-calculation_service, optimization_service, analysis_service = create_fsfvi_services()
+# Initialize services - SINGLE POINT OF INITIALIZATION (with singleton pattern)
+_services_initialized = False
+calculation_service = optimization_service = analysis_service = None
+
+def get_services():
+    global _services_initialized, calculation_service, optimization_service, analysis_service
+    if not _services_initialized:
+        calculation_service, optimization_service, analysis_service = create_fsfvi_services()
+        _services_initialized = True
+    return calculation_service, optimization_service, analysis_service
+
+# Get services on first access
+calculation_service, optimization_service, analysis_service = get_services()
 
 # Thread pool for Django operations
 thread_pool = ThreadPoolExecutor(max_workers=4)
@@ -125,7 +151,7 @@ async def get_current_user(authorization: HTTPAuthorizationCredentials = Depends
     
     try:
         response = requests.get(
-            f'{AUTH_SERVICE_URL}/auth/profile/',
+            f'{AUTH_SERVICE_URL}/django-api/auth/profile/',
             headers={'Authorization': f'Token {token}'},
             timeout=10 if IS_PRODUCTION else 5,
             verify=IS_PRODUCTION  # SSL verification in production only
@@ -154,7 +180,7 @@ async def root():
         "architecture": "streamlined_single_responsibility",
         "django_integration": DJANGO_INTEGRATION,
         "workflow": [
-            "1. Authenticate via Django (http://localhost:8000/auth/)",
+            "1. Authenticate via Django (http://localhost:8000/django-api/auth/)",
             "2. Upload Data (/upload_data)",
             "3. Run Individual Analysis Steps:",
             "   - Analyze Current Distribution (/analyze_current_distribution)",

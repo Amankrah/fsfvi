@@ -14,16 +14,47 @@ import sys
 import os
 
 # Add the fastapi_app directory to the path to access the centralized modules
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', 'fastapi_app'))
+fastapi_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'fastapi_app'))
+if fastapi_path not in sys.path:
+    sys.path.insert(0, fastapi_path)
 
 try:
-    from fastapi_app.config import normalize_component_type, get_component_types, ComponentType
-    from fastapi_app.validators import validate_component_data, normalize_component_weights
-    from fastapi_app.fsfvi_core import estimate_sensitivity_parameter
-    from fastapi_app.exceptions import ValidationError, CalculationError
+    # Use importlib for more reliable imports
+    import importlib.util
+    
+    # Load modules directly from file paths
+    fastapi_base = os.path.join(os.path.dirname(__file__), '..', '..', 'fastapi_app')
+    
+    config_spec = importlib.util.spec_from_file_location("fsfvi_config", os.path.join(fastapi_base, "config.py"))
+    config_module = importlib.util.module_from_spec(config_spec)
+    config_spec.loader.exec_module(config_module)
+    
+    validators_spec = importlib.util.spec_from_file_location("fsfvi_validators", os.path.join(fastapi_base, "validators.py"))
+    validators_module = importlib.util.module_from_spec(validators_spec)
+    validators_spec.loader.exec_module(validators_module)
+    
+    core_spec = importlib.util.spec_from_file_location("fsfvi_core", os.path.join(fastapi_base, "fsfvi_core.py"))
+    core_module = importlib.util.module_from_spec(core_spec)
+    core_spec.loader.exec_module(core_module)
+    
+    exceptions_spec = importlib.util.spec_from_file_location("fsfvi_exceptions", os.path.join(fastapi_base, "exceptions.py"))
+    exceptions_module = importlib.util.module_from_spec(exceptions_spec)
+    exceptions_spec.loader.exec_module(exceptions_module)
+    
+    # Extract the functions we need
+    normalize_component_type = config_module.normalize_component_type
+    get_component_types = config_module.get_component_types
+    ComponentType = config_module.ComponentType
+    validate_component_data = validators_module.validate_component_data
+    normalize_component_weights = validators_module.normalize_component_weights
+    estimate_sensitivity_parameter = core_module.estimate_sensitivity_parameter
+    ValidationError = exceptions_module.ValidationError
+    CalculationError = exceptions_module.CalculationError
+    
     FASTAPI_MODULES_AVAILABLE = True
-except ImportError:
-    print("⚠️  Warning: FastAPI modules not available. Using fallback functions.")
+    print("✅ FastAPI modules imported successfully - using centralized calculations")
+except Exception as e:
+    print(f"⚠️ Warning: FastAPI modules not available ({e}). Using fallback functions.")
     FASTAPI_MODULES_AVAILABLE = False
     ComponentType = None
 
