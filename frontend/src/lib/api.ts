@@ -88,12 +88,12 @@ export const dataAPI = {
   },
 
   getDashboard: async () => {
-    const response = await api.get('/dashboard/');
+    const response = await api.get('/django-api/dashboard/');
     return response.data;
   },
 
   getAnalytics: async () => {
-    const response = await api.get('/analytics/');
+    const response = await api.get('/django-api/analytics/');
     return response.data;
   },
 

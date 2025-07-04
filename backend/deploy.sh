@@ -346,10 +346,10 @@ server {
         proxy_pass http://django_backend;
     }
     
-    location /analytics/ {
+        location /analytics/ {
         proxy_pass http://django_backend;
     }
-    
+
     location /upload-csv {
         proxy_pass http://django_backend;
     }

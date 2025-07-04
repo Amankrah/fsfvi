@@ -16,10 +16,6 @@ router.register(r'weight-adjustments', views.WeightAdjustmentViewSet, basename='
 router.register(r'uploaded-files', views.UploadedFileViewSet, basename='uploaded-file')
 
 urlpatterns = [
-    # Dashboard and Analytics
-    path('dashboard/', views.dashboard_summary, name='dashboard'),
-    path('analytics/', views.analytics_overview, name='analytics'),
-    
     # File Upload and Processing endpoints
     path('upload-csv/', views.upload_csv_file, name='upload-csv'),
     path('my-files/', views.get_user_uploaded_files, name='user-files'),
@@ -38,6 +34,10 @@ urlpatterns = [
     # Django REST Framework API endpoints (includes auth)
     # Changed from 'api/' to 'django-api/' to avoid conflicts with FastAPI
     path('django-api/', include([
+        # Dashboard and Analytics
+        path('dashboard/', views.dashboard_summary, name='dashboard'),
+        path('analytics/', views.analytics_overview, name='analytics'),
+        
         # Authentication endpoints (moved here to avoid frontend conflicts)
         path('auth/register/', views.RegisterView.as_view(), name='register'),
         path('auth/login/', views.LoginView.as_view(), name='login'),
