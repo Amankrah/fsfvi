@@ -79,7 +79,7 @@ export const authAPI = {
 // Data API endpoints for FSFVI analysis
 export const dataAPI = {
   uploadCSV: async (formData: FormData) => {
-    const response = await api.post('/upload-csv/', formData, {
+    const response = await api.post('/django-api/upload-csv/', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
@@ -97,7 +97,7 @@ export const dataAPI = {
     return response.data;
   },
 
-  // Updated to use django-api prefix for DRF endpoints
+  // All endpoints now use django-api prefix
   getUserSessions: async () => {
     const response = await api.get('/django-api/sessions/');
     return response.data;
@@ -109,12 +109,27 @@ export const dataAPI = {
   },
 
   clearSession: async (sessionId: string) => {
-    const response = await api.delete(`/sessions/${sessionId}/delete/`);
+    const response = await api.delete(`/django-api/sessions/${sessionId}/delete/`);
     return response.data;
   },
 
   listUserSessions: async () => {
     const response = await api.get('/django-api/sessions/');
+    return response.data;
+  },
+
+  getUserFiles: async () => {
+    const response = await api.get('/django-api/my-files/');
+    return response.data;
+  },
+
+  getSessionFileInfo: async (sessionId: string) => {
+    const response = await api.get(`/django-api/sessions/${sessionId}/file-info/`);
+    return response.data;
+  },
+
+  reprocessFile: async (sessionId: string) => {
+    const response = await api.post(`/django-api/sessions/${sessionId}/reprocess/`);
     return response.data;
   },
 };

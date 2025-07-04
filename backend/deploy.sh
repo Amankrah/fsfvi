@@ -341,22 +341,7 @@ server {
         proxy_pass http://django_backend;
     }
     
-    # Analytics and upload endpoints (Django) - handle both with and without trailing slash
-    location /analytics {
-        proxy_pass http://django_backend;
-    }
     
-        location /analytics/ {
-        proxy_pass http://django_backend;
-    }
-
-    location /upload-csv {
-        proxy_pass http://django_backend;
-    }
-    
-    location /upload-csv/ {
-        proxy_pass http://django_backend;
-    }
     
     # Django REST Framework API - handle both with and without trailing slash
     location /django-api {
@@ -378,6 +363,10 @@ server {
     
     # Health checks - handle both with and without trailing slash
     location /health {
+        proxy_pass http://django_backend;
+    }
+    
+    location /health/ {
         proxy_pass http://django_backend;
     }
     
