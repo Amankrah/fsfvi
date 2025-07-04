@@ -25,7 +25,7 @@ import {
 } from '@/lib/api';
 
 // Import dedicated optimization components
-import { OptimizationHeader } from '@/components/optimization/OptimizationHeader';
+import OptimizationHeader from '@/components/optimization/OptimizationHeader';
 import { OptimizationResults } from '@/components/optimization/OptimizationResults';
 import { MultiYearResults } from '@/components/optimization/MultiYearResults';
 import BudgetImpactAnalysis, { BudgetImpactConfig } from '@/components/optimization/BudgetImpactAnalysis';
@@ -61,14 +61,27 @@ interface OptimizationResult {
   [key: string]: unknown; // Index signature for compatibility
 }
 
-// Individual configuration interfaces for each analysis tool
-
-
+interface OptimizationConfig {
+  configured: boolean;
+  method: string;
+  scenario: string;
+  budgetChange: number;
+  budgetChangePercent: number;
+  constraints: {
+    minAllocation: number;
+    maxAllocation: number;
+    transitionLimit: number;
+  };
+  optimizationMode: 'traditional' | 'new_budget';
+  newBudgetAmount?: number;
+  targetFsfvi?: number;
+  targetYear?: number;
+}
 
 interface PlanningHorizon {
   startYear: number;
   endYear: number;
-  budgetGrowth: number;
+  annualNewBudget: number; // Changed from budgetGrowth to annual new budget amount in millions
 }
 
 interface MultiYearConfig {
@@ -93,8 +106,6 @@ interface OptimizationResults {
   budgetSensitivity?: BudgetSensitivityAnalysis;
 }
 
-
-
 // Removed unused interfaces - using the ones from components
 
 export default function AllocationOptimizationPage() {
@@ -117,7 +128,7 @@ export default function AllocationOptimizationPage() {
   const [planningHorizon, setPlanningHorizon] = useState<PlanningHorizon>({
     startYear: new Date().getFullYear(),
     endYear: new Date().getFullYear() + 5,
-    budgetGrowth: 3 // Annual growth percentage
+    annualNewBudget: 500 // Annual new budget amount in millions USD
   });
 
   // Enhanced multi-year configuration state
@@ -139,6 +150,22 @@ export default function AllocationOptimizationPage() {
       maxAllocation: 40,
       transitionLimit: 30
     }
+  });
+
+  // New budget optimization configuration state
+  const [optimizationConfig] = useState<OptimizationConfig>({
+    configured: false,
+    method: 'hybrid',
+    scenario: 'baseline',
+    budgetChangePercent: 0,
+    budgetChange: 0,
+    constraints: {
+      minAllocation: 0,
+      maxAllocation: 100,
+      transitionLimit: 50
+    },
+    optimizationMode: 'traditional' as 'traditional' | 'new_budget',
+    newBudgetAmount: 0
   });
 
   const getToken = () => localStorage.getItem('auth_token') || '';
@@ -210,23 +237,36 @@ export default function AllocationOptimizationPage() {
   const runBasicOptimization = async () => {
     await runAnalysis('optimization', async () => {
       const token = getToken();
+      
+      // Determine optimization mode and validate
+      const mode = optimizationConfig.optimizationMode || 'traditional';
+      
+      // Validation for new budget optimization
+      if (mode === 'new_budget') {
+        if (!optimizationConfig.newBudgetAmount || optimizationConfig.newBudgetAmount <= 0) {
+          throw new Error('New budget amount must be specified and greater than 0 for new budget optimization mode. Please configure the new budget amount in optimization settings.');
+        }
+      }
+      
       const result = await analysisAPI.optimizeAllocation(
         sessionId, 
         token, 
-        'hybrid', 
-        0,
+        optimizationConfig.method || 'hybrid', 
+        optimizationConfig.budgetChange || 0,
         {
-          minAllocation: 1,
-          maxAllocation: 40,
-          transitionLimit: 30
-        }
+          minAllocation: optimizationConfig.constraints.minAllocation || 1,
+          maxAllocation: optimizationConfig.constraints.maxAllocation || 40,
+          transitionLimit: optimizationConfig.constraints.transitionLimit || 30
+        },
+        mode,
+        optimizationConfig.newBudgetAmount
       );
       setOptimizationResults(prev => ({ ...prev, basic: result }));
       return result;
     });
   };
 
-  // Enhanced multi-year planning with configuration validation
+  // Enhanced multi-year planning with NEW BUDGET CUMULATIVE approach
   const runMultiYearPlan = async () => {
     // Check if multi-year configuration is complete
     if (!multiYearConfig.configured) {
@@ -238,27 +278,29 @@ export default function AllocationOptimizationPage() {
     await runAnalysis('multi-year', async () => {
       const token = getToken();
       
-      // Generate budget scenarios based on planning horizon and configuration
+      // NEW BUDGET APPROACH: Generate scenarios for NEW BUDGET each year
       const budgetScenarios: Record<number, number> = {};
-      const baseBudget = sessionInfo?.total_budget || 2900;
       
-      // Apply implementation speed adjustments
-      let adjustedGrowthRate = planningHorizon.budgetGrowth;
+      // Base new budget amount per year from planning horizon configuration
+      const baseNewBudgetPerYear = planningHorizon.annualNewBudget || 500;
+      
+      // Apply implementation speed adjustments to new budget amounts
+      let adjustedNewBudget = baseNewBudgetPerYear;
       if (multiYearConfig.implementationSpeed === 'aggressive') {
-        adjustedGrowthRate *= 1.2; // 20% higher growth for aggressive implementation
+        adjustedNewBudget *= 1.5; // 50% higher new budget for aggressive implementation
       } else if (multiYearConfig.implementationSpeed === 'gradual') {
-        adjustedGrowthRate *= 0.8; // 20% lower growth for gradual implementation
+        adjustedNewBudget *= 0.7; // 30% lower new budget for gradual implementation
       }
       
+      // Each year gets the same new budget amount (not cumulative)
       for (let year = planningHorizon.startYear; year <= planningHorizon.endYear; year++) {
-        const yearsFromStart = year - planningHorizon.startYear;
-        budgetScenarios[year] = baseBudget * Math.pow(1 + adjustedGrowthRate / 100, yearsFromStart);
+        budgetScenarios[year] = adjustedNewBudget;
       }
       
-      // Enhanced constraints based on configuration
+      // Enhanced constraints for new budget optimization
       const enhancedConstraints = {
-          minAllocation: 1,
-          maxAllocation: 40,
+        minAllocation: 1,
+        maxAllocation: 40,
         // Adjust transition limits based on implementation speed
         transitionLimit: multiYearConfig.implementationSpeed === 'aggressive' ? 50 : 
                         multiYearConfig.implementationSpeed === 'gradual' ? 15 : 30,
@@ -271,25 +313,21 @@ export default function AllocationOptimizationPage() {
         sessionId,
         token,
         budgetScenarios,
-          multiYearConfig.targetFsfvi,
-          multiYearConfig.targetYear,
-          'hybrid',
-          'normal_operations',
+        multiYearConfig.targetFsfvi,
+        multiYearConfig.targetYear,
+        'hybrid',
+        'normal_operations',
         enhancedConstraints
       );
       
       // Extract the multi-year plan data from the response
       const multiYearPlan = result.multi_year_plan || result;
-      console.log('Extracted multi-year plan:', multiYearPlan);
+      console.log('Extracted multi-year plan (new budget approach):', multiYearPlan);
       
       setOptimizationResults(prev => ({ ...prev, multiYear: multiYearPlan }));
       return multiYearPlan;
     });
   };
-
-
-
-
 
   const handleRunAnalysis = (toolId: string) => {
     // Set active view immediately when starting analysis
@@ -361,11 +399,6 @@ export default function AllocationOptimizationPage() {
     }));
   };
 
-  const handleOpenBudgetImpactConfiguration = () => {
-    setActiveResultsView('budget-impact-config');
-    setShowBudgetImpactConfig(true);
-  };
-
   const handleOpenMultiYearConfiguration = () => {
     setActiveResultsView('multi-year-config');
     setShowMultiYearConfig(true);
@@ -419,6 +452,9 @@ export default function AllocationOptimizationPage() {
         {/* Header Component */}
         <OptimizationHeader 
           sessionInfo={sessionInfo}
+          optimizationConfig={optimizationConfig}
+          isConfigured={optimizationConfig.configured}
+          onConfigure={() => {}}
         />
 
         {/* Main Content Layout with Sidebar */}
@@ -437,29 +473,45 @@ export default function AllocationOptimizationPage() {
                 </p>
               </CardHeader>
               <CardContent className="space-y-3">
-                
+                {/* Show different tools based on active view */}
+                {activeResultsView === 'multi-year' && (
+                  <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                    <p className="text-sm text-green-800">
+                      <strong>📊 Multi-Year Planning Mode:</strong> Viewing cumulative new budget analysis. 
+                      Traditional optimization tools are hidden to avoid confusion.
+                    </p>
+                  </div>
+                )}
 
+                {/* Budget Planning Simulations - Hide traditional tools in multi-year view */}
+                {activeResultsView !== 'multi-year' && (
+                  <div className="space-y-2">
+                    <h5 className="font-medium text-gray-700 text-sm">Traditional Budget Planning</h5>
+                  </div>
+                )}
 
-                {/* Budget Planning Simulations */}
+                {/* Multi-Year Planning Tools */}
                 <div className="space-y-2">
-                  <h5 className="font-medium text-gray-700 text-sm">Budget Planning</h5>
+                  <h5 className="font-medium text-gray-700 text-sm">
+                    {activeResultsView === 'multi-year' ? 'Multi-Year Planning' : 'New Budget Planning'}
+                  </h5>
                   
                   {/* Multi-Year Planning */}
                   <div className={`p-3 rounded-lg border ${activeResultsView === 'multi-year' ? 'border-green-500 bg-green-50' : 'border-gray-200'}`}>
                     <div className="flex items-center justify-between mb-2">
-                      <h6 className="text-sm font-medium">Multi-Year Planning</h6>
+                      <h6 className="text-sm font-medium">Multi-Year New Budget</h6>
                       <div className="flex items-center space-x-1">
                         {optimizationResults.multiYear && <CheckCircle className="w-3 h-3 text-green-600" />}
                         {multiYearConfig.configured && <CheckCircle className="w-3 h-3 text-blue-600" />}
                       </div>
                     </div>
-                    <p className="text-xs text-gray-600 mb-2">Plan budget allocation for next 3-5 years</p>
+                    <p className="text-xs text-gray-600 mb-2">Cumulative new budget planning (current allocations fixed)</p>
                     
                     {/* Configuration Status */}
                     {!multiYearConfig.configured && (
                       <div className="mb-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs">
                         <p className="text-yellow-800 font-medium">Configuration Required</p>
-                        <p className="text-yellow-700">Set planning parameters first</p>
+                        <p className="text-yellow-700">Set new budget parameters first</p>
                       </div>
                     )}
                     
@@ -468,7 +520,7 @@ export default function AllocationOptimizationPage() {
                         <p className="text-blue-800 font-medium">Configured</p>
                         <p className="text-blue-700">
                           {planningHorizon.endYear - planningHorizon.startYear + 1} years, 
-                          {multiYearConfig.implementationSpeed} pace
+                          ${planningHorizon.annualNewBudget || 500}M/year new budget
                         </p>
                       </div>
                     )}
@@ -509,21 +561,22 @@ export default function AllocationOptimizationPage() {
                     </div>
                   </div>
 
-                  {/* Budget Impact Analysis */}
-                  <BudgetImpactAnalysis
-                    sessionId={sessionId}
-                    sessionInfo={sessionInfo}
-                    activeResultsView={activeResultsView}
-                    setActiveResultsView={setActiveResultsView}
-                    analysisInProgress={analysisInProgress}
-                    optimizationResults={optimizationResults}
-                    setOptimizationResults={setOptimizationResults}
-                    setError={setError}
-                    runAnalysis={runAnalysis}
-                    budgetImpactConfig={budgetImpactConfig}
-                    setBudgetImpactConfig={setBudgetImpactConfig}
-                    onOpenConfiguration={handleOpenBudgetImpactConfiguration}
-                  />
+                  {/* Budget Impact Analysis - Only show when not in multi-year view */}
+                  {activeResultsView !== 'multi-year' && (
+                    <BudgetImpactAnalysis
+                      optimizationResult={optimizationResults.basic || {
+                        success: false,
+                        original_fsfvi: 0,
+                        optimal_fsfvi: 0,
+                        optimal_allocations: [],
+                        relative_improvement_percent: 0,
+                        efficiency_gain_percent: 0,
+                        total_reallocation_amount: 0,
+                        reallocation_intensity_percent: 0,
+                        budget_utilization_percent: 0
+                      }}
+                    />
+                  )}
 
                 </div>
 
@@ -573,6 +626,7 @@ export default function AllocationOptimizationPage() {
                           value={budgetImpactConfig.method}
                           onChange={(e) => setBudgetImpactConfig(prev => ({ ...prev, method: e.target.value }))}
                           className="w-full border border-gray-300 rounded-md px-3 py-2"
+                          aria-label="Analysis method selection"
                         >
                           <option value="hybrid">Hybrid (Recommended)</option>
                           <option value="expert">Expert Consensus</option>
@@ -716,7 +770,7 @@ export default function AllocationOptimizationPage() {
                   <CardTitle className="flex items-center justify-between">
                     <div className="flex items-center space-x-2">
                       <Calendar className="w-5 h-5 text-blue-600" />
-                      <span>Multi-Year Planning Configuration</span>
+                      <span>Multi-Year New Budget Planning</span>
                     </div>
                     <Button 
                       variant="ghost" 
@@ -726,6 +780,15 @@ export default function AllocationOptimizationPage() {
                       ✕
                     </Button>
                   </CardTitle>
+                  <div className="mt-3 p-4 bg-emerald-50 border border-emerald-200 rounded-lg">
+                    <h4 className="font-semibold text-emerald-900 mb-2">🧠 Dynamic Government Planning Approach</h4>
+                    <div className="text-sm text-emerald-800 space-y-2">
+                      <p><strong>✅ Current Allocations:</strong> Remain fixed (already committed/spent)</p>
+                      <p><strong>🧠 Dynamic Optimization:</strong> Each year considers how cumulative funding changes system sensitivity and performance</p>
+                      <p><strong>📈 Evolving Strategy:</strong> Allocation patterns adapt as components reach diminishing returns</p>
+                      <p><strong>🎯 Smart Allocation:</strong> Resources flow to components with highest marginal impact potential</p>
+                    </div>
+                  </div>
                 </CardHeader>
                 <CardContent className="space-y-6">
                   
@@ -758,17 +821,18 @@ export default function AllocationOptimizationPage() {
                         />
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Annual Budget Growth (%)</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Annual New Budget (Million USD)</label>
                         <input
                           type="number"
-                          min={-5}
-                          max={15}
-                          step={0.5}
-                          value={planningHorizon.budgetGrowth || 3}
-                          onChange={(e) => setPlanningHorizon(prev => ({ ...prev, budgetGrowth: parseFloat(e.target.value) || 3 }))}
+                          min={50}
+                          max={5000}
+                          step={50}
+                          value={planningHorizon.annualNewBudget || 500}
+                          onChange={(e) => setPlanningHorizon(prev => ({ ...prev, annualNewBudget: parseFloat(e.target.value) || 500 }))}
                           className="w-full border border-gray-300 rounded-md px-3 py-2"
-                          aria-label="Annual budget growth percentage"
+                          aria-label="Annual new budget amount in millions USD"
                         />
+                        <p className="text-xs text-gray-500 mt-1">Additional budget allocated each year (current allocations remain fixed)</p>
                       </div>
                     </div>
                   </div>
@@ -881,6 +945,41 @@ export default function AllocationOptimizationPage() {
                     </div>
                   </div>
 
+                  {/* Financial Impact Summary */}
+                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <h4 className="font-semibold text-blue-900 mb-3">💰 Financial Impact Summary</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                      <div>
+                        <span className="text-blue-700">Planning Period:</span>
+                        <span className="font-bold text-blue-900 ml-2">
+                          {planningHorizon.endYear - planningHorizon.startYear + 1} years
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-blue-700">Annual New Budget:</span>
+                        <span className="font-bold text-blue-900 ml-2">
+                          ${planningHorizon.annualNewBudget || 500}M
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-blue-700">Total New Investment:</span>
+                        <span className="font-bold text-blue-900 ml-2">
+                          ${((planningHorizon.endYear - planningHorizon.startYear + 1) * (planningHorizon.annualNewBudget || 500)).toFixed(0)}M
+                        </span>
+                      </div>
+                    </div>
+                    <div className="mt-3 pt-3 border-t border-blue-200">
+                      <div className="text-sm text-blue-800">
+                        <span>Current Budget (Fixed): </span>
+                        <span className="font-bold">${sessionInfo?.total_budget?.toFixed(0) || '2,900'}M</span>
+                        <span className="ml-4">Final Year Total: </span>
+                        <span className="font-bold">
+                          ${((sessionInfo?.total_budget || 2900) + ((planningHorizon.endYear - planningHorizon.startYear + 1) * (planningHorizon.annualNewBudget || 500))).toFixed(0)}M
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
                   {/* Action Buttons */}
                   <div className="flex justify-between pt-4 border-t">
                     <Button 
@@ -891,6 +990,37 @@ export default function AllocationOptimizationPage() {
                     </Button>
                     <Button 
                       onClick={() => {
+                        // Validation for multi-year configuration
+                        const planningYears = planningHorizon.endYear - planningHorizon.startYear + 1;
+                        const totalNewBudget = planningYears * planningHorizon.annualNewBudget;
+                        const currentBudget = sessionInfo?.total_budget || 2900;
+                        
+                        // Validate reasonable values
+                        if (planningYears < 3) {
+                          alert('Multi-year planning requires at least 3 years. Please extend the end year.');
+                          return;
+                        }
+                        if (planningYears > 10) {
+                          alert('Multi-year planning beyond 10 years may be unrealistic. Please reduce the planning horizon.');
+                          return;
+                        }
+                        if (planningHorizon.annualNewBudget < 50) {
+                          alert('Annual new budget should be at least $50M for meaningful impact.');
+                          return;
+                        }
+                        if (planningHorizon.annualNewBudget > currentBudget) {
+                          alert(`Annual new budget ($${planningHorizon.annualNewBudget}M) exceeds current total budget ($${currentBudget}M). Consider a more realistic amount.`);
+                          return;
+                        }
+                        if (totalNewBudget > currentBudget * 3) {
+                          const confirm = window.confirm(
+                            `Total new investment over ${planningYears} years would be $${totalNewBudget.toFixed(0)}M, ` +
+                            `which is ${(totalNewBudget/currentBudget).toFixed(1)}x the current budget. ` +
+                            `This may be unrealistic. Continue anyway?`
+                          );
+                          if (!confirm) return;
+                        }
+                        
                         setMultiYearConfig(prev => ({ ...prev, configured: true }));
                         setShowMultiYearConfig(false);
                         // Set view back to show results when ready
@@ -967,9 +1097,17 @@ export default function AllocationOptimizationPage() {
             )}
 
             {optimizationResults.basic && activeResultsView === 'optimization' && (
-              <OptimizationResults
-                result={optimizationResults.basic}
-              />
+              <div>
+                <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-sm text-blue-800">
+                    <strong>💡 Traditional Reallocation Analysis:</strong> This shows how current budget could be optimally reallocated. 
+                    For new budget planning, use the Multi-Year New Budget analysis above.
+                  </p>
+                </div>
+                <OptimizationResults
+                  result={optimizationResults.basic}
+                />
+              </div>
             )}
 
             {/* Multi-Year Results Component */}

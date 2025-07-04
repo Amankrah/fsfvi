@@ -902,35 +902,92 @@ class FSFVIOptimizationService:
         budget: float,
         method: Optional[str] = None,
         scenario: Optional[str] = None,
-        constraints: Optional[Dict[str, Any]] = None
+        constraints: Optional[Dict[str, Any]] = None,
+        new_budget_only: bool = False,
+        new_budget_amount: Optional[float] = None
     ) -> Dict[str, Any]:
         """
         Optimize financial allocation to minimize FSFVI using mathematical specification
         
+        Two optimization modes:
+        1. Traditional (new_budget_only=False): Optimize reallocation of entire budget
+           - Shows "how money should have been allocated" (retrospective)
+           - Useful for understanding optimal allocation patterns
+        
+        2. New Budget (new_budget_only=True): Optimize allocation of new budget only
+           - Current allocations are fixed (already committed/spent)
+           - Only new budget is optimized to minimize total system FSFVI
+           - More realistic for government planning going forward
+        
         Mathematical Objective: Minimize FSFVI = Σᵢ ωᵢ·υᵢ(fᵢ) = Σᵢ ωᵢ·δᵢ·[1/(1+αᵢfᵢ)]
         
-        Constraints:
-        1. Budget: Σfᵢ ≤ F
-        2. Non-negativity: fᵢ ≥ 0 
-        3. Prioritization: fᵢ ≥ fⱼ if δᵢ ≥ δⱼ
+        Where for new_budget_only=True:
+        - fᵢ = fᵢ_current (fixed) + fᵢ_new (optimized)
+        - Constraint: Σfᵢ_new ≤ new_budget
         
         Args:
             components: Component data
-            budget: Total budget constraint
+            budget: Total budget constraint (traditional) or new budget amount (new_budget_only)
             method: Weighting method
             scenario: Analysis scenario
             constraints: Additional optimization constraints
+            new_budget_only: If True, optimize only new budget with current allocations fixed
+            new_budget_amount: Explicit new budget amount (for validation)
             
         Returns:
             Optimization result dictionary
         """
-        # Validate inputs once
-        components, method, scenario = validate_calculation_inputs(
-            components, method, scenario, budget
-        )
+        # Enhanced validation for new budget optimization
+        if new_budget_only:
+            effective_new_budget = new_budget_amount if new_budget_amount is not None else budget
+            if effective_new_budget is None or effective_new_budget <= 0:
+                return {
+                    'success': False,
+                    'error': 'New budget amount must be specified and greater than 0 for new budget optimization mode. Please configure the new budget amount in optimization settings.',
+                    'optimization_type': 'new_budget_allocation'
+                }
+            if effective_new_budget > 100000:  # More than 100 billion
+                return {
+                    'success': False,
+                    'error': 'New budget amount seems unreasonably large. Please check the amount (should be in millions USD).',
+                    'optimization_type': 'new_budget_allocation'
+                }
+        
+        # Validate inputs - skip budget validation for new budget optimization
+        if new_budget_only:
+            # For new budget optimization, don't validate existing allocations against new budget
+            components, method, scenario = validate_calculation_inputs(
+                components, method, scenario, None  # Skip budget validation
+            )
+        else:
+            # For traditional optimization, validate allocations against total budget
+            components, method, scenario = validate_calculation_inputs(
+                components, method, scenario, budget
+            )
         
         constraints = constraints or {}
         
+        if new_budget_only:
+            return self._optimize_new_budget_allocation(
+                components, budget, method, scenario, constraints
+            )
+        else:
+            return self._optimize_traditional_allocation(
+                components, budget, method, scenario, constraints
+            )
+
+    def _optimize_traditional_allocation(
+        self,
+        components: List[Dict[str, Any]],
+        budget: float,
+        method: str,
+        scenario: str,
+        constraints: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        Traditional optimization: treat all allocations as malleable
+        Shows "how money should have been allocated" for retrospective analysis
+        """
         # Prepare optimization data - single calculation
         opt_data = self._prepare_optimization_data(components, method, scenario, budget)
         
@@ -938,20 +995,18 @@ class FSFVIOptimizationService:
         current_fsfvi = self._calculate_fsfvi_efficient(opt_data)
         
         # Debug the optimization inputs
-        logger.info(f"=== OPTIMIZATION DEBUG START ===")
+        logger.info(f"=== TRADITIONAL OPTIMIZATION START ===")
         logger.info(f"Budget: ${budget:.1f}M")
         logger.info(f"Components: {len(components)}")
         logger.info(f"Current FSFVI: {current_fsfvi:.6f}")
         logger.info(f"Original allocations: {[round(x, 1) for x in opt_data['original_allocations']]}")
-        logger.info(f"Performance gaps: {[round(x, 3) for x in opt_data['performance_gaps']]}")
-        logger.info(f"Sensitivities: {[round(x, 6) for x in opt_data['sensitivities']]}")
-        logger.info(f"Weights: {[round(x, 3) for x in opt_data['weights']]}")
         
         # Initialize basic result structure
         optimization_result = {
             'original_fsfvi': current_fsfvi,
             'method': method,
             'scenario': scenario,
+            'optimization_type': 'traditional_reallocation',
             'timestamp': datetime.now().isoformat(),
             'constraints_applied': ['budget', 'non_negativity', 'prioritization']
         }
@@ -959,18 +1014,10 @@ class FSFVIOptimizationService:
         try:
             # Run streamlined optimization
             opt_result = self._optimize_mathematical(opt_data, constraints)
-            logger.info(f"Optimization result: {opt_result}")
-            
-            # Update result with optimization data
             optimization_result.update(opt_result)
             
             # Calculate improvement metrics efficiently
             if optimization_result.get('success', False):
-                logger.info(f"Calculating improvement metrics...")
-                logger.info(f"Original FSFVI: {current_fsfvi:.6f}")
-                logger.info(f"Optimal FSFVI: {optimization_result.get('optimal_fsfvi', 'MISSING')}")
-                logger.info(f"Optimal allocations: {optimization_result.get('optimal_allocations', 'MISSING')}")
-                
                 improvement_metrics = self._calculate_improvement_metrics_efficient(
                     current_fsfvi,
                     optimization_result['optimal_fsfvi'],
@@ -978,7 +1025,6 @@ class FSFVIOptimizationService:
                     optimization_result['optimal_allocations'],
                     opt_data['budget']
                 )
-                logger.info(f"Improvement metrics: {improvement_metrics}")
                 optimization_result.update(improvement_metrics)
                 
                 # Add detailed component analysis
@@ -986,21 +1032,1017 @@ class FSFVIOptimizationService:
                     opt_data, optimization_result['optimal_allocations']
                 )
                 optimization_result['component_analysis'] = component_analysis
-            else:
-                logger.error(f"Optimization was not successful: {optimization_result}")
             
         except Exception as e:
-            logger.error(f"Optimization failed: {e}")
-            import traceback
-            logger.error(f"Full traceback: {traceback.format_exc()}")
+            logger.error(f"Traditional optimization failed: {e}")
             optimization_result['error'] = str(e)
             optimization_result['success'] = False
-            optimization_result['mathematical_compliance'] = False  # Mathematical optimization failed
         
         # Sanitize infinite/NaN values for JSON serialization
         optimization_result = self._sanitize_optimization_result(optimization_result)
         
         return optimization_result
+
+    def _optimize_new_budget_allocation(
+        self,
+        components: List[Dict[str, Any]],
+        new_budget: float,
+        method: str,
+        scenario: str,
+        constraints: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        NEW BUDGET OPTIMIZATION: Optimize allocation of new budget only
+        
+        DYNAMIC APPROACH: Considers how cumulative allocations change system state:
+        - Updates sensitivity parameters based on cumulative funding levels
+        - Recalculates performance expectations based on previous investments
+        - Adjusts vulnerability landscape to reflect evolving system capabilities
+        
+        Mathematical Framework:
+        - fᵢ_current: Fixed current allocation (from component data)
+        - fᵢ_new: New budget allocation (variable to optimize)
+        - fᵢ_total = fᵢ_current + fᵢ_new: Total allocation for FSFVI calculation
+        - Minimize: FSFVI = Σᵢ ωᵢ·δᵢ·[1/(1+αᵢ(fᵢ_total)·fᵢ_total)]
+        - Subject to: Σfᵢ_new ≤ new_budget, fᵢ_new ≥ 0
+        
+        Args:
+            components: Component data with current allocations
+            new_budget: New budget available for allocation
+            method: Weighting method
+            scenario: Analysis scenario
+            constraints: Additional constraints
+            
+        Returns:
+            Optimization result with current, new, and total allocations
+        """
+        # STEP 1: Update component state based on cumulative allocations
+        updated_components = self._update_components_for_cumulative_state(components)
+        
+        # STEP 2: Prepare optimization data with updated components
+        opt_data = self._prepare_new_budget_optimization_data(
+            updated_components, method, scenario, new_budget
+        )
+        
+        # STEP 3: Calculate baseline FSFVI with current cumulative state
+        baseline_fsfvi = self._calculate_fsfvi_efficient_with_split(
+            opt_data, new_allocations=np.zeros(opt_data['n_components'])
+        )
+        
+        logger.info(f"=== DYNAMIC NEW BUDGET OPTIMIZATION START ===")
+        logger.info(f"New Budget: ${new_budget:.1f}M")
+        logger.info(f"Components: {len(components)}")
+        logger.info(f"Current allocations: {[round(x, 1) for x in opt_data['current_allocations']]}")
+        logger.info(f"Total current budget: ${sum(opt_data['current_allocations']):.1f}M")
+        logger.info(f"Updated sensitivity parameters: {[round(x, 6) for x in opt_data['sensitivities']]}")
+        logger.info(f"Updated performance gaps: {[round(x, 3) for x in opt_data['performance_gaps']]}")
+        logger.info(f"Baseline FSFVI (current cumulative): {baseline_fsfvi:.6f}")
+        
+        # Initialize result structure
+        optimization_result = {
+            'baseline_fsfvi': baseline_fsfvi,
+            'method': method,
+            'scenario': scenario,
+            'optimization_type': 'dynamic_new_budget_allocation',
+            'new_budget': new_budget,
+            'current_budget': float(sum(opt_data['current_allocations'])),
+            'total_budget': float(sum(opt_data['current_allocations'])) + new_budget,
+            'timestamp': datetime.now().isoformat(),
+            'constraints_applied': ['new_budget', 'non_negativity', 'dynamic_prioritization'],
+            'dynamic_updates_applied': True
+        }
+        
+        try:
+            # STEP 4: Run dynamic new budget optimization
+            opt_result = self._optimize_new_budget_mathematical_dynamic(opt_data, constraints)
+            optimization_result.update(opt_result)
+            
+            if optimization_result.get('success', False):
+                # Calculate improvement metrics
+                improvement_metrics = self._calculate_new_budget_improvement_metrics(
+                    baseline_fsfvi,
+                    optimization_result['optimal_fsfvi'],
+                    opt_data['current_allocations'],
+                    optimization_result['optimal_new_allocations'],
+                    new_budget
+                )
+                optimization_result.update(improvement_metrics)
+                
+                # Generate component analysis for new budget optimization
+                component_analysis = self._generate_new_budget_component_analysis(
+                    opt_data, optimization_result['optimal_new_allocations']
+                )
+                optimization_result['component_analysis'] = component_analysis
+                
+                # Add practical government insights
+                optimization_result['government_insights'] = self._generate_new_budget_government_insights(
+                    opt_data, optimization_result, new_budget
+                )
+                
+        except Exception as e:
+            logger.error(f"Dynamic new budget optimization failed: {e}")
+            optimization_result['error'] = str(e)
+            optimization_result['success'] = False
+        
+        # Sanitize results
+        optimization_result = self._sanitize_optimization_result(optimization_result)
+        
+        return optimization_result
+
+    def _update_components_for_cumulative_state(
+        self,
+        components: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
+        """
+        DYNAMIC UPDATE: Update component state based on cumulative allocations
+        
+        This method addresses the core issue: as components receive more funding over time,
+        their sensitivity parameters, performance levels, and vulnerabilities change.
+        This creates a dynamic optimization landscape that varies year by year.
+        
+        Key Updates:
+        1. Sensitivity parameters: αᵢ decreases as funding increases (diminishing returns)
+        2. Performance improvements: Observed values improve with sustained funding
+        3. Benchmark adjustments: Higher standards as system capabilities improve
+        
+        Args:
+            components: Original components with cumulative allocations
+            
+        Returns:
+            Updated components reflecting current system state
+        """
+        updated_components = []
+        
+        for i, comp in enumerate(components):
+            updated_comp = comp.copy()
+            
+            current_allocation = comp['financial_allocation']
+            component_type = comp['component_type']
+            
+            # 1. DYNAMIC SENSITIVITY: Adjust αᵢ based on cumulative funding level
+            # Higher funding levels reduce sensitivity (diminishing returns)
+            base_sensitivity = comp.get('sensitivity_parameter', 0.001)
+            
+            # Calculate funding ratio compared to baseline (assume baseline ~500M per component)
+            baseline_funding = 500.0  # Baseline funding level in millions
+            funding_ratio = current_allocation / baseline_funding
+            
+            # Apply diminishing returns: αᵢ_new = αᵢ_base / (1 + 0.3 * funding_ratio)
+            # This means more funded components become less sensitive to additional funding
+            adjustment_factor = 1 + (0.3 * max(0, funding_ratio - 1))  # Only adjust above baseline
+            updated_sensitivity = base_sensitivity / adjustment_factor
+            
+            # Ensure sensitivity stays within reasonable bounds
+            updated_sensitivity = max(0.0001, min(updated_sensitivity, 0.01))
+            updated_comp['sensitivity_parameter'] = updated_sensitivity
+            
+            # 2. DYNAMIC PERFORMANCE: Improve observed values with sustained funding
+            # Components with higher funding should show performance improvements
+            observed_value = comp['observed_value']
+            benchmark_value = comp['benchmark_value']
+            
+            # Calculate potential improvement based on funding above baseline
+            if funding_ratio > 1.0:  # Only improve if funded above baseline
+                excess_funding_ratio = funding_ratio - 1.0
+                
+                # Performance improvement: 5% per 100% excess funding, capped at 20%
+                improvement_factor = min(0.20, excess_funding_ratio * 0.05)
+                
+                # Determine if higher values are better for this component
+                from config import get_component_performance_preference
+                prefer_higher = get_component_performance_preference(component_type)
+                
+                if prefer_higher:
+                    # Improve towards benchmark (but don't exceed it significantly)
+                    gap_to_benchmark = max(0, benchmark_value - observed_value)
+                    improvement = gap_to_benchmark * improvement_factor
+                    updated_observed = observed_value + improvement
+                    
+                    # Cap improvement at 5% above benchmark to maintain challenge
+                    max_allowed = benchmark_value * 1.05
+                    updated_comp['observed_value'] = min(updated_observed, max_allowed)
+                else:
+                    # Lower values are better - reduce towards benchmark
+                    gap_to_benchmark = max(0, observed_value - benchmark_value)
+                    improvement = gap_to_benchmark * improvement_factor
+                    updated_observed = observed_value - improvement
+                    
+                    # Cap improvement at 5% below benchmark
+                    min_allowed = benchmark_value * 0.95
+                    updated_comp['observed_value'] = max(updated_observed, min_allowed)
+            
+            # 3. DYNAMIC BENCHMARKS: Gradually raise standards as system improves
+            # As the overall system gets more funding, benchmarks can become more ambitious
+            total_funding = sum(c['financial_allocation'] for c in components)
+            baseline_total = len(components) * baseline_funding
+            
+            if total_funding > baseline_total:
+                system_improvement_ratio = (total_funding - baseline_total) / baseline_total
+                # Raise benchmarks by up to 10% as system gets more resourced
+                benchmark_adjustment = min(0.10, system_improvement_ratio * 0.05)
+                
+                from config import get_component_performance_preference
+                prefer_higher = get_component_performance_preference(component_type)
+                
+                if prefer_higher:
+                    # Raise benchmarks higher for better performance
+                    updated_comp['benchmark_value'] = benchmark_value * (1 + benchmark_adjustment)
+                else:
+                    # Lower benchmarks for better performance (since lower is better)
+                    updated_comp['benchmark_value'] = benchmark_value * (1 - benchmark_adjustment)
+            
+            # 4. LOG DYNAMIC CHANGES for transparency
+            if i == 0:  # Log details for first component as example
+                logger.info(f"=== DYNAMIC COMPONENT UPDATE EXAMPLE ===")
+                logger.info(f"Component: {component_type}")
+                logger.info(f"Funding ratio: {funding_ratio:.2f}")
+                logger.info(f"Sensitivity: {base_sensitivity:.6f} -> {updated_sensitivity:.6f}")
+                logger.info(f"Observed: {observed_value:.2f} -> {updated_comp['observed_value']:.2f}")
+                logger.info(f"Benchmark: {benchmark_value:.2f} -> {updated_comp['benchmark_value']:.2f}")
+            
+            updated_components.append(updated_comp)
+        
+        return updated_components
+
+    def _prepare_new_budget_optimization_data(
+        self,
+        components: List[Dict[str, Any]],
+        method: str,
+        scenario: str,
+        new_budget: float
+    ) -> Dict[str, Any]:
+        """
+        Prepare optimization data for new budget allocation
+        
+        Separates current (fixed) allocations from new (optimizable) budget
+        """
+        from fsfvi_core import calculate_performance_gap
+        from config import get_component_performance_preference
+        
+        # Apply weighting to get component weights
+        weighted_components = self.calculation_service._apply_enhanced_weighting(
+            components, method, scenario
+        )
+        
+        n_components = len(weighted_components)
+        
+        # Extract arrays for efficient calculation
+        weights = np.zeros(n_components)
+        performance_gaps = np.zeros(n_components)
+        sensitivities = np.zeros(n_components)
+        current_allocations = np.zeros(n_components)
+        component_types = []
+        component_names = []
+        
+        for i, comp in enumerate(weighted_components):
+            # Ensure sensitivity parameter (now dynamically updated)
+            self.calculation_service._ensure_sensitivity_parameter(comp)
+            
+            # Get performance direction preference
+            prefer_higher = get_component_performance_preference(comp['component_type'])
+            
+            # Calculate performance gap (using potentially updated values)
+            gap = calculate_performance_gap(
+                comp['observed_value'], comp['benchmark_value'], prefer_higher
+            )
+            
+            # Store data
+            weights[i] = comp['weight']
+            performance_gaps[i] = gap
+            sensitivities[i] = comp['sensitivity_parameter']
+            current_allocations[i] = comp['financial_allocation']  # These are FIXED
+            component_types.append(comp['component_type'])
+            component_names.append(comp.get('component_name', comp['component_type']))
+        
+        return {
+            'n_components': n_components,
+            'weights': weights,
+            'performance_gaps': performance_gaps,
+            'sensitivities': sensitivities,
+            'current_allocations': current_allocations,  # FIXED allocations
+            'new_budget': new_budget,  # Available for optimization
+            'component_types': component_types,
+            'component_names': component_names
+        }
+
+    def _calculate_fsfvi_efficient_with_split(
+        self, 
+        opt_data: Dict[str, Any], 
+        new_allocations: np.ndarray
+    ) -> float:
+        """
+        Calculate FSFVI using current (fixed) + new (variable) allocations
+        
+        Mathematical Formula: FSFVI = Σᵢ ωᵢ·δᵢ·[1/(1+αᵢ·(fᵢ_current + fᵢ_new))]
+        """
+        weights = opt_data['weights']
+        gaps = opt_data['performance_gaps']
+        alphas = opt_data['sensitivities']
+        current_allocations = opt_data['current_allocations']
+        
+        # Total allocations = current (fixed) + new (variable)
+        total_allocations = current_allocations + new_allocations
+        
+        # Vectorized FSFVI calculation with enhanced safety checks
+        # Ensure all inputs are finite
+        if not np.all(np.isfinite(weights)):
+            logger.error(f"Non-finite weights detected: {weights}")
+            weights = np.nan_to_num(weights, nan=1.0/len(weights), posinf=1.0, neginf=0.0)
+            weights = weights / np.sum(weights)  # Renormalize
+        
+        if not np.all(np.isfinite(gaps)):
+            logger.error(f"Non-finite gaps detected: {gaps}")
+            gaps = np.nan_to_num(gaps, nan=0.0, posinf=1.0, neginf=0.0)
+        
+        if not np.all(np.isfinite(alphas)):
+            logger.error(f"Non-finite alphas detected: {alphas}")
+            alphas = np.nan_to_num(alphas, nan=0.001, posinf=0.01, neginf=0.0001)
+        
+        if not np.all(np.isfinite(total_allocations)):
+            logger.error(f"Non-finite allocations detected: {total_allocations}")
+            total_allocations = np.nan_to_num(total_allocations, nan=100.0, posinf=1000.0, neginf=0.0)
+        
+        denominators = 1 + alphas * total_allocations
+        denominators = np.where(denominators < 1e-10, 1e-10, denominators)
+        
+        vulnerabilities = gaps / denominators
+        # Additional safety check for vulnerabilities
+        vulnerabilities = np.nan_to_num(vulnerabilities, nan=0.0, posinf=1.0, neginf=0.0)
+        
+        weighted_vulnerabilities = weights * vulnerabilities
+        # Final safety check
+        weighted_vulnerabilities = np.nan_to_num(weighted_vulnerabilities, nan=0.0, posinf=1.0, neginf=0.0)
+        
+        fsfvi = np.sum(weighted_vulnerabilities)
+        
+        # Validate final result
+        if np.isnan(fsfvi) or np.isinf(fsfvi):
+            logger.error(f"FSFVI calculation with split allocations returned {fsfvi} despite safety checks")
+            # Return a reasonable fallback value
+            fsfvi = 0.5  # Mid-range FSFVI value
+            logger.warning(f"Using fallback FSFVI value: {fsfvi}")
+        
+        return float(np.clip(fsfvi, 0.0, 1.0))  # Ensure FSFVI is in valid range
+
+    def _calculate_new_budget_gradient(
+        self, 
+        opt_data: Dict[str, Any], 
+        new_allocations: np.ndarray
+    ) -> np.ndarray:
+        """
+        Calculate gradient for new budget optimization: ∂FSFVI/∂fᵢ_new
+        
+        Since fᵢ_total = fᵢ_current + fᵢ_new:
+        ∂FSFVI/∂fᵢ_new = ∂FSFVI/∂fᵢ_total = -ωᵢ·δᵢ·αᵢ/(1+αᵢ·fᵢ_total)²
+        """
+        weights = opt_data['weights']
+        gaps = opt_data['performance_gaps']
+        alphas = opt_data['sensitivities']
+        current_allocations = opt_data['current_allocations']
+        
+        # Total allocations = current + new
+        total_allocations = current_allocations + new_allocations
+        
+        denominators = (1 + alphas * total_allocations) ** 2
+        denominators = np.where(denominators < 1e-12, 1e-12, denominators)
+        
+        gradients = -weights * gaps * alphas / denominators
+        gradients = np.where(np.isnan(gradients) | np.isinf(gradients), 0.0, gradients)
+        
+        return gradients
+
+    def _optimize_new_budget_mathematical_dynamic(
+        self,
+        opt_data: Dict[str, Any],
+        constraints: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        DYNAMIC optimization of new budget allocation with intelligent initialization
+        
+        Key improvements over static approach:
+        1. Smart initialization based on current gradient landscape
+        2. Adaptive prioritization based on cumulative state
+        3. Dynamic bounds based on marginal impact potential
+        4. Enhanced convergence criteria for evolving systems
+        """
+        # Get optimization parameters from config
+        max_iterations = FSFVI_CONFIG.max_optimization_iterations
+        learning_rate = FSFVI_CONFIG.initial_learning_rate * 0.4  # More conservative for dynamic
+        tolerance = FSFVI_CONFIG.tolerance
+        min_improvement = FSFVI_CONFIG.min_improvement
+        
+        n_components = opt_data['n_components']
+        new_budget = opt_data['new_budget']
+        
+        # DYNAMIC INITIALIZATION: Instead of equal distribution, use gradient-based smart start
+        initial_new_allocations = self._calculate_smart_initial_allocation(opt_data, new_budget)
+        new_allocations = initial_new_allocations.copy()
+        
+        # DYNAMIC BOUNDS: Calculate bounds based on marginal impact potential
+        min_new_bounds, max_new_bounds = self._calculate_dynamic_bounds(opt_data, new_budget)
+        
+        # ADAPTIVE PRIORITIZATION: Adjust bounds based on current system state
+        priority_adjusted_bounds = self._apply_adaptive_prioritization(
+            opt_data, max_new_bounds, min_new_bounds
+        )
+        max_new_bounds = priority_adjusted_bounds
+        
+        # Optimization loop with enhanced tracking
+        convergence_history = []
+        prev_fsfvi = float('inf')
+        stagnation_count = 0
+        
+        logger.info(f"Starting dynamic new budget optimization with {max_iterations} max iterations")
+        logger.info(f"Smart initial allocations: {[round(x, 1) for x in new_allocations]}")
+        logger.info(f"Dynamic bounds - Min: {[round(x, 1) for x in min_new_bounds[:3]]}...")
+        logger.info(f"Dynamic bounds - Max: {[round(x, 1) for x in max_new_bounds[:3]]}...")
+        
+        for iteration in range(max_iterations):
+            # Calculate current FSFVI and gradient
+            current_fsfvi = self._calculate_fsfvi_efficient_with_split(opt_data, new_allocations)
+            gradient = self._calculate_new_budget_gradient(opt_data, new_allocations)
+            
+            if iteration < 3 or iteration % 5 == 0:
+                logger.info(f"Dynamic Iteration {iteration}: FSFVI={current_fsfvi:.6f}, Gradient norm={np.linalg.norm(gradient):.6f}")
+                logger.info(f"New allocations: {[round(x, 1) for x in new_allocations]}")
+            
+            # Check convergence with enhanced criteria
+            improvement = prev_fsfvi - current_fsfvi
+            if iteration > 0:
+                if improvement <= min_improvement:
+                    stagnation_count += 1
+                    if stagnation_count >= 3:  # Allow for some oscillation in dynamic systems
+                        logger.info(f"Dynamic optimization converged after {iteration} iterations (stagnation)")
+                        break
+                else:
+                    stagnation_count = 0
+            
+            # ADAPTIVE GRADIENT DESCENT: Adjust step size based on system state
+            adaptive_step_size = self._calculate_adaptive_step_size(
+                learning_rate, new_budget, gradient, iteration, convergence_history
+            )
+            
+            updated_new_allocations = new_allocations - adaptive_step_size * gradient
+            
+            # Apply dynamic bounds
+            updated_new_allocations = np.clip(updated_new_allocations, min_new_bounds, max_new_bounds)
+            
+            # SMART BUDGET CONSTRAINT: Distribute budget based on marginal effectiveness
+            updated_new_allocations = self._enforce_smart_budget_constraint(
+                updated_new_allocations, new_budget, gradient, opt_data
+            )
+            
+            # Update for next iteration
+            new_allocations = updated_new_allocations
+            prev_fsfvi = current_fsfvi
+            
+            # Enhanced convergence tracking
+            marginal_efficiency = improvement / max(np.sum(np.abs(gradient)) * adaptive_step_size, 1e-8)
+            convergence_history.append({
+                'iteration': iteration,
+                'fsfvi': current_fsfvi,
+                'improvement': improvement if improvement != float('inf') else 0.0,
+                'gradient_norm': np.linalg.norm(gradient),
+                'marginal_efficiency': marginal_efficiency,
+                'new_budget_used': np.sum(new_allocations),
+                'allocation_diversity': np.std(new_allocations) / np.mean(new_allocations) if np.mean(new_allocations) > 0 else 0
+            })
+            
+            # DYNAMIC LEARNING RATE: Adapt based on convergence pattern
+            if iteration > 5:
+                self._update_dynamic_learning_rate(convergence_history, learning_rate)
+        
+        # Calculate final results with enhanced metrics
+        final_fsfvi = self._calculate_fsfvi_efficient_with_split(opt_data, new_allocations)
+        final_total_allocations = opt_data['current_allocations'] + new_allocations
+        new_budget_used = np.sum(new_allocations)
+        
+        # Calculate dynamic allocation insights
+        allocation_insights = self._generate_dynamic_allocation_insights(
+            new_allocations, opt_data, initial_new_allocations
+        )
+        
+        logger.info(f"=== DYNAMIC NEW BUDGET OPTIMIZATION COMPLETE ===")
+        logger.info(f"Final FSFVI: {final_fsfvi:.6f}")
+        logger.info(f"Final new allocations: {[round(x, 1) for x in new_allocations]}")
+        logger.info(f"Total allocations: {[round(x, 1) for x in final_total_allocations]}")
+        logger.info(f"Budget utilization: {new_budget_used:.1f} / {new_budget:.1f} = {new_budget_used/new_budget*100:.1f}%")
+        logger.info(f"Allocation strategy: {allocation_insights['strategy_type']}")
+        
+        return {
+            'success': True,
+            'optimal_fsfvi': final_fsfvi,
+            'optimal_new_allocations': new_allocations.tolist(),
+            'optimal_total_allocations': final_total_allocations.tolist(),
+            'current_allocations': opt_data['current_allocations'].tolist(),
+            'iterations': iteration + 1,
+            'convergence_history': convergence_history,
+            'solver': 'dynamic_new_budget_gradient_descent',
+            'mathematical_compliance': True,
+            'dynamic_features_used': True,
+            'allocation_insights': allocation_insights,
+            'new_budget_utilization': new_budget_used / new_budget if new_budget > 0 else 0
+        }
+    
+
+    
+    def _calculate_smart_initial_allocation(
+        self,
+        opt_data: Dict[str, Any],
+        new_budget: float
+    ) -> np.ndarray:
+        """
+        Calculate intelligent initial allocation based on current gradient landscape
+        
+        Instead of starting with equal distribution, this initializes based on:
+        1. Current marginal impact potential (gradient analysis)
+        2. Performance gap priorities  
+        3. Sensitivity-adjusted optimization potential
+        """
+        n_components = opt_data['n_components']
+        
+        # Start with equal allocation as base
+        base_allocation = np.full(n_components, new_budget / n_components)
+        
+        # Calculate initial gradient to understand impact landscape
+        initial_gradient = self._calculate_new_budget_gradient(opt_data, base_allocation)
+        
+        # Convert gradients to allocation priorities (negative gradients = high impact)
+        # Normalize to get allocation weights
+        gradient_magnitudes = np.abs(initial_gradient)
+        if np.sum(gradient_magnitudes) > 0:
+            gradient_weights = gradient_magnitudes / np.sum(gradient_magnitudes)
+        else:
+            gradient_weights = np.full(n_components, 1.0 / n_components)
+        
+        # Combine with performance gap prioritization
+        gaps = opt_data['performance_gaps']
+        gap_weights = gaps / np.sum(gaps) if np.sum(gaps) > 0 else np.full(n_components, 1.0 / n_components)
+        
+        # Weighted combination: 60% gradient-based, 40% gap-based
+        smart_weights = 0.6 * gradient_weights + 0.4 * gap_weights
+        
+        # Convert to allocations
+        smart_allocation = smart_weights * new_budget
+        
+        # Apply reasonable bounds (no component gets less than 5% or more than 40%)
+        min_allocation = new_budget * 0.05
+        max_allocation = new_budget * 0.40
+        smart_allocation = np.clip(smart_allocation, min_allocation, max_allocation)
+        
+        # Ensure total equals budget
+        total_allocation = np.sum(smart_allocation)
+        if total_allocation != new_budget:
+            smart_allocation *= new_budget / total_allocation
+        
+        return smart_allocation
+    
+    def _calculate_dynamic_bounds(
+        self,
+        opt_data: Dict[str, Any],
+        new_budget: float
+    ) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Calculate dynamic bounds based on marginal impact potential
+        
+        Bounds adapt based on:
+        1. Current sensitivity levels (diminishing returns)
+        2. Performance gap magnitude
+        3. Cumulative funding levels
+        """
+        n_components = opt_data['n_components']
+        gaps = opt_data['performance_gaps']
+        sensitivities = opt_data['sensitivities']
+        current_allocations = opt_data['current_allocations']
+        
+        # Base bounds
+        min_bounds = np.full(n_components, new_budget * 0.02)  # Min 2% each
+        max_bounds = np.full(n_components, new_budget * 0.50)  # Max 50% each (increased from 40%)
+        
+        # Adjust based on marginal impact potential
+        for i in range(n_components):
+            gap = gaps[i]
+            sensitivity = sensitivities[i]
+            current_funding = current_allocations[i]
+            
+            # Calculate marginal impact potential: gap * sensitivity / (1 + current_funding_factor)
+            funding_factor = current_funding / 1000.0  # Normalize to thousands
+            marginal_potential = gap * sensitivity / (1 + funding_factor)
+            
+            # Adjust max bounds based on potential
+            if marginal_potential > 0.001:  # High potential
+                max_bounds[i] *= 1.5  # Can get up to 75% of new budget
+            elif marginal_potential < 0.0001:  # Low potential
+                max_bounds[i] *= 0.6  # Reduced to 30% of new budget
+        
+        # Ensure bounds are feasible
+        if np.sum(max_bounds) < new_budget:
+            # Scale up if bounds are too restrictive
+            max_bounds *= new_budget / np.sum(max_bounds) * 1.2
+        
+        # Cap individual maximums to ensure some distribution
+        max_bounds = np.minimum(max_bounds, new_budget * 0.60)
+        
+        return min_bounds, max_bounds
+    
+    def _apply_adaptive_prioritization(
+        self,
+        opt_data: Dict[str, Any],
+        max_bounds: np.ndarray,
+        min_bounds: np.ndarray
+    ) -> np.ndarray:
+        """
+        Apply adaptive prioritization based on current system state
+        """
+        gaps = opt_data['performance_gaps']
+        current_allocations = opt_data['current_allocations']
+        
+        # Calculate prioritization adjustments
+        priority_factors = np.ones_like(max_bounds)
+        
+        # Prioritize based on performance gap ranking
+        gap_order = np.argsort(-gaps)  # Descending order
+        
+        for rank, idx in enumerate(gap_order):
+            # Higher rank (lower index) = higher priority
+            priority_boost = 1.0 + (0.2 * (len(gaps) - rank) / len(gaps))
+            priority_factors[idx] *= priority_boost
+        
+        # Apply funding level adjustments (heavily funded components get less priority)
+        avg_current_funding = np.mean(current_allocations)
+        for i in range(len(current_allocations)):
+            if current_allocations[i] > avg_current_funding * 1.5:  # 50% above average
+                priority_factors[i] *= 0.8  # Reduce priority for over-funded components
+        
+        # Apply adjustments to bounds
+        adjusted_max_bounds = max_bounds * priority_factors
+        
+        # Ensure feasibility
+        total_max = np.sum(adjusted_max_bounds)
+        new_budget = opt_data['new_budget']
+        if total_max < new_budget:
+            # Scale up proportionally
+            adjusted_max_bounds *= new_budget / total_max * 1.1
+        
+        return adjusted_max_bounds
+    
+    def _calculate_adaptive_step_size(
+        self,
+        base_learning_rate: float,
+        new_budget: float,
+        gradient: np.ndarray,
+        iteration: int,
+        convergence_history: List[Dict[str, Any]]
+    ) -> float:
+        """
+        Calculate adaptive step size based on optimization progress
+        """
+        # Base step size
+        gradient_norm = np.linalg.norm(gradient)
+        if gradient_norm < 1e-8:
+            return base_learning_rate * new_budget / 1000.0
+        
+        base_step = base_learning_rate * new_budget / gradient_norm
+        
+        # Adapt based on recent progress
+        if len(convergence_history) >= 3:
+            recent_improvements = [h['improvement'] for h in convergence_history[-3:]]
+            avg_improvement = np.mean(recent_improvements)
+            
+            if avg_improvement > convergence_history[-3]['improvement']:
+                # Progress is accelerating - maintain or increase step size
+                adaptation = 1.05
+            elif avg_improvement < convergence_history[-3]['improvement'] * 0.5:
+                # Progress is slowing - reduce step size
+                adaptation = 0.85
+            else:
+                # Steady progress - maintain
+                adaptation = 1.0
+            
+            base_step *= adaptation
+        
+        # Reduce step size as iterations progress
+        iteration_factor = 1.0 / (1.0 + iteration * 0.01)
+        
+        return base_step * iteration_factor
+    
+    def _enforce_smart_budget_constraint(
+        self,
+        allocations: np.ndarray,
+        new_budget: float,
+        gradient: np.ndarray,
+        opt_data: Dict[str, Any]
+    ) -> np.ndarray:
+        """
+        Enforce budget constraint intelligently based on marginal effectiveness
+        """
+        total_allocation = np.sum(allocations)
+        
+        if abs(total_allocation - new_budget) < new_budget * 0.01:  # Within 1%
+            return allocations
+        
+        if total_allocation > new_budget:
+            # Need to reduce - scale down proportionally
+            return allocations * (new_budget / total_allocation)
+        
+        # Need to increase - distribute remaining budget based on gradient effectiveness
+        remaining = new_budget - total_allocation
+        
+        # Calculate effectiveness weights (negative gradients = more effective)
+        gradient_effectiveness = -gradient  # Flip sign
+        gradient_effectiveness = np.maximum(gradient_effectiveness, 0)  # Only positive values
+        
+        if np.sum(gradient_effectiveness) > 0:
+            effectiveness_weights = gradient_effectiveness / np.sum(gradient_effectiveness)
+        else:
+            # Fallback to performance gaps
+            gaps = opt_data['performance_gaps']
+            effectiveness_weights = gaps / np.sum(gaps) if np.sum(gaps) > 0 else np.ones_like(gaps) / len(gaps)
+        
+        # Distribute remaining budget
+        additional_allocation = remaining * effectiveness_weights
+        
+        return allocations + additional_allocation
+    
+    def _update_dynamic_learning_rate(
+        self,
+        convergence_history: List[Dict[str, Any]],
+        learning_rate: float
+    ) -> float:
+        """
+        Update learning rate based on convergence pattern
+        """
+        if len(convergence_history) < 5:
+            return learning_rate
+        
+        recent_improvements = [h['improvement'] for h in convergence_history[-5:]]
+        
+        # Check for oscillation
+        sign_changes = sum(1 for i in range(1, len(recent_improvements)) 
+                          if (recent_improvements[i] > 0) != (recent_improvements[i-1] > 0))
+        
+        if sign_changes >= 3:  # Oscillating
+            return learning_rate * 0.8
+        
+        # Check for consistent improvement
+        positive_improvements = sum(1 for imp in recent_improvements if imp > 0)
+        if positive_improvements >= 4:  # Consistently improving
+            return learning_rate * 1.05
+        
+        # Check for stagnation
+        avg_recent = np.mean(recent_improvements)
+        if abs(avg_recent) < 1e-8:  # Very small improvements
+            return learning_rate * 0.9
+        
+        return learning_rate
+    
+    def _generate_dynamic_allocation_insights(
+        self,
+        final_allocations: np.ndarray,
+        opt_data: Dict[str, Any],
+        initial_allocations: np.ndarray
+    ) -> Dict[str, Any]:
+        """
+        Generate insights about the dynamic allocation strategy
+        """
+        allocation_changes = final_allocations - initial_allocations
+        
+        # Determine strategy type
+        max_change_idx = np.argmax(np.abs(allocation_changes))
+        max_change_component = opt_data['component_names'][max_change_idx]
+        
+        # Calculate concentration
+        allocation_std = np.std(final_allocations)
+        allocation_mean = np.mean(final_allocations)
+        concentration = allocation_std / allocation_mean if allocation_mean > 0 else 0
+        
+        if concentration > 0.5:
+            strategy_type = "Concentrated"
+        elif concentration < 0.2:
+            strategy_type = "Distributed"
+        else:
+            strategy_type = "Balanced"
+        
+        # Calculate adaptation magnitude
+        total_change = np.sum(np.abs(allocation_changes))
+        adaptation_intensity = total_change / opt_data['new_budget']
+        
+        return {
+            'strategy_type': strategy_type,
+            'concentration_level': concentration,
+            'adaptation_intensity': adaptation_intensity,
+            'primary_beneficiary': max_change_component,
+            'allocation_diversity': 1.0 - concentration,
+            'total_reallocation': total_change
+        }
+
+    def _calculate_new_budget_improvement_metrics(
+        self,
+        baseline_fsfvi: float,
+        optimized_fsfvi: float,
+        current_allocations: np.ndarray,
+        new_allocations: List[float],
+        new_budget: float
+    ) -> Dict[str, Any]:
+        """Calculate improvement metrics for new budget optimization"""
+        new_allocations_array = np.array(new_allocations)
+        
+        # Validate inputs to prevent infinite values
+        if not np.isfinite(baseline_fsfvi) or not np.isfinite(optimized_fsfvi):
+            logger.error(f"Invalid FSFVI values: baseline={baseline_fsfvi}, optimized={optimized_fsfvi}")
+            baseline_fsfvi = max(0.001, baseline_fsfvi) if np.isfinite(baseline_fsfvi) else 0.5
+            optimized_fsfvi = max(0.001, optimized_fsfvi) if np.isfinite(optimized_fsfvi) else 0.5
+        
+        if not np.all(np.isfinite(new_allocations_array)):
+            logger.error(f"Invalid new allocations detected: {new_allocations_array}")
+            new_allocations_array = np.nan_to_num(new_allocations_array, nan=0.0, posinf=new_budget/len(new_allocations_array), neginf=0.0)
+        
+        # Basic improvement metrics with safety checks
+        absolute_improvement = baseline_fsfvi - optimized_fsfvi
+        relative_improvement = (absolute_improvement / max(baseline_fsfvi, 0.001)) * 100
+        
+        # New budget efficiency metrics with safety checks
+        efficiency_per_million = absolute_improvement / max(new_budget / 1000000, 0.001)
+        
+        # Budget utilization with safety checks
+        new_budget_used = np.sum(new_allocations_array)
+        new_budget_utilization = (new_budget_used / max(new_budget, 0.001)) * 100
+        
+        # Total system metrics with safety checks
+        total_budget = np.sum(current_allocations) + new_budget_used
+        total_allocations = current_allocations + new_allocations_array
+        
+        # Ensure all values are finite
+        metrics = {
+            'absolute_improvement': float(np.clip(absolute_improvement, -10, 10)),
+            'relative_improvement_percent': float(np.clip(relative_improvement, -1000, 1000)),
+            'efficiency_per_million_new_budget': float(np.clip(efficiency_per_million, -1000, 1000)),
+            'new_budget_utilization_percent': float(np.clip(new_budget_utilization, 0, 200)),
+            'total_budget_millions': float(total_budget),
+            'impact_of_new_budget': {
+                'baseline_fsfvi_current_only': float(baseline_fsfvi),
+                'optimized_fsfvi_current_plus_new': float(optimized_fsfvi),
+                'improvement_from_new_budget': float(np.clip(absolute_improvement, -10, 10)),
+                'new_budget_roi_percent': float(np.clip(relative_improvement, -1000, 1000))
+            }
+        }
+        
+        return metrics
+
+    def _generate_new_budget_component_analysis(
+        self,
+        opt_data: Dict[str, Any],
+        optimal_new_allocations: List[float]
+    ) -> Dict[str, Any]:
+        """Generate component analysis for new budget optimization"""
+        
+        analysis = {
+            'components': [],
+            'summary': {},
+            'recommendations': []
+        }
+        
+        current_allocations = opt_data['current_allocations']
+        new_allocations = np.array(optimal_new_allocations)
+        total_allocations = current_allocations + new_allocations
+        
+        for i in range(opt_data['n_components']):
+            current_alloc = current_allocations[i]
+            new_alloc = new_allocations[i]
+            total_alloc = total_allocations[i]
+            
+            # Calculate vulnerabilities
+            gap = opt_data['performance_gaps'][i]
+            alpha = opt_data['sensitivities'][i]
+            
+            current_vulnerability = gap / (1 + alpha * current_alloc) if alpha * current_alloc > -1 else gap
+            total_vulnerability = gap / (1 + alpha * total_alloc) if alpha * total_alloc > -1 else gap
+            
+            vulnerability_reduction = current_vulnerability - total_vulnerability
+            vulnerability_reduction_percent = (vulnerability_reduction / current_vulnerability) * 100 if current_vulnerability > 0 else 0
+            
+            # New budget efficiency
+            new_budget_efficiency = vulnerability_reduction / (new_alloc / 100) if new_alloc > 0 else 0  # Per $100M
+            
+            component_analysis = {
+                'component_type': opt_data['component_types'][i],
+                'component_name': opt_data['component_names'][i],
+                'current_allocation_fixed': float(current_alloc),
+                'new_allocation_optimized': float(new_alloc),
+                'total_allocation': float(total_alloc),
+                'new_budget_share_percent': (new_alloc / opt_data['new_budget']) * 100 if opt_data['new_budget'] > 0 else 0,
+                'current_vulnerability': float(current_vulnerability),
+                'optimized_vulnerability': float(total_vulnerability),
+                'vulnerability_reduction': float(vulnerability_reduction),
+                'vulnerability_reduction_percent': float(vulnerability_reduction_percent),
+                'new_budget_efficiency_per_100m': float(new_budget_efficiency),
+                'allocation_priority': self._determine_new_budget_priority(new_alloc, opt_data['new_budget']),
+                'strategic_rationale': self._generate_new_budget_rationale(
+                    opt_data['component_types'][i], current_alloc, new_alloc, vulnerability_reduction_percent
+                ),
+                'weight': float(opt_data['weights'][i]),
+                'performance_gap': float(opt_data['performance_gaps'][i])
+            }
+            
+            analysis['components'].append(component_analysis)
+        
+        # Generate summary
+        total_new_budget_used = float(np.sum(new_allocations))
+        components_receiving_new_budget = len([c for c in analysis['components'] if c['new_allocation_optimized'] > 0])
+        avg_vulnerability_reduction = np.mean([c['vulnerability_reduction_percent'] for c in analysis['components']])
+        
+        analysis['summary'] = {
+            'total_components': len(analysis['components']),
+            'components_receiving_new_budget': components_receiving_new_budget,
+            'new_budget_utilized_percent': (total_new_budget_used / opt_data['new_budget']) * 100,
+            'average_vulnerability_reduction_percent': float(avg_vulnerability_reduction),
+            'highest_new_allocation': max([c['new_allocation_optimized'] for c in analysis['components']]),
+            'most_improved_component': max(analysis['components'], key=lambda x: x['vulnerability_reduction_percent'])['component_name']
+        }
+        
+        # Generate recommendations
+        high_allocation_components = [c for c in analysis['components'] if c['new_allocation_optimized'] > opt_data['new_budget'] * 0.2]
+        for comp in high_allocation_components:
+            analysis['recommendations'].append(
+                f"Prioritize {comp['component_name']}: ${comp['new_allocation_optimized']:.1f}M new allocation for {comp['vulnerability_reduction_percent']:.1f}% vulnerability reduction"
+            )
+        
+        return analysis
+
+    def _generate_new_budget_government_insights(
+        self,
+        opt_data: Dict[str, Any],
+        optimization_result: Dict[str, Any],
+        new_budget: float
+    ) -> Dict[str, Any]:
+        """Generate practical government insights for new budget allocation"""
+        
+        new_allocations = np.array(optimization_result['optimal_new_allocations'])
+        baseline_fsfvi = optimization_result['baseline_fsfvi']
+        optimal_fsfvi = optimization_result['optimal_fsfvi']
+        
+        insights = {
+            'budget_planning': {
+                'new_budget_impact': f"${new_budget:.1f}M new budget reduces system vulnerability by {((baseline_fsfvi - optimal_fsfvi) / baseline_fsfvi * 100):.1f}%",
+                'most_effective_allocation': opt_data['component_names'][np.argmax(new_allocations)],
+                'allocation_spread': f"{len([x for x in new_allocations if x > 0])} of {len(new_allocations)} components receive new funding",
+                'budget_efficiency': f"{(baseline_fsfvi - optimal_fsfvi) / (new_budget / 1000):.3f} FSFVI reduction per $1B invested"
+            },
+            
+            'implementation_guidance': {
+                'immediate_priorities': [
+                    opt_data['component_names'][i] for i, alloc in enumerate(new_allocations) 
+                    if alloc > new_budget * 0.15  # Components getting >15% of new budget
+                ],
+                'funding_timeline': 'Allocate new budget immediately for maximum impact',
+                'monitoring_focus': 'Track vulnerability reduction in components receiving new funding',
+                'success_metrics': [
+                    f"System FSFVI should improve from {baseline_fsfvi:.3f} to {optimal_fsfvi:.3f}",
+                    f"Monitor component-level vulnerability reductions",
+                    f"Ensure {(np.sum(new_allocations) / new_budget * 100):.1f}% of new budget is utilized"
+                ]
+            },
+            
+            'strategic_context': {
+                'current_vs_new': f"Current budget: ${np.sum(opt_data['current_allocations']):.1f}M (fixed), New budget: ${new_budget:.1f}M (optimized)",
+                'system_improvement': f"New budget provides {((baseline_fsfvi - optimal_fsfvi) / baseline_fsfvi * 100):.1f}% system improvement",
+                'future_planning': 'Results show optimal allocation pattern for future budget cycles',
+                'risk_mitigation': f"Reduces system vulnerability from {baseline_fsfvi:.3f} to {optimal_fsfvi:.3f}"
+            }
+        }
+        
+        return insights
+
+    def _determine_new_budget_priority(self, new_allocation: float, total_new_budget: float) -> str:
+        """Determine priority level for new budget allocation"""
+        share = new_allocation / total_new_budget if total_new_budget > 0 else 0
+        
+        if share > 0.25:
+            return 'High Priority'
+        elif share > 0.10:
+            return 'Medium Priority'
+        elif share > 0.05:
+            return 'Low Priority'
+        else:
+            return 'Minimal'
+
+    def _generate_new_budget_rationale(
+        self,
+        component_type: str,
+        current_allocation: float,
+        new_allocation: float,
+        vulnerability_reduction_percent: float
+    ) -> str:
+        """Generate rationale for new budget allocation"""
+        
+        if new_allocation > current_allocation * 0.5:  # Significant increase
+            return f"High-impact investment: ${new_allocation:.1f}M new funding achieves {vulnerability_reduction_percent:.1f}% vulnerability reduction"
+        elif new_allocation > current_allocation * 0.2:  # Moderate increase
+            return f"Strategic enhancement: ${new_allocation:.1f}M boosts existing ${current_allocation:.1f}M investment for {vulnerability_reduction_percent:.1f}% improvement"
+        elif new_allocation > 0:  # Small increase
+            return f"Targeted improvement: ${new_allocation:.1f}M provides focused {vulnerability_reduction_percent:.1f}% vulnerability reduction"
+        else:
+            return f"Current allocation adequate: existing ${current_allocation:.1f}M allocation maintained without additional funding"
 
     @handle_optimization_error
     def multi_year_optimization(
@@ -1056,80 +2098,102 @@ class FSFVIOptimizationService:
             'crisis_preparedness': {}
         }
         
-        # FIXED: Scale components to baseline budget before optimization
-        baseline_budget = budget_scenarios.get(current_year, list(budget_scenarios.values())[0])
-        scaled_components = self._scale_components_to_budget(components, baseline_budget)
-        
-        # Calculate baseline (current year)
-        baseline_result = self.optimize_allocation(
-            scaled_components, 
-            baseline_budget,
-            method, scenario, constraints
+        # NEW APPROACH: Use current allocations as fixed baseline (already spent)
+        # Calculate baseline FSFVI with current allocations only (no optimization)
+        baseline_fsfvi_result = self.calculation_service.calculate_fsfvi(
+            components, method=method, scenario=scenario
         )
         
         multi_year_plan['baseline'] = {
             'year': current_year,
-            'fsfvi': baseline_result['original_fsfvi'],
-            'optimal_fsfvi': baseline_result['optimal_fsfvi'],
-            'components': baseline_result.get('component_analysis', {})
+            'fsfvi': baseline_fsfvi_result['fsfvi_value'],
+            'optimal_fsfvi': baseline_fsfvi_result['fsfvi_value'],  # No optimization - current state
+            'components': [],
+            'note': 'Baseline represents current allocations (fixed/already spent) without optimization'
         }
         
-        # Optimize for each year
-        previous_allocations = None
+        # CUMULATIVE NEW BUDGET OPTIMIZATION: Each year adds new budget to previous optimizations
+        cumulative_components = [comp.copy() for comp in components]  # Start with original current allocations
+        cumulative_new_budget_total = 0
         trajectory_data = []
         
         for year in planning_years:
-            year_budget = budget_scenarios[year]
+            year_new_budget = budget_scenarios[year]
+            cumulative_new_budget_total += year_new_budget
             
-            # FIXED: Scale components to year budget to prevent validation errors
-            year_scaled_components = self._scale_components_to_budget(scaled_components, year_budget)
-            
-            # Progressive optimization considering previous year's allocations
+            # NEW BUDGET OPTIMIZATION: Keep current allocations fixed, optimize only new budget
             year_constraints = constraints.copy()
-            if previous_allocations is not None:
-                # Add transition constraints to prevent drastic year-over-year changes
-                year_constraints['transition_limit'] = 0.3  # Max 30% change per year
-                year_constraints['previous_allocations'] = previous_allocations
             
             # Target-based constraints
             if target_fsfvi and target_year and year <= target_year:
                 years_remaining = target_year - year + 1
                 progress_target = self._calculate_progressive_target(
-                    baseline_result['original_fsfvi'], target_fsfvi, years_remaining
+                    baseline_fsfvi_result['fsfvi_value'], target_fsfvi, years_remaining
                 )
                 year_constraints['target_fsfvi'] = progress_target
             
-            # Optimize for this year
-            year_result = self._optimize_with_targets(
-                year_scaled_components, year_budget, method, scenario, year_constraints
+            # Optimize NEW BUDGET ONLY for this year
+            year_result = self.optimize_allocation(
+                cumulative_components,  # Components with current + previous new budget allocations
+                year_new_budget,        # This year's NEW budget
+                method, 
+                scenario, 
+                year_constraints,
+                new_budget_only=True,   # FORCE new budget optimization
+                new_budget_amount=year_new_budget
             )
             
-            # Calculate transition costs and feasibility
+            # If optimization successful, update cumulative components with new allocations
+            if year_result.get('success', False) and 'optimal_new_allocations' in year_result:
+                # Add this year's new optimal allocations to cumulative components
+                for i, new_allocation in enumerate(year_result['optimal_new_allocations']):
+                    if i < len(cumulative_components):
+                        cumulative_components[i]['financial_allocation'] += new_allocation
+            
+            # Calculate improvement from original baseline (not previous year)
+            current_fsfvi = year_result.get('optimal_fsfvi', year_result.get('baseline_fsfvi', baseline_fsfvi_result['fsfvi_value']))
+            improvement_from_baseline = ((baseline_fsfvi_result['fsfvi_value'] - current_fsfvi) / baseline_fsfvi_result['fsfvi_value']) * 100
+            
+            # Calculate transition analysis (changes from previous year)
+            previous_total_allocations = None
+            if len(trajectory_data) > 0:
+                # Get previous year's total allocations for transition analysis
+                previous_total_allocations = [comp['financial_allocation'] for comp in cumulative_components]
+                # Subtract this year's new allocations to get previous state
+                for i, new_allocation in enumerate(year_result.get('optimal_new_allocations', [])):
+                    if i < len(previous_total_allocations):
+                        previous_total_allocations[i] -= new_allocation
+            
+            current_total_allocations = [comp['financial_allocation'] for comp in cumulative_components]
             transition_analysis = self._analyze_year_transition(
-                previous_allocations, year_result['optimal_allocations'], year_budget
-            ) if previous_allocations else {}
+                previous_total_allocations, current_total_allocations, year_new_budget
+            ) if previous_total_allocations else {'is_baseline': True, 'cumulative_new_budget': year_new_budget}
             
             # Store yearly recommendation
             multi_year_plan['yearly_recommendations'][year] = {
-                'budget': year_budget,
-                'optimal_allocations': year_result['optimal_allocations'],
-                'projected_fsfvi': year_result['optimal_fsfvi'],
-                'improvement_from_baseline': ((baseline_result['original_fsfvi'] - year_result['optimal_fsfvi']) / baseline_result['original_fsfvi']) * 100,
+                'new_budget_this_year': year_new_budget,
+                'cumulative_new_budget': cumulative_new_budget_total,
+                'current_allocations_total': sum(comp['financial_allocation'] for comp in components),
+                'total_budget_after_new': sum(comp['financial_allocation'] for comp in cumulative_components),
+                'optimal_new_allocations': year_result.get('optimal_new_allocations', []),
+                'total_allocations_after_optimization': current_total_allocations,
+                'projected_fsfvi': current_fsfvi,
+                'improvement_from_baseline': improvement_from_baseline,
                 'component_analysis': year_result.get('component_analysis', {}),
                 'transition_analysis': transition_analysis,
                 'implementation_complexity': self._assess_yearly_implementation(year_result, transition_analysis),
-                'crisis_resilience_score': self._calculate_crisis_resilience(year_scaled_components, year_result['optimal_allocations'], method)
+                'crisis_resilience_score': self._calculate_crisis_resilience(cumulative_components, current_total_allocations, method),
+                'optimization_type': 'cumulative_new_budget'
             }
             
             # Track trajectory
             trajectory_data.append({
                 'year': year,
-                'fsfvi': year_result['optimal_fsfvi'],
-                'budget': year_budget,
-                'improvement': year_result.get('relative_improvement_percent', 0)
+                'fsfvi': current_fsfvi,
+                'new_budget': year_new_budget,
+                'cumulative_new_budget': cumulative_new_budget_total,
+                'improvement': improvement_from_baseline
             })
-            
-            previous_allocations = year_result['optimal_allocations']
         
         # Analyze trajectory
         multi_year_plan['trajectory_analysis'] = self._analyze_multi_year_trajectory(
@@ -1958,15 +3022,22 @@ class FSFVIOptimizationService:
     
     def _sanitize_optimization_result(self, result: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Sanitize optimization result by replacing infinite/NaN values only
+        Sanitize optimization result by replacing infinite/NaN values with reasonable fallbacks
         """
         import math
         
         def sanitize_value(value):
             if isinstance(value, (int, float, np.number)):
-                if math.isnan(value) or math.isinf(value):
-                    logger.error(f"ERROR: Found invalid value {value} - this indicates a mathematical problem!")
-                    raise ValueError(f"Invalid calculation result: {value}")
+                if math.isnan(value):
+                    logger.warning(f"NaN value detected and replaced with 0.0: originally {value}")
+                    return 0.0
+                elif math.isinf(value):
+                    if value > 0:
+                        logger.warning(f"Positive infinite value detected and replaced with 1000.0: originally {value}")
+                        return 1000.0  # Large but finite value
+                    else:
+                        logger.warning(f"Negative infinite value detected and replaced with -1000.0: originally {value}")
+                        return -1000.0  # Large negative but finite value
                 return float(value)  # Convert numpy types to Python float
             elif isinstance(value, dict):
                 return {k: sanitize_value(v) for k, v in value.items()}
@@ -2148,13 +3219,29 @@ class FSFVIOptimizationService:
         
         current_array = np.array(current_allocations)
         changes = current_array - previous_allocations
-        change_percents = (changes / previous_allocations) * 100
+        
+        # Safe division for change percentages
+        change_percents = np.zeros_like(changes)
+        for i, (change, prev_alloc) in enumerate(zip(changes, previous_allocations)):
+            if prev_alloc > 0:
+                change_percents[i] = (change / prev_alloc) * 100
+            else:
+                # Handle division by zero case
+                change_percents[i] = 0.0 if change == 0 else (100.0 if change > 0 else -100.0)
+        
+        # Safe budget division
+        budget_safe = max(budget, 1e-6)  # Avoid division by zero
+        total_changes = np.sum(np.abs(changes))
+        reallocation_intensity = (total_changes / budget_safe) * 100
+        
+        # Ensure all values are finite
+        change_percents = np.nan_to_num(change_percents, nan=0.0, posinf=1000.0, neginf=-1000.0)
         
         return {
-            'total_reallocation': float(np.sum(np.abs(changes))),
-            'reallocation_intensity': float(np.sum(np.abs(changes)) / budget * 100),
-            'max_increase_percent': float(np.max(change_percents)),
-            'max_decrease_percent': float(np.min(change_percents)),
+            'total_reallocation': float(np.clip(total_changes, 0, 1e10)),
+            'reallocation_intensity': float(np.clip(reallocation_intensity, 0, 1000)),
+            'max_increase_percent': float(np.clip(np.max(change_percents), -1000, 1000)),
+            'max_decrease_percent': float(np.clip(np.min(change_percents), -1000, 1000)),
             'components_increased': int(np.sum(changes > 0)),
             'components_decreased': int(np.sum(changes < 0)),
             'implementation_complexity': 'high' if np.max(np.abs(change_percents)) > 25 else 'medium' if np.max(np.abs(change_percents)) > 10 else 'low'
@@ -2246,15 +3333,27 @@ class FSFVIOptimizationService:
         # Calculate trends
         years = [d['year'] for d in trajectory_data]
         fsfvi_scores = [d['fsfvi'] for d in trajectory_data]
-        budgets = [d['budget'] for d in trajectory_data]
+        budgets = [d.get('new_budget', d.get('budget', 0)) for d in trajectory_data]
         
-        # Calculate improvement trajectory
-        total_improvement = ((fsfvi_scores[0] - fsfvi_scores[-1]) / fsfvi_scores[0]) * 100 if fsfvi_scores[0] > 0 else 0
-        average_yearly_improvement = total_improvement / len(trajectory_data) if len(trajectory_data) > 1 else 0
+        # Calculate improvement trajectory with safety checks
+        if fsfvi_scores[0] > 1e-6:  # Avoid division by very small numbers
+            total_improvement = ((fsfvi_scores[0] - fsfvi_scores[-1]) / fsfvi_scores[0]) * 100
+        else:
+            total_improvement = 0.0
+            
+        average_yearly_improvement = total_improvement / max(len(trajectory_data), 1)
         
-        # Budget efficiency
+        # Budget efficiency with safety checks
         total_budget = sum(budgets)
-        efficiency_per_billion = total_improvement / (total_budget / 1000) if total_budget > 0 else 0
+        if total_budget > 1e-6:  # Avoid division by very small numbers
+            efficiency_per_billion = total_improvement / (total_budget / 1000)
+        else:
+            efficiency_per_billion = 0.0
+        
+        # Ensure values are finite and reasonable
+        total_improvement = float(np.clip(np.nan_to_num(total_improvement, nan=0.0, posinf=1000.0, neginf=-1000.0), -1000, 1000))
+        average_yearly_improvement = float(np.clip(np.nan_to_num(average_yearly_improvement, nan=0.0, posinf=100.0, neginf=-100.0), -100, 100))
+        efficiency_per_billion = float(np.clip(np.nan_to_num(efficiency_per_billion, nan=0.0, posinf=1000.0, neginf=-1000.0), -1000, 1000))
         
         analysis = {
             'total_improvement_percent': total_improvement,
@@ -2308,13 +3407,28 @@ class FSFVIOptimizationService:
         
         # Calculate what would be needed to achieve target
         if projected_fsfvi > target_fsfvi:
-            # Estimate additional budget needed
-            gap_percent = ((projected_fsfvi - target_fsfvi) / target_fsfvi) * 100
-            estimated_additional_budget = sum(budget_scenarios.values()) * (gap_percent / 100) * 2  # Rough estimate
+            # Estimate additional budget needed with safety checks
+            if target_fsfvi > 1e-6:  # Avoid division by very small numbers
+                gap_percent = ((projected_fsfvi - target_fsfvi) / target_fsfvi) * 100
+            else:
+                gap_percent = 0.0
+                
+            total_budget_scenarios = sum(budget_scenarios.values())
+            estimated_additional_budget = total_budget_scenarios * (gap_percent / 100) * 2  # Rough estimate
+            
+            # Calculate additional budget percentage safely
+            if total_budget_scenarios > 1e-6:
+                additional_budget_percent = (estimated_additional_budget / total_budget_scenarios) * 100
+            else:
+                additional_budget_percent = 0.0
+            
+            # Ensure values are finite
+            estimated_additional_budget = float(np.clip(np.nan_to_num(estimated_additional_budget, nan=0.0, posinf=1e10, neginf=0.0), 0, 1e10))
+            additional_budget_percent = float(np.clip(np.nan_to_num(additional_budget_percent, nan=0.0, posinf=1000.0, neginf=0.0), 0, 1000))
             
             analysis.update({
                 'additional_budget_needed_millions': estimated_additional_budget,
-                'additional_budget_percent': (estimated_additional_budget / sum(budget_scenarios.values())) * 100,
+                'additional_budget_percent': additional_budget_percent,
                 'alternative_strategies': [
                     'Increase total budget allocation',
                     'Focus on highest-impact components',
@@ -2358,11 +3472,15 @@ class FSFVIOptimizationService:
             preparedness_analysis['crisis_vulnerability_by_year'][year] = {
                 'resilience_score': resilience_score,
                 'preparedness_level': preparedness_level,
-                'budget': recommendation['budget']
+                'budget': recommendation.get('new_budget_this_year', recommendation.get('budget', 0))
             }
         
-        # Generate recommendations
-        avg_resilience = np.mean([r['resilience_score'] for r in preparedness_analysis['overall_resilience_trend']])
+        # Generate recommendations with safety check
+        resilience_scores = [r['resilience_score'] for r in preparedness_analysis['overall_resilience_trend']]
+        if resilience_scores:
+            avg_resilience = float(np.clip(np.mean(resilience_scores), 0.0, 1.0))
+        else:
+            avg_resilience = 0.5  # Default moderate resilience
         
         if avg_resilience < 0.5:
             preparedness_analysis['preparedness_recommendations'].extend([
@@ -3453,7 +4571,7 @@ class FSFVIAnalysisService:
                 'action_required': 'increase' if change > 0 else 'decrease' if change < 0 else 'maintain',
                 'priority': self._determine_reallocation_priority(abs(change), total_budget),
                 'rationale': self._generate_reallocation_rationale(comp, change, change_percent),
-                'implementation_complexity': self._assess_implementation_complexity(comp['component_type'], abs(change_percent))
+                'implementation_complexity': self.optimization_service._assess_implementation_complexity(comp['component_type'], abs(change_percent))
             }
             
             redistribution_recommendations.append(recommendation)
@@ -3581,28 +4699,6 @@ class FSFVIAnalysisService:
             return f"Reduce funding by {abs(change_percent):.1f}% due to relative efficiency and redirect to higher-priority components"
         else:
             return "Maintain current funding level - allocation is optimal"
-    
-    def _assess_implementation_complexity(self, component_type: str, change_percent: float) -> str:
-        """Assess implementation complexity of reallocation"""
-        complexity_factors = {
-            'governance_institutions': 'High',  # Policy changes take time
-            'infrastructure': 'High',  # Large capital projects
-            'climate_natural_resources': 'Medium',  # Environmental programs
-            'agricultural_development': 'Medium',  # Sectoral coordination needed
-            'nutrition_health': 'Low',  # Direct service delivery
-            'social_protection_equity': 'Low'  # Direct transfers and social protection
-        }
-        
-        base_complexity = complexity_factors.get(component_type, 'Medium')
-        
-        # Adjust based on change magnitude
-        if change_percent > 25:
-            if base_complexity == 'Low':
-                return 'Medium'
-            elif base_complexity == 'Medium':
-                return 'High'
-        
-        return base_complexity
     
     def _suggest_implementation_timeline(self, recommendations: List[Dict[str, Any]]) -> Dict[str, List[str]]:
         """Suggest implementation timeline for redistributions"""

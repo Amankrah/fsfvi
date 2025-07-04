@@ -175,7 +175,7 @@ async def get_current_user(authorization: HTTPAuthorizationCredentials = Depends
 async def root():
     """API health check and system overview"""
     return {
-        "message": "Streamlined FSFVI Analysis API v3.1",
+        "message": "Streamlined FSFVI Analysis API v3.1 - Enhanced with Realistic Budget Optimization",
         "status": "operational",
         "architecture": "streamlined_single_responsibility",
         "django_integration": DJANGO_INTEGRATION,
@@ -188,14 +188,50 @@ async def root():
             "   - Calculate Component Vulnerabilities (/calculate_component_vulnerabilities)",
             "   - Calculate System Vulnerability (/calculate_system_vulnerability)",
             "4. OR Run Complete Analysis (/analyze_system)",
-            "5. Optimize Allocation (/optimize_allocation)",
+            "5. Optimize Allocation - Two Modes:",
+            "   - Traditional: How money should have been allocated (/optimize_allocation with traditional mode)",
+            "   - NEW BUDGET: How to optimally allocate new budget (/optimize_new_budget) - REALISTIC",
             "6. Generate Reports (/generate_reports)"
         ],
+        "optimization_modes": {
+            "traditional_optimization": {
+                "description": "Optimizes reallocation of entire budget",
+                "use_case": "Retrospective analysis - 'how money should have been allocated'",
+                "endpoint": "/optimize_allocation (optimization_mode=traditional)",
+                "mathematical_approach": "Treats all allocations as malleable variables",
+                "government_value": "Understanding optimal allocation patterns and missed opportunities"
+            },
+            "new_budget_optimization": {
+                "description": "Optimizes allocation of NEW budget only (RECOMMENDED)",
+                "use_case": "Prospective planning - 'how to optimally allocate new budget'",
+                "endpoint": "/optimize_new_budget",
+                "mathematical_approach": "fᵢ_total = fᵢ_current (fixed) + fᵢ_new (optimized)",
+                "government_value": "Realistic budget planning where current spending is already committed",
+                "practical_benefits": [
+                    "Current allocations treated as sunk costs (realistic)",
+                    "Only new budget is optimized (actionable)",
+                    "Shows marginal impact of new investments",
+                    "Directly applicable to next fiscal year planning"
+                ]
+            }
+        },
+        "mathematical_framework": {
+            "core_formula": "FSFVI = Σᵢ ωᵢ·δᵢ·[1/(1+αᵢfᵢ)]",
+            "new_budget_extension": "FSFVI = Σᵢ ωᵢ·δᵢ·[1/(1+αᵢ·(fᵢ_current + fᵢ_new))]",
+            "optimization_constraint": "Minimize FSFVI subject to Σfᵢ_new ≤ new_budget"
+        },
         "features": {
             "streamlined_architecture": "Business logic in service layer only",
             "weighting_methods": get_weighting_methods(),
             "scenarios": get_scenarios(),
-            "django_integration": DJANGO_INTEGRATION
+            "django_integration": DJANGO_INTEGRATION,
+            "realistic_budget_optimization": "NEW - Separates current (fixed) vs new (optimizable) allocations"
+        },
+        "recommended_workflow": {
+            "step_1": "Upload data and run system analysis",
+            "step_2": "Use /optimize_new_budget for realistic government planning",
+            "step_3": "Use /optimize_allocation (traditional) for understanding optimal patterns",
+            "step_4": "Generate reports with practical implementation guidance"
         }
     }
 
@@ -328,9 +364,26 @@ async def optimize_allocation(
     method: str = Form(default="hybrid"),
     budget_change_percent: float = Form(default=0.0),
     constraints: Optional[str] = Form(default=None),
+    optimization_mode: str = Form(default="traditional"),  # "traditional" or "new_budget"
+    new_budget_amount: Optional[float] = Form(default=None),  # Required for new_budget mode
     current_user: dict = Depends(get_current_user)
 ):
-    """Optimize financial allocation - DELEGATES TO SERVICE LAYER"""
+    """
+    Optimize financial allocation - Two modes available:
+    
+    1. Traditional Mode (optimization_mode="traditional"):
+       - Optimizes reallocation of entire budget
+       - Shows "how money should have been allocated" (retrospective analysis)
+       - Useful for understanding optimal allocation patterns
+    
+    2. New Budget Mode (optimization_mode="new_budget"):
+       - Current allocations are fixed (already committed/spent)
+       - Only new budget is optimized to minimize total system FSFVI
+       - More realistic for government planning going forward
+       - budget_change_percent represents new budget as % of current budget
+    
+    DELEGATES TO SERVICE LAYER
+    """
     try:
         # Get session data
         session_data = await _get_session_data(session_id, current_user['id'])
@@ -342,28 +395,56 @@ async def optimize_allocation(
             import json
             parsed_constraints = json.loads(constraints)
         
-        # Calculate optimized budget
-        current_budget = session_data['total_budget']
-        optimized_budget = current_budget * (1 + budget_change_percent / 100)
-        
-        # Delegate ALL optimization logic to service layer
-        logger.info(f"Starting optimization: budget=${optimized_budget:.1f}M, method={method}, components={len(components)}")
-        optimization_result = optimization_service.optimize_allocation(
-            components=components,
-            budget=optimized_budget,
-            method=method,
-            scenario="normal_operations",
-            constraints=parsed_constraints
-        )
-        logger.info(f"Optimization completed: success={optimization_result.get('success', False)}, iterations={optimization_result.get('iterations', 0)}")
+        if optimization_mode == "new_budget":
+            # Validate new budget requirement
+            if new_budget_amount is None or new_budget_amount <= 0:
+                raise HTTPException(
+                    status_code=400, 
+                    detail="New budget amount must be specified and greater than 0 for new budget optimization mode"
+                )
+            
+            # New Budget Mode: current allocations fixed, optimize new budget
+            current_budget = session_data['total_budget']
+            new_budget = new_budget_amount  # Use directly provided new budget amount
+            
+            logger.info(f"Starting NEW BUDGET optimization: current=${current_budget:.1f}M (fixed), new=${new_budget:.1f}M (optimized)")
+            
+            # Use new budget optimization
+            optimization_result = optimization_service.optimize_allocation(
+                components=components,
+                budget=new_budget,
+                method=method,
+                scenario="normal_operations",
+                constraints=parsed_constraints,
+                new_budget_only=True,
+                new_budget_amount=new_budget
+            )
+            
+        else:
+            # Traditional Mode: optimize reallocation of entire budget
+            current_budget = session_data['total_budget']
+            optimized_budget = current_budget * (1 + budget_change_percent / 100)
+            
+            logger.info(f"Starting TRADITIONAL optimization: budget=${optimized_budget:.1f}M, method={method}, components={len(components)}")
+            
+            # Use traditional optimization
+            optimization_result = optimization_service.optimize_allocation(
+                components=components,
+                budget=optimized_budget,
+                method=method,
+                scenario="normal_operations",
+                constraints=parsed_constraints,
+                new_budget_only=False
+            )
         
         # Save results
         await _save_optimization_results(session_id, optimization_result)
-        await _update_session_status(session_id, current_user['id'], 'optimization_completed')
+        await _update_session_status(session_id, current_user['id'], f'optimization_completed_{optimization_mode}')
         
         return {
             "session_id": session_id,
             "country": session_data['country_name'],
+            "optimization_mode": optimization_mode,
             "optimization_results": optimization_result,
             "next_step": "Call /generate_reports for comprehensive reporting"
         }
@@ -371,6 +452,95 @@ async def optimize_allocation(
     except Exception as e:
         logger.error(f"Optimization error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Optimization failed: {str(e)}")
+
+
+@app.post("/optimize_new_budget", summary="Optimize New Budget Allocation (Realistic Government Planning)")
+async def optimize_new_budget(
+    session_id: str = Form(...),
+    new_budget_millions: float = Form(...),
+    method: str = Form(default="hybrid"),
+    scenario: str = Form(default="normal_operations"),
+    constraints: Optional[str] = Form(default=None),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    NEW BUDGET OPTIMIZATION: Optimize allocation of new budget only
+    
+    This endpoint provides realistic government budget planning where:
+    - Current allocations are FIXED (already committed/spent)
+    - Only the NEW budget is optimized to minimize total system FSFVI
+    - Results show how to allocate new funds for maximum impact
+    
+    This is the most practical approach for government planning going forward.
+    
+    Mathematical Framework:
+    - fᵢ_current: Fixed current allocation (from component data)
+    - fᵢ_new: New budget allocation (variable to optimize)
+    - fᵢ_total = fᵢ_current + fᵢ_new: Total allocation for FSFVI calculation
+    - Minimize: FSFVI = Σᵢ ωᵢ·δᵢ·[1/(1+αᵢ·(fᵢ_current + fᵢ_new))]
+    - Subject to: Σfᵢ_new ≤ new_budget, fᵢ_new ≥ 0
+    
+    Results include:
+    - Current allocations (fixed)
+    - Optimal new allocations (optimized)
+    - Total allocations (current + new)
+    - System FSFVI improvement from new budget
+    - Component-by-component analysis
+    - Government implementation guidance
+    """
+    try:
+        # Get session data
+        session_data = await _get_session_data(session_id, current_user['id'])
+        components = await _get_session_components(session_id)
+        
+        # Parse constraints
+        parsed_constraints = None
+        if constraints:
+            import json
+            parsed_constraints = json.loads(constraints)
+        
+        # Validate new budget
+        if new_budget_millions <= 0:
+            raise HTTPException(status_code=400, detail="New budget must be positive")
+        
+        current_budget = session_data.get('total_budget', 0)
+        logger.info(f"NEW BUDGET OPTIMIZATION: current=${current_budget:.1f}M (fixed), new=${new_budget_millions:.1f}M (to optimize)")
+        
+        # Run new budget optimization
+        optimization_result = optimization_service.optimize_allocation(
+            components=components,
+            budget=new_budget_millions,
+            method=method,
+            scenario=scenario,
+            constraints=parsed_constraints,
+            new_budget_only=True
+        )
+        
+        # Save results
+        await _save_optimization_results(session_id, optimization_result)
+        await _update_session_status(session_id, current_user['id'], 'new_budget_optimization_completed')
+        
+        return {
+            "session_id": session_id,
+            "country": session_data['country_name'],
+            "optimization_type": "new_budget_allocation",
+            "current_budget_millions": current_budget,
+            "new_budget_millions": new_budget_millions,
+            "total_budget_millions": current_budget + new_budget_millions,
+            "optimization_results": optimization_result,
+            "practical_guidance": {
+                "interpretation": "Results show optimal allocation of NEW budget to maximize system improvement",
+                "current_allocations": "Already committed/spent - cannot be changed",
+                "new_allocations": "Optimal distribution of new budget across components",
+                "implementation": "Allocate new budget according to optimization results",
+                "monitoring": "Track system FSFVI improvement as new budget is deployed"
+            },
+            "next_step": "Implement new budget allocation as recommended for maximum system improvement"
+        }
+        
+    except Exception as e:
+        logger.error(f"New budget optimization error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"New budget optimization failed: {str(e)}")
 
 
 @app.post("/multi_year_optimization", summary="Multi-Year Budget Planning")

@@ -289,11 +289,28 @@ export const analysisAPI = {
     return result;
   },
 
-  optimizeAllocation: async (sessionId: string, token: string, optimizationMethod = 'hybrid', budgetChangePercent = 0, constraints?: OptimizationConstraints) => {
+  optimizeAllocation: async (sessionId: string, token: string, optimizationMethod = 'hybrid', budgetChangePercent = 0, constraints?: OptimizationConstraints, optimizationMode = 'traditional', newBudgetAmount?: number) => {
+    // Enhanced validation for new budget requirement
+    if (optimizationMode === 'new_budget') {
+      if (!newBudgetAmount || newBudgetAmount <= 0) {
+        throw new Error('New budget amount must be specified and greater than 0 for new budget optimization mode. Please configure the new budget amount in optimization settings.');
+      }
+      // Additional validation for reasonable budget amounts
+      if (newBudgetAmount > 100000) { // More than 100 billion
+        throw new Error('New budget amount seems unreasonably large. Please check the amount (should be in millions USD).');
+      }
+    }
+    
     const formData = new FormData();
     formData.append('session_id', sessionId);
     formData.append('method', optimizationMethod);
     formData.append('budget_change_percent', budgetChangePercent.toString());
+    formData.append('optimization_mode', optimizationMode); // "traditional" or "new_budget"
+    
+    // Add new budget amount if specified
+    if (newBudgetAmount !== undefined) {
+      formData.append('new_budget_amount', newBudgetAmount.toString());
+    }
     
     if (constraints) {
       formData.append('constraints', JSON.stringify(constraints));
@@ -308,19 +325,48 @@ export const analysisAPI = {
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Allocation optimization failed:', errorText);
-      throw new Error(`Allocation optimization failed: ${response.status} ${response.statusText}`);
+      const error = await response.json();
+      throw new Error(error.detail || 'Failed to optimize allocation');
     }
 
-    const result = await response.json();
-    console.log('Optimization result:', result);
-    return result;
+    return await response.json();
+  },
+
+  // NEW: Dedicated function for new budget optimization
+  optimizeNewBudget: async (sessionId: string, token: string, newBudgetAmount: number, optimizationMethod = 'hybrid', constraints?: OptimizationConstraints) => {
+    if (!newBudgetAmount || newBudgetAmount <= 0) {
+      throw new Error('New budget amount must be specified and greater than 0');
+    }
+    
+    const formData = new FormData();
+    formData.append('session_id', sessionId);
+    formData.append('method', optimizationMethod);
+    formData.append('new_budget_amount', newBudgetAmount.toString());
+    formData.append('optimization_mode', 'new_budget');
+    
+    if (constraints) {
+      formData.append('constraints', JSON.stringify(constraints));
+    }
+
+    const response = await fetch(`${FASTAPI_BASE_URL}/optimize_allocation`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || 'Failed to optimize new budget allocation');
+    }
+
+    return await response.json();
   },
 
   // GOVERNMENT PLANNING TOOLS
 
-  // Multi-year optimization for fiscal planning
+  // Multi-year optimization for fiscal planning (NEW BUDGET CUMULATIVE APPROACH)
   multiYearOptimization: async (
     sessionId: string, 
     token: string, 
@@ -331,11 +377,27 @@ export const analysisAPI = {
     scenario = 'normal_operations',
     constraints?: OptimizationConstraints
   ) => {
+    // Validate that budget scenarios contain new budget amounts
+    const budgetValues = Object.values(budgetScenarios);
+    if (budgetValues.length === 0) {
+      throw new Error('Budget scenarios must be provided for multi-year optimization');
+    }
+    
+    // Validate reasonable budget amounts
+    if (budgetValues.some(budget => budget <= 0)) {
+      throw new Error('All budget scenarios must be positive values (in millions USD)');
+    }
+    
+    if (budgetValues.some(budget => budget > 50000)) { // More than 50 billion per year
+      throw new Error('Budget amounts seem unreasonably large. Please check amounts (should be in millions USD)');
+    }
+    
     const formData = new FormData();
     formData.append('session_id', sessionId);
     formData.append('budget_scenarios', JSON.stringify(budgetScenarios));
     formData.append('method', method);
     formData.append('scenario', scenario);
+    formData.append('optimization_mode', 'new_budget'); // Force new budget mode for multi-year
     
     if (targetFsfvi !== undefined) {
       formData.append('target_fsfvi', targetFsfvi.toString());
@@ -637,6 +699,14 @@ export interface YearlyRecommendation {
   transition_analysis: TransitionAnalysis;
   implementation_complexity: string;
   crisis_resilience_score: number;
+  // New budget optimization properties
+  new_budget_this_year?: number;
+  cumulative_new_budget?: number;
+  current_allocations_total?: number;
+  total_budget_after_new?: number;
+  optimal_new_allocations?: number[];
+  total_allocations_after_optimization?: number[];
+  optimization_type?: string;
 }
 
 export interface TrajectoryAnalysis {
@@ -819,4 +889,90 @@ export interface EfficiencyCurveResult {
   fsfvi: number;
   efficiency_per_million: number;
   error?: string;
+}
+
+// NEW BUDGET OPTIMIZATION TYPES
+export interface NewBudgetOptimizationResult {
+  session_id: string;
+  country: string;
+  optimization_type: 'new_budget_allocation';
+  current_budget_millions: number;
+  new_budget_millions: number;
+  total_budget_millions: number;
+  optimization_results: {
+    success: boolean;
+    baseline_fsfvi: number;
+    optimal_fsfvi: number;
+    optimal_new_allocations: number[];
+    optimal_total_allocations: number[];
+    current_allocations: number[];
+    absolute_improvement: number;
+    relative_improvement_percent: number;
+    new_budget_utilization_percent: number;
+    component_analysis: NewBudgetComponentAnalysis;
+    government_insights: NewBudgetGovernmentInsights;
+    optimization_type: string;
+    new_budget: number;
+    current_budget: number;
+    total_budget: number;
+  };
+  practical_guidance: {
+    interpretation: string;
+    current_allocations: string;
+    new_allocations: string;
+    implementation: string;
+    monitoring: string;
+  };
+}
+
+export interface NewBudgetComponentAnalysis {
+  components: NewBudgetComponentResult[];
+  summary: {
+    total_components: number;
+    components_receiving_new_budget: number;
+    new_budget_utilized_percent: number;
+    average_vulnerability_reduction_percent: number;
+    highest_new_allocation: number;
+    most_improved_component: string;
+  };
+  recommendations: string[];
+}
+
+export interface NewBudgetComponentResult {
+  component_type: string;
+  component_name: string;
+  current_allocation_fixed: number;
+  new_allocation_optimized: number;
+  total_allocation: number;
+  new_budget_share_percent: number;
+  current_vulnerability: number;
+  optimized_vulnerability: number;
+  vulnerability_reduction: number;
+  vulnerability_reduction_percent: number;
+  new_budget_efficiency_per_100m: number;
+  allocation_priority: string;
+  strategic_rationale: string;
+  weight: number;
+  performance_gap: number;
+}
+
+export interface NewBudgetGovernmentInsights {
+  budget_planning: {
+    new_budget_impact: string;
+    most_effective_allocation: string;
+    allocation_spread: string;
+    budget_efficiency: string;
+  };
+  implementation_guidance: {
+    immediate_priorities: string[];
+    funding_timeline: string;
+    monitoring_focus: string;
+    success_metrics: string[];
+  };
+  strategic_context: {
+    current_vs_new: string;
+    system_improvement: string;
+    future_planning: string;
+    risk_mitigation: string;
+  };
 } 

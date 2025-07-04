@@ -1,7 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Settings, AlertTriangle, CheckCircle, Info, Calendar, Target, Shield } from 'lucide-react';
+import { Settings, Info, Target } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { TrendingUp, DollarSign } from 'lucide-react';
 
 interface OptimizationConfig {
   method: string;
@@ -14,13 +18,8 @@ interface OptimizationConfig {
     maxAllocation: number;
     transitionLimit: number;
   };
-}
-
-interface PlanningScenario {
-  name: string;
-  description: string;
-  enabled: boolean;
-  severity?: 'low' | 'medium' | 'high' | 'critical';
+  optimizationMode: 'traditional' | 'new_budget';
+  newBudgetAmount?: number;
 }
 
 interface PlanningHorizon {
@@ -29,482 +28,484 @@ interface PlanningHorizon {
   budgetGrowth: number;
 }
 
-interface ConfigurationPanelProps {
-  optimizationConfig: OptimizationConfig;
-  planningHorizon: PlanningHorizon;
-  onConfigChange: (config: OptimizationConfig) => void;
-  onPlanningHorizonChange: (horizon: PlanningHorizon) => void;
-  scenarios?: PlanningScenario[];
-  analysisType?: string;
+interface SessionInfo {
+  country: string;
+  fiscal_year: number;
+  total_budget: number;
+  currency: string;
 }
 
-export const ConfigurationPanel: React.FC<ConfigurationPanelProps> = ({
+interface BudgetImpactConfig {
+  configured: boolean;
+  baseBudget?: number;
+  budgetVariations: number[];
+  method: string;
+  scenario: string;
+  constraints: {
+    minAllocation: number;
+    maxAllocation: number;
+    transitionLimit: number;
+  };
+}
+
+interface ConfigurationPanelProps {
+  isOpen: boolean;
+  onClose: () => void;
+  sessionInfo: SessionInfo | null;
+  optimizationConfig: OptimizationConfig;
+  setOptimizationConfig: (config: OptimizationConfig) => void;
+  budgetImpactConfig: BudgetImpactConfig;
+  setBudgetImpactConfig: (config: BudgetImpactConfig) => void;
+  planningHorizon: PlanningHorizon;
+}
+
+export default function ConfigurationPanel({
+  isOpen,
+  onClose,
+  sessionInfo,
   optimizationConfig,
-  planningHorizon,
-  onConfigChange,
-  onPlanningHorizonChange,
-  scenarios = [
-    { name: 'normal_operations', description: 'Normal Operations', enabled: true, severity: 'low' },
-    { name: 'climate_shock', description: 'Climate Crisis', enabled: true, severity: 'high' },
-    { name: 'financial_crisis', description: 'Economic Downturn', enabled: true, severity: 'high' },
-    { name: 'pandemic_disruption', description: 'Health Emergency', enabled: true, severity: 'critical' },
-    { name: 'cyber_threats', description: 'Cyber Security Crisis', enabled: true, severity: 'medium' }
-  ],
-  analysisType = 'optimization'
-}) => {
-  const [activeSection, setActiveSection] = useState<string>('basic');
-  const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  setOptimizationConfig,
+  budgetImpactConfig,
+  setBudgetImpactConfig,
+  planningHorizon
+}: ConfigurationPanelProps) {
+  const [activeTab, setActiveTab] = useState<'optimization' | 'budget-impact'>('optimization');
+  
+  // Local state for optimization configuration
+  const [tempOptimizationConfig, setTempOptimizationConfig] = useState<OptimizationConfig>(optimizationConfig);
+  
+  // Local state for budget impact configuration
+  const [tempBudgetImpactConfig, setTempBudgetImpactConfig] = useState<BudgetImpactConfig>(budgetImpactConfig);
 
   // Validation
   useEffect(() => {
-    const errors: string[] = [];
-    
-    if (optimizationConfig.targetFsfvi && (optimizationConfig.targetFsfvi < 0 || optimizationConfig.targetFsfvi > 1)) {
-      errors.push('Target FSFVI must be between 0 and 1');
-    }
-    
-    if (optimizationConfig.targetYear && optimizationConfig.targetYear < new Date().getFullYear()) {
-      errors.push('Target year must be in the future');
-    }
-    
-    if (planningHorizon.startYear >= planningHorizon.endYear) {
-      errors.push('Planning end year must be after start year');
-    }
-    
-    if (optimizationConfig.constraints.minAllocation >= optimizationConfig.constraints.maxAllocation) {
-      errors.push('Maximum allocation must be greater than minimum allocation');
-    }
-    
-    setValidationErrors(errors);
+    // Validation logic if needed
   }, [optimizationConfig, planningHorizon]);
 
-  const updateConfig = (updates: Partial<OptimizationConfig>) => {
-    onConfigChange({ ...optimizationConfig, ...updates });
-  };
-
-  const updateConstraints = (constraintUpdates: Partial<OptimizationConfig['constraints']>) => {
-    onConfigChange({
-      ...optimizationConfig,
-      constraints: { ...optimizationConfig.constraints, ...constraintUpdates }
-    });
-  };
-
-  const updatePlanningHorizon = (updates: Partial<PlanningHorizon>) => {
-    onPlanningHorizonChange({ ...planningHorizon, ...updates });
-  };
-
-  const getSeverityColor = (severity: string) => {
-    switch (severity) {
-      case 'low': return 'bg-green-100 text-green-800';
-      case 'medium': return 'bg-yellow-100 text-yellow-800';
-      case 'high': return 'bg-orange-100 text-orange-800';
-      case 'critical': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
+  const handleSaveConfiguration = () => {
+    // Validation for new budget optimization
+    if (tempOptimizationConfig.optimizationMode === 'new_budget') {
+      if (!tempOptimizationConfig.newBudgetAmount || tempOptimizationConfig.newBudgetAmount <= 0) {
+        alert('Please enter a valid new budget amount (greater than 0) for new budget optimization mode.');
+        return;
+      }
+      if (tempOptimizationConfig.newBudgetAmount > 100000) {
+        alert('New budget amount seems unreasonably large. Please check the amount (should be in millions USD).');
+        return;
+      }
     }
+    
+    setOptimizationConfig(tempOptimizationConfig);
+    setBudgetImpactConfig(tempBudgetImpactConfig);
+    onClose();
   };
 
-  const configSections = [
-    { id: 'basic', name: 'Basic Settings', icon: Settings, description: 'Core analysis parameters' },
-    { id: 'scenarios', name: 'Crisis Scenarios', icon: Shield, description: 'Risk assessment settings' },
-    { id: 'targets', name: 'Target Settings', icon: Target, description: 'Performance objectives' },
-    { id: 'constraints', name: 'Constraints', icon: AlertTriangle, description: 'Allocation limits' },
-    { id: 'planning', name: 'Multi-Year Planning', icon: Calendar, description: 'Long-term horizon' }
-  ];
+  const handleCancel = () => {
+    // Reset to original configs
+    setTempOptimizationConfig(optimizationConfig);
+    setTempBudgetImpactConfig(budgetImpactConfig);
+    onClose();
+  };
 
-  const isRelevantSection = (sectionId: string) => {
-    switch (analysisType) {
-      case 'multi-year':
-        return ['basic', 'targets', 'constraints', 'planning'].includes(sectionId);
-      case 'scenario-comparison':
-        return ['basic', 'scenarios', 'constraints'].includes(sectionId);
-      case 'target-based':
-        return ['basic', 'targets', 'constraints'].includes(sectionId);
-      case 'budget-sensitivity':
-        return ['basic', 'constraints'].includes(sectionId);
-      default:
-        return ['basic', 'constraints'].includes(sectionId);
-    }
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    }).format(amount * 1000000);
   };
 
   return (
-    <Card className="border-0 shadow-lg">
-      <CardHeader>
-        <CardTitle className="flex items-center space-x-2">
-          <Settings className="w-5 h-5" />
-          <span>Analysis Configuration</span>
-          {validationErrors.length > 0 && (
-            <Badge className="bg-red-100 text-red-800 ml-2">
-              {validationErrors.length} error{validationErrors.length > 1 ? 's' : ''}
-            </Badge>
-          )}
-        </CardTitle>
-        
-        {/* Analysis Type Info */}
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mt-2">
-          <div className="flex items-center space-x-2">
-            <Info className="w-4 h-4 text-blue-600" />
-            <span className="text-sm font-medium text-blue-900">
-              Configuration for: {analysisType?.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())} Analysis
-            </span>
-          </div>
-        </div>
-      </CardHeader>
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center space-x-2">
+            <Settings className="w-5 h-5" />
+            <span>Optimization Configuration</span>
+          </DialogTitle>
+        </DialogHeader>
 
-      <CardContent>
-        {/* Validation Errors */}
-        {validationErrors.length > 0 && (
-          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-            <div className="flex items-center space-x-2 mb-2">
-              <AlertTriangle className="w-4 h-4 text-red-600" />
-              <span className="text-sm font-medium text-red-900">Configuration Issues</span>
+        {/* Tab Navigation */}
+        <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg">
+          <button
+            onClick={() => setActiveTab('optimization')}
+            className={`flex-1 py-2 px-4 text-sm font-medium rounded-md transition-colors ${
+              activeTab === 'optimization'
+                ? 'bg-white text-blue-600 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            <div className="flex items-center justify-center space-x-2">
+              <Target className="w-4 h-4" />
+              <span>Optimization Settings</span>
             </div>
-            <ul className="text-sm text-red-800 space-y-1">
-              {validationErrors.map((error, index) => (
-                <li key={index}>• {error}</li>
-              ))}
-            </ul>
-          </div>
-        )}
-
-        {/* Section Navigation */}
-        <div className="flex flex-wrap gap-2 mb-6">
-          {configSections.filter(section => isRelevantSection(section.id)).map((section) => {
-            const Icon = section.icon;
-            return (
-              <button
-                key={section.id}
-                onClick={() => setActiveSection(section.id)}
-                className={`flex items-center space-x-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  activeSection === section.id
-                    ? 'bg-blue-100 text-blue-900 border border-blue-200'
-                    : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
-                }`}
-              >
-                <Icon className="w-4 h-4" />
-                <span>{section.name}</span>
-              </button>
-            );
-          })}
+          </button>
+          <button
+            onClick={() => setActiveTab('budget-impact')}
+            className={`flex-1 py-2 px-4 text-sm font-medium rounded-md transition-colors ${
+              activeTab === 'budget-impact'
+                ? 'bg-white text-blue-600 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            <div className="flex items-center justify-center space-x-2">
+              <TrendingUp className="w-4 h-4" />
+              <span>Budget Impact Analysis</span>
+            </div>
+          </button>
         </div>
 
-        {/* Section Content */}
-        {activeSection === 'basic' && (
-          <div className="space-y-4">
-            <h4 className="text-sm font-medium text-gray-700 mb-3">Analysis Foundation</h4>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="analysis-method" className="block text-sm font-medium text-gray-700 mb-2">
-                  Weighting Method
-                </label>
-                <select 
-                  id="analysis-method"
-                  value={optimizationConfig.method} 
-                  onChange={(e) => updateConfig({ method: e.target.value })}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2"
-                  aria-label="Select analysis method"
-                >
-                  <option value="hybrid">Hybrid Weighting (Recommended)</option>
-                  <option value="expert">Expert Knowledge</option>
-                  <option value="network">Network Analysis</option>
-                  <option value="financial">Financial Proportional</option>
-                </select>
-                <p className="text-xs text-gray-500 mt-1">
-                  Hybrid combines multiple weighting approaches for optimal results
-                </p>
-              </div>
+        {/* Tab Content */}
+        <div className="space-y-6">
+          {activeTab === 'optimization' && (
+            <div className="space-y-6">
+              {/* Optimization Mode Selection */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center space-x-2">
+                    <Target className="w-5 h-5 text-blue-600" />
+                    <span>Optimization Mode</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div 
+                      className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                        tempOptimizationConfig.optimizationMode === 'traditional' 
+                          ? 'border-blue-500 bg-blue-50' 
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                      onClick={() => setTempOptimizationConfig(prev => ({ ...prev, optimizationMode: 'traditional' }))}
+                    >
+                      <div className="flex items-start space-x-3">
+                        <div className="w-5 h-5 rounded-full border-2 border-blue-500 flex items-center justify-center mt-0.5">
+                          {tempOptimizationConfig.optimizationMode === 'traditional' && (
+                            <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                          )}
+                        </div>
+                        <div>
+                          <h3 className="font-medium text-gray-900">Traditional Reallocation</h3>
+                          <p className="text-sm text-gray-600">
+                            Optimizes reallocation of entire current budget. Shows &ldquo;how money should have been allocated.&rdquo;
+                          </p>
+                          <div className="mt-2 text-xs text-gray-500">
+                            • Retrospective analysis<br/>
+                            • Treats all allocations as malleable<br/>
+                            • Useful for understanding patterns
+                          </div>
+                        </div>
+                      </div>
+                    </div>
 
-              <div>
-                <label htmlFor="base-scenario" className="block text-sm font-medium text-gray-700 mb-2">
-                  Base Scenario
-                </label>
-                <select 
-                  id="base-scenario"
-                  value={optimizationConfig.scenario} 
-                  onChange={(e) => updateConfig({ scenario: e.target.value })}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2"
-                  aria-label="Select base scenario"
-                >
-                  {scenarios.map(scenario => (
-                    <option key={scenario.name} value={scenario.name}>
-                      {scenario.description}
-                    </option>
-                  ))}
-                </select>
-                <p className="text-xs text-gray-500 mt-1">
-                  Context for optimization analysis
-                </p>
-              </div>
-            </div>
-
-            {/* Budget Change Slider */}
-            <div>
-              <label htmlFor="budget-change" className="block text-sm font-medium text-gray-700 mb-2">
-                Budget Change: {optimizationConfig.budgetChange > 0 ? '+' : ''}{optimizationConfig.budgetChange}%
-              </label>
-              <input
-                id="budget-change"
-                type="range"
-                min="-30"
-                max="50"
-                step="1"
-                value={optimizationConfig.budgetChange}
-                onChange={(e) => updateConfig({ budgetChange: parseInt(e.target.value) })}
-                className="w-full"
-                aria-label="Budget change percentage"
-              />
-              <div className="flex justify-between text-xs text-gray-500 mt-1">
-                <span>-30% (Austerity)</span>
-                <span>0% (Current)</span>
-                <span>+50% (Expansion)</span>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {activeSection === 'scenarios' && (
-          <div className="space-y-4">
-            <h4 className="text-sm font-medium text-gray-700 mb-3">Crisis Scenario Assessment</h4>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {scenarios.map(scenario => (
-                <div key={scenario.name} className="p-3 border border-gray-200 rounded-lg">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="font-medium text-gray-900">{scenario.description}</span>
-                    <Badge className={`text-xs ${getSeverityColor(scenario.severity || 'medium')}`}>
-                      {scenario.severity || 'medium'}
-                    </Badge>
+                    <div 
+                      className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                        tempOptimizationConfig.optimizationMode === 'new_budget' 
+                          ? 'border-green-500 bg-green-50' 
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                      onClick={() => setTempOptimizationConfig(prev => ({ ...prev, optimizationMode: 'new_budget' }))}
+                    >
+                      <div className="flex items-start space-x-3">
+                        <div className="w-5 h-5 rounded-full border-2 border-green-500 flex items-center justify-center mt-0.5">
+                          {tempOptimizationConfig.optimizationMode === 'new_budget' && (
+                            <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                          )}
+                        </div>
+                        <div>
+                          <h3 className="font-medium text-gray-900">New Budget Optimization</h3>
+                          <p className="text-sm text-gray-600">
+                            Current allocations are fixed. Optimizes allocation of new budget for maximum impact.
+                          </p>
+                          <div className="mt-2 text-xs text-gray-500">
+                            • Prospective planning<br/>
+                            • Realistic for government budgeting<br/>
+                            • Focuses on new investments
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                  <p className="text-xs text-gray-600">
-                    {scenario.name === 'normal_operations' && 'Baseline operating conditions'}
-                    {scenario.name === 'climate_shock' && 'Extreme weather events, droughts, floods'}
-                    {scenario.name === 'financial_crisis' && 'Economic recession, currency devaluation'}
-                    {scenario.name === 'pandemic_disruption' && 'Health emergencies, supply chain disruption'}
-                    {scenario.name === 'cyber_threats' && 'Digital infrastructure attacks, data breaches'}
-                  </p>
-                </div>
-              ))}
+
+                  {/* New Budget Amount Configuration */}
+                  {tempOptimizationConfig.optimizationMode === 'new_budget' && (
+                    <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+                      <Label className="text-sm font-medium text-green-900">
+                        New Budget Amount (Million USD)
+                      </Label>
+                      <div className="mt-2 space-y-2">
+                        <Input
+                          type="number"
+                          placeholder="Enter new budget amount"
+                          value={tempOptimizationConfig.newBudgetAmount || ''}
+                          onChange={(e) => setTempOptimizationConfig(prev => ({ 
+                            ...prev, 
+                            newBudgetAmount: parseFloat(e.target.value) || 0 
+                          }))}
+                          className="bg-white"
+                        />
+                        <div className="flex items-center space-x-2 text-sm text-green-700">
+                          <Info className="w-4 h-4" />
+                          <span>
+                            Current budget: {formatCurrency(sessionInfo?.total_budget || 2900)}
+                            {tempOptimizationConfig.newBudgetAmount && (
+                              <span className="ml-2">
+                                → Total: {formatCurrency((sessionInfo?.total_budget || 2900) + tempOptimizationConfig.newBudgetAmount)}
+                              </span>
+                            )}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Rest of optimization configuration */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Optimization Parameters</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="method">Optimization Method</Label>
+                      <select
+                        id="method"
+                        aria-label="Optimization Method"
+                        value={tempOptimizationConfig.method}
+                        onChange={(e) => setTempOptimizationConfig(prev => ({ ...prev, method: e.target.value }))}
+                        className="w-full border border-gray-300 rounded-md px-3 py-2"
+                      >
+                        <option value="hybrid">Hybrid (Recommended)</option>
+                        <option value="mathematical">Mathematical</option>
+                        <option value="gradient">Gradient-based</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="scenario">Scenario</Label>
+                      <select
+                        id="scenario"
+                        aria-label="Scenario"
+                        value={tempOptimizationConfig.scenario}
+                        onChange={(e) => setTempOptimizationConfig(prev => ({ ...prev, scenario: e.target.value }))}
+                        className="w-full border border-gray-300 rounded-md px-3 py-2"
+                      >
+                        <option value="baseline">Baseline</option>
+                        <option value="aggressive">Aggressive</option>
+                        <option value="conservative">Conservative</option>
+                        <option value="balanced">Balanced</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Traditional mode specific settings */}
+                  {tempOptimizationConfig.optimizationMode === 'traditional' && (
+                    <div>
+                      <Label htmlFor="budgetChange">Budget Change Percentage</Label>
+                      <Input
+                        id="budgetChange"
+                        type="number"
+                        placeholder="0.0"
+                        value={tempOptimizationConfig.budgetChange}
+                        onChange={(e) => setTempOptimizationConfig(prev => ({ 
+                          ...prev, 
+                          budgetChange: parseFloat(e.target.value) || 0 
+                        }))}
+                      />
+                      <p className="text-sm text-gray-600 mt-1">
+                        Percentage change in total budget (positive for increase, negative for decrease)
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Constraints */}
+                  <div>
+                    <Label className="text-base font-medium">Constraints</Label>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-2">
+                      <div>
+                        <Label htmlFor="minAllocation" className="text-sm">Min Allocation (%)</Label>
+                        <Input
+                          id="minAllocation"
+                          type="number"
+                          placeholder="0"
+                          value={tempOptimizationConfig.constraints.minAllocation}
+                          onChange={(e) => setTempOptimizationConfig(prev => ({
+                            ...prev,
+                            constraints: { ...prev.constraints, minAllocation: parseFloat(e.target.value) || 0 }
+                          }))}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="maxAllocation" className="text-sm">Max Allocation (%)</Label>
+                        <Input
+                          id="maxAllocation"
+                          type="number"
+                          placeholder="100"
+                          value={tempOptimizationConfig.constraints.maxAllocation}
+                          onChange={(e) => setTempOptimizationConfig(prev => ({
+                            ...prev,
+                            constraints: { ...prev.constraints, maxAllocation: parseFloat(e.target.value) || 100 }
+                          }))}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="transitionLimit" className="text-sm">Transition Limit (%)</Label>
+                        <Input
+                          id="transitionLimit"
+                          type="number"
+                          placeholder="50"
+                          value={tempOptimizationConfig.constraints.transitionLimit}
+                          onChange={(e) => setTempOptimizationConfig(prev => ({
+                            ...prev,
+                            constraints: { ...prev.constraints, transitionLimit: parseFloat(e.target.value) || 50 }
+                          }))}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
-          </div>
-        )}
+          )}
 
-        {activeSection === 'targets' && (
-          <div className="space-y-4">
-            <h4 className="text-sm font-medium text-gray-700 mb-3">Performance Targets</h4>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="target-fsfvi" className="block text-sm font-medium text-gray-700 mb-2">
-                  Target FSFVI Score
-                </label>
-                <input 
-                  id="target-fsfvi"
-                  type="number" 
-                  step="0.001"
-                  min="0"
-                  max="1"
-                  value={optimizationConfig.targetFsfvi || ''} 
-                  onChange={(e) => updateConfig({ 
-                    targetFsfvi: e.target.value ? parseFloat(e.target.value) : undefined 
-                  })}
-                  placeholder="e.g., 0.015"
-                  className="w-full border border-gray-300 rounded-md px-3 py-2"
-                  aria-label="Target FSFVI score"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Lower scores indicate better performance (0 = perfect, 1 = maximum vulnerability)
-                </p>
-              </div>
+          {activeTab === 'budget-impact' && (
+            <div className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center space-x-2">
+                    <DollarSign className="w-5 h-5 text-green-600" />
+                    <span>Budget Impact Analysis Settings</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="baseBudget">Base Budget (Million USD)</Label>
+                      <Input
+                        id="baseBudget"
+                        type="number"
+                        placeholder={sessionInfo?.total_budget?.toString() || "2900"}
+                        value={tempBudgetImpactConfig.baseBudget || ''}
+                        onChange={(e) => setTempBudgetImpactConfig(prev => ({ 
+                          ...prev, 
+                          baseBudget: parseFloat(e.target.value) || 0 
+                        }))}
+                      />
+                    </div>
 
-              <div>
-                <label htmlFor="target-year" className="block text-sm font-medium text-gray-700 mb-2">
-                  Target Achievement Year
-                </label>
-                <input 
-                  id="target-year"
-                  type="number" 
-                  min={new Date().getFullYear()}
-                  max={new Date().getFullYear() + 20}
-                  value={optimizationConfig.targetYear || ''} 
-                  onChange={(e) => updateConfig({ 
-                    targetYear: e.target.value ? parseInt(e.target.value) : undefined 
-                  })}
-                  placeholder={`e.g., ${new Date().getFullYear() + 3}`}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2"
-                  aria-label="Target year for achievement"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Year by which target should be achieved
-                </p>
-              </div>
+                    <div>
+                      <Label htmlFor="methodBI">Analysis Method</Label>
+                      <select
+                        id="methodBI"
+                        aria-label="Budget Impact Analysis Method"
+                        value={tempBudgetImpactConfig.method}
+                        onChange={(e) => setTempBudgetImpactConfig(prev => ({ ...prev, method: e.target.value }))}
+                        className="w-full border border-gray-300 rounded-md px-3 py-2"
+                      >
+                        <option value="hybrid">Hybrid</option>
+                        <option value="mathematical">Mathematical</option>
+                        <option value="gradient">Gradient-based</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="budgetVariations">Budget Variations (Million USD)</Label>
+                    <Input
+                      id="budgetVariations"
+                      type="text"
+                      placeholder="100, 200, 300, 400, 500"
+                      value={tempBudgetImpactConfig.budgetVariations.join(', ')}
+                      onChange={(e) => setTempBudgetImpactConfig(prev => ({ 
+                        ...prev, 
+                        budgetVariations: e.target.value.split(',').map(v => parseFloat(v.trim()) || 0).filter(v => v > 0)
+                      }))}
+                    />
+                    <p className="text-sm text-gray-600 mt-1">
+                      Comma-separated values for budget sensitivity analysis
+                    </p>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="scenarioBI">Scenario</Label>
+                    <select
+                      id="scenarioBI"
+                      aria-label="Budget Impact Scenario"
+                      value={tempBudgetImpactConfig.scenario}
+                      onChange={(e) => setTempBudgetImpactConfig(prev => ({ ...prev, scenario: e.target.value }))}
+                      className="w-full border border-gray-300 rounded-md px-3 py-2"
+                    >
+                      <option value="baseline">Baseline</option>
+                      <option value="aggressive">Aggressive</option>
+                      <option value="conservative">Conservative</option>
+                      <option value="balanced">Balanced</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <Label className="text-base font-medium">Constraints</Label>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-2">
+                      <div>
+                        <Label htmlFor="minAllocationBI" className="text-sm">Min Allocation</Label>
+                        <Input
+                          id="minAllocationBI"
+                          type="number"
+                          placeholder="0"
+                          value={tempBudgetImpactConfig.constraints.minAllocation}
+                          onChange={(e) => setTempBudgetImpactConfig(prev => ({
+                            ...prev,
+                            constraints: { ...prev.constraints, minAllocation: parseFloat(e.target.value) || 0 }
+                          }))}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="maxAllocationBI" className="text-sm">Max Allocation</Label>
+                        <Input
+                          id="maxAllocationBI"
+                          type="number"
+                          placeholder="1000"
+                          value={tempBudgetImpactConfig.constraints.maxAllocation}
+                          onChange={(e) => setTempBudgetImpactConfig(prev => ({
+                            ...prev,
+                            constraints: { ...prev.constraints, maxAllocation: parseFloat(e.target.value) || 1000 }
+                          }))}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="transitionLimitBI" className="text-sm">Transition Limit</Label>
+                        <Input
+                          id="transitionLimitBI"
+                          type="number"
+                          placeholder="50"
+                          value={tempBudgetImpactConfig.constraints.transitionLimit}
+                          onChange={(e) => setTempBudgetImpactConfig(prev => ({
+                            ...prev,
+                            constraints: { ...prev.constraints, transitionLimit: parseFloat(e.target.value) || 50 }
+                          }))}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
-          </div>
-        )}
-
-        {activeSection === 'constraints' && (
-          <div className="space-y-4">
-            <h4 className="text-sm font-medium text-gray-700 mb-3">Allocation Constraints</h4>
-            
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label htmlFor="min-allocation" className="block text-sm font-medium text-gray-700 mb-2">
-                  Min Allocation (%)
-                </label>
-                <input
-                  id="min-allocation"
-                  type="number"
-                  min="0"
-                  max="50"
-                  value={optimizationConfig.constraints.minAllocation}
-                  onChange={(e) => updateConstraints({ minAllocation: parseFloat(e.target.value) || 0 })}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2"
-                  aria-label="Minimum allocation percentage per component"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Minimum budget share per component
-                </p>
-              </div>
-
-              <div>
-                <label htmlFor="max-allocation" className="block text-sm font-medium text-gray-700 mb-2">
-                  Max Allocation (%)
-                </label>
-                <input
-                  id="max-allocation"
-                  type="number"
-                  min="10"
-                  max="100"
-                  value={optimizationConfig.constraints.maxAllocation}
-                  onChange={(e) => updateConstraints({ maxAllocation: parseFloat(e.target.value) || 100 })}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2"
-                  aria-label="Maximum allocation percentage per component"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Maximum budget share per component
-                </p>
-              </div>
-
-              <div>
-                <label htmlFor="transition-limit" className="block text-sm font-medium text-gray-700 mb-2">
-                  Max Year-over-Year Change (%)
-                </label>
-                <input
-                  id="transition-limit"
-                  type="number"
-                  min="0"
-                  max="100"
-                  value={optimizationConfig.constraints.transitionLimit}
-                  onChange={(e) => updateConstraints({ transitionLimit: parseFloat(e.target.value) || 30 })}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2"
-                  aria-label="Maximum year-over-year allocation change"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Limits dramatic budget shifts
-                </p>
-              </div>
-            </div>
-
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-              <div className="flex items-center space-x-2">
-                <AlertTriangle className="w-4 h-4 text-yellow-600" />
-                <span className="text-sm font-medium text-yellow-900">Constraint Guidelines</span>
-              </div>
-              <p className="text-xs text-yellow-800 mt-1">
-                Conservative constraints (10-40% max allocation, 15% transition limit) provide stability. 
-                Aggressive constraints (up to 60% allocation, 50% transition) allow rapid transformation.
-              </p>
-            </div>
-          </div>
-        )}
-
-        {activeSection === 'planning' && (
-          <div className="space-y-4">
-            <h4 className="text-sm font-medium text-gray-700 mb-3">Multi-Year Planning Horizon</h4>
-            
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label htmlFor="planning-start" className="block text-sm font-medium text-gray-700 mb-2">
-                  Planning Start Year
-                </label>
-                <input
-                  id="planning-start"
-                  type="number"
-                  min={new Date().getFullYear()}
-                  max={new Date().getFullYear() + 5}
-                  value={planningHorizon.startYear}
-                  onChange={(e) => updatePlanningHorizon({ startYear: parseInt(e.target.value) || new Date().getFullYear() })}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2"
-                  aria-label="Planning start year"
-                />
-              </div>
-              
-              <div>
-                <label htmlFor="planning-end" className="block text-sm font-medium text-gray-700 mb-2">
-                  Planning End Year
-                </label>
-                <input
-                  id="planning-end"
-                  type="number"
-                  min={planningHorizon.startYear + 1}
-                  max={new Date().getFullYear() + 20}
-                  value={planningHorizon.endYear}
-                  onChange={(e) => updatePlanningHorizon({ endYear: parseInt(e.target.value) || new Date().getFullYear() + 5 })}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2"
-                  aria-label="Planning end year"
-                />
-              </div>
-              
-              <div>
-                <label htmlFor="budget-growth" className="block text-sm font-medium text-gray-700 mb-2">
-                  Annual Budget Growth (%)
-                </label>
-                <input
-                  id="budget-growth"
-                  type="number"
-                  step="0.1"
-                  min="-10"
-                  max="20"
-                  value={planningHorizon.budgetGrowth}
-                  onChange={(e) => updatePlanningHorizon({ budgetGrowth: parseFloat(e.target.value) || 3 })}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2"
-                  aria-label="Annual budget growth percentage"
-                />
-              </div>
-            </div>
-
-            <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-              <div className="flex items-center space-x-2">
-                <CheckCircle className="w-4 h-4 text-green-600" />
-                <span className="text-sm font-medium text-green-900">Planning Summary</span>
-              </div>
-              <p className="text-xs text-green-800 mt-1">
-                {planningHorizon.endYear - planningHorizon.startYear + 1} year planning horizon 
-                ({planningHorizon.startYear}-{planningHorizon.endYear}) with {planningHorizon.budgetGrowth}% annual growth
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* Configuration Summary */}
-        <div className="mt-6 pt-4 border-t border-gray-200">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-gray-700">Configuration Status</span>
-            <div className="flex items-center space-x-2">
-              {validationErrors.length === 0 ? (
-                <>
-                  <CheckCircle className="w-4 h-4 text-green-600" />
-                  <span className="text-sm text-green-600">Ready for Analysis</span>
-                </>
-              ) : (
-                <>
-                  <AlertTriangle className="w-4 h-4 text-red-600" />
-                  <span className="text-sm text-red-600">Requires Attention</span>
-                </>
-              )}
-            </div>
-          </div>
+          )}
         </div>
-      </CardContent>
-    </Card>
+
+        <div className="border-t my-4" />
+
+        {/* Action Buttons */}
+        <div className="flex justify-end space-x-3">
+          <Button variant="outline" onClick={handleCancel}>
+            Cancel
+          </Button>
+          <Button onClick={handleSaveConfiguration}>
+            Save Configuration
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
-}; 
+} 

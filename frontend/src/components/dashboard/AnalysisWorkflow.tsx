@@ -74,8 +74,8 @@ export const AnalysisWorkflow: React.FC<AnalysisWorkflowProps> = ({
     },
     {
       id: 'optimization',
-      title: 'Optimize Allocation',
-      description: 'Generate optimal budget reallocation recommendations',
+      title: 'Analyze Optimal Allocation',
+      description: 'Show how current budget should have been allocated for best performance',
       status: 'pending',
       icon: <Activity className="w-5 h-5" />,
     },
@@ -134,7 +134,15 @@ export const AnalysisWorkflow: React.FC<AnalysisWorkflowProps> = ({
           results = await analysisAPI.calculateSystemVulnerability(sessionId, token);
           break;
         case 'optimization':
-          results = await analysisAPI.optimizeAllocation(sessionId, token);
+          // Use traditional optimization mode to show "how money should have been allocated"
+          results = await analysisAPI.optimizeAllocation(
+            sessionId, 
+            token, 
+            'hybrid', // method
+            0, // budgetChangePercent - no budget change, just reallocation
+            undefined, // constraints
+            'traditional' // optimizationMode - retrospective analysis
+          );
           break;
         default:
           throw new Error('Unknown analysis step');
@@ -634,9 +642,11 @@ export const AnalysisWorkflow: React.FC<AnalysisWorkflowProps> = ({
       case 'optimization':
         return (
           <div className="mt-3 space-y-3">
-            {/* Optimization Results Summary */}
+            {/* Optimization Results Summary - Traditional Retrospective Analysis */}
             <div className="p-3 bg-green-50 rounded-lg border border-green-200">
-              <h4 className="text-sm font-semibold text-green-900 mb-2">Optimization Results:</h4>
+              <h4 className="text-sm font-semibold text-green-900 mb-2">
+                Optimal Allocation Analysis: <span className="text-xs font-normal text-green-700">(how budget should have been allocated)</span>
+              </h4>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
                 <div className="text-center">
                   <div className="text-lg font-bold text-green-800">
@@ -652,9 +662,10 @@ export const AnalysisWorkflow: React.FC<AnalysisWorkflowProps> = ({
                 </div>
                 <div className="text-center">
                   <div className="text-lg font-bold text-purple-800">
-                    {step.results.optimization_results?.efficiency_gain_percent?.toFixed(1) || '0.0'}%
+                    {step.results.optimization_results?.new_budget_utilization_percent?.toFixed(1) || 
+                     step.results.optimization_results?.efficiency_gain_percent?.toFixed(1) || '0.0'}%
                   </div>
-                  <div className="text-purple-700">Efficiency Gain</div>
+                  <div className="text-purple-700">Budget Utilization</div>
                 </div>
                 <div className="text-center">
                   <div className="text-lg font-bold text-orange-800">
@@ -668,62 +679,70 @@ export const AnalysisWorkflow: React.FC<AnalysisWorkflowProps> = ({
             {/* Optimization Validation */}
             <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
               <div className="flex items-center justify-between mb-2">
-                <h5 className="text-sm font-semibold text-blue-900">Optimization Process:</h5>
+                <h5 className="text-sm font-semibold text-blue-900">Optimal Allocation Analysis:</h5>
                 <div className="flex items-center space-x-2">
                   <Badge className="bg-green-100 text-green-800 text-xs">
                     <CheckCircle className="w-3 h-3 mr-1" />
                     {step.results.optimization_results?.success ? 'Converged' : 'Failed'}
                   </Badge>
-
                 </div>
               </div>
               <p className="text-xs text-blue-800">
-                FSFVI minimization optimization with budget allocation constraints
+                Shows optimal reallocation of current budget for maximum vulnerability reduction
               </p>
               <p className="text-xs text-blue-700 mt-1">
-                {step.results.optimization_results?.solver || 'Advanced optimization algorithm'} with prioritization constraints for optimal resource allocation
+                Mathematical optimization: FSFVI = Σᵢ ωᵢ·δᵢ·[1/(1+αᵢfᵢ)] - retrospective analysis
               </p>
+              <div className="mt-2 text-xs text-blue-700">
+                ℹ️ This shows how current budget should have been allocated - for new budget planning, use detailed analysis
+              </div>
             </div>
 
-            {/* Optimization Impact Assessment */}
+            {/* Reallocation Impact Assessment */}
             <div className="p-3 bg-yellow-50 rounded-lg border border-yellow-200">
-              <h5 className="text-sm font-semibold text-yellow-900 mb-2">Impact Assessment:</h5>
+              <h5 className="text-sm font-semibold text-yellow-900 mb-2">Reallocation Potential:</h5>
               <div className="text-xs text-yellow-800">
                 {(() => {
                   const improvement = step.results.optimization_results?.relative_improvement_percent || 0;
                   const reallocation = step.results.optimization_results?.reallocation_intensity_percent || 0;
                   
                   if (improvement > 30) {
-                    return `🎯 High-impact optimization: ${improvement.toFixed(1)}% FSFVI improvement achievable with strategic reallocation`;
+                    return `🎯 High-impact reallocation potential: ${improvement.toFixed(1)}% FSFVI improvement achievable with strategic redistribution`;
                   } else if (improvement > 15) {
-                    return `📈 Moderate optimization potential: ${improvement.toFixed(1)}% improvement with ${reallocation.toFixed(1)}% budget reallocation`;
+                    return `📈 Moderate optimization opportunity: ${improvement.toFixed(1)}% improvement with ${reallocation.toFixed(1)}% budget reallocation`;
                   } else if (improvement > 5) {
-                    return `✨ Limited but meaningful improvement: ${improvement.toFixed(1)}% FSFVI enhancement possible`;
+                    return `🔧 Targeted improvements: ${improvement.toFixed(1)}% FSFVI reduction possible with focused reallocation`;
                   } else {
-                    return `✅ Current allocation is near-optimal - minimal improvement potential detected`;
+                    return `📊 Current allocation near-optimal: ${improvement.toFixed(1)}% additional improvement possible`;
                   }
                 })()}
+              </div>
+              <div className="mt-2 text-xs text-blue-700">
+                This shows missed opportunities - for new budget planning, use detailed optimization analysis
               </div>
             </div>
 
             {/* Budget Reallocation Insight */}
-            {step.results.optimization_results?.budget_utilization_percent && (
-              <div className="p-3 bg-indigo-50 rounded-lg border border-indigo-200">
-                <div className="flex items-center justify-between text-xs">
-                  <div>
-                    <span className="font-semibold text-indigo-900">Budget Utilization:</span>
-                    <span className="text-indigo-800 ml-2">
-                      {step.results.optimization_results.budget_utilization_percent.toFixed(1)}% of allocated budget
-                    </span>
-                  </div>
-                  <div className="text-indigo-700">
-                    {step.results.optimization_results.reallocation_intensity_percent && 
-                      `${step.results.optimization_results.reallocation_intensity_percent.toFixed(1)}% reallocation intensity`
+            <div className="p-3 bg-indigo-50 rounded-lg border border-indigo-200">
+              <div className="flex items-center justify-between text-xs">
+                <div>
+                  <span className="font-semibold text-indigo-900">Reallocation Analysis:</span>
+                  <span className="text-indigo-800 ml-2">
+                    {step.results.optimization_results?.reallocation_intensity_percent && 
+                      `${step.results.optimization_results.reallocation_intensity_percent.toFixed(1)}% budget reallocation intensity`
                     }
-                  </div>
+                  </span>
+                </div>
+                <div className="text-indigo-700">
+                  {step.results.optimization_results?.budget_utilization_percent && 
+                    `${step.results.optimization_results.budget_utilization_percent.toFixed(1)}% budget utilized`
+                  }
                 </div>
               </div>
-            )}
+              <div className="mt-1 text-xs text-indigo-700">
+                📊 Shows optimal reallocation pattern | 💡 For new budget planning, use allocation optimization page
+              </div>
+            </div>
 
             {/* Actions */}
             <div className="flex flex-col sm:flex-row gap-3 mt-4">
@@ -738,7 +757,7 @@ export const AnalysisWorkflow: React.FC<AnalysisWorkflowProps> = ({
                 }}
               >
                 <Eye className="w-4 h-4 mr-2" />
-                View Detailed Optimization
+                Configure New Budget Optimization
               </Button>
               <Button
                 variant="outline"

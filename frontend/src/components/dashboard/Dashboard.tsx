@@ -213,7 +213,8 @@ export const Dashboard: React.FC = () => {
                     </h2>
                     <p className="text-blue-100 mb-6 text-lg max-w-2xl leading-relaxed">
                       Analyze food system vulnerabilities with mathematical precision using our comprehensive 
-                      FSFVI framework. Build resilient food systems through data-driven insights.
+                      FSFVI framework. Optimize new budget allocations with realistic government planning that 
+                      preserves current commitments while maximizing impact.
                     </p>
                     <div className="flex flex-wrap gap-4">
                       <Button 
