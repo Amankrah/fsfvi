@@ -214,17 +214,21 @@ export const Dashboard: React.FC = () => {
                       </div>
                     </div>
                     
-                    {/* Video overlay for future implementation */}
-                    {/* 
-                    <iframe 
-                      className="w-full h-full absolute inset-0"
-                      src="YOUR_VIDEO_URL_HERE"
-                      title="FSFVI Platform Demonstration"
-                      frameBorder="0"
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                      allowFullScreen
-                    ></iframe>
-                    */}
+                    {/* Demo Video */}
+                    <video 
+                      className="w-full h-full absolute inset-0 rounded-xl object-cover"
+                      controls
+                      poster="/logo.png"
+                      preload="metadata"
+                    >
+                      <source src="/video/demo_video.mp4" type="video/mp4" />
+                      <p className="text-gray-600 p-4">
+                        Your browser does not support the video tag. 
+                        <a href="/video/demo_video.mp4" className="text-blue-600 hover:underline ml-1">
+                          Download the video instead
+                        </a>
+                      </p>
+                    </video>
                   </div>
                 </div>
 
