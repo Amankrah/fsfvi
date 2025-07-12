@@ -120,3 +120,114 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Custom animations for auth forms */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200px 0; }
+  100% { background-position: calc(200px + 100%) 0; }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.1); }
+  50% { box-shadow: 0 0 0 10px rgba(59, 130, 246, 0.0); }
+}
+
+/* Apply animations to auth forms */
+.auth-form-container {
+  animation: fadeInUp 0.6s ease-out;
+}
+
+.auth-form-container .relative.group:focus-within {
+  animation: pulse-glow 2s infinite;
+}
+
+/* Logo animation on load */
+.auth-logo {
+  animation: fadeInUp 0.8s ease-out;
+}
+
+/* Subtle hover effects for buttons */
+.auth-button:hover {
+  transform: translateY(-1px);
+  transition: all 0.2s ease;
+}
+
+/* Smooth focus transitions */
+.auth-input:focus {
+  transform: scale(1.02);
+  transition: all 0.3s ease;
+}
+
+/* Password strength indicator animation */
+.password-strength-indicator {
+  animation: fadeInUp 0.3s ease-out;
+}
+
+/* Shimmer effect for loading states */
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    #f0f0f0 0%,
+    #e0e0e0 50%,
+    #f0f0f0 100%
+  );
+  background-size: 200px 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+/* Enhance form field focus effects */
+.form-field:focus-within {
+  transform: translateY(-2px);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Subtle background animation */
+.auth-background {
+  background: linear-gradient(-45deg, #f8fafc, #f1f5f9, #e2e8f0, #f8fafc);
+  background-size: 400% 400%;
+  animation: gradientShift 15s ease infinite;
+}
+
+@keyframes gradientShift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* Improved button hover states */
+.gradient-button {
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.gradient-button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.2),
+    transparent
+  );
+  transition: left 0.5s ease;
+}
+
+.gradient-button:hover::before {
+  left: 100%;
+}

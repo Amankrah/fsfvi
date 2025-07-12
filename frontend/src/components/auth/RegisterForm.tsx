@@ -6,13 +6,14 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import Link from 'next/link';
+import Image from 'next/image';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useAuth } from '@/contexts/AuthContext';
-import { BarChart3, UserPlus, User, Mail, Lock, AlertCircle, ArrowLeft, CheckCircle } from 'lucide-react';
+import { UserPlus, User, Mail, Lock, AlertCircle, ArrowLeft, CheckCircle } from 'lucide-react';
 
 // Validation schema
 const registerSchema = z.object({
@@ -112,246 +113,267 @@ export const RegisterForm: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
+    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-green-50 relative overflow-hidden">
+      {/* Background Pattern */}
+      <div className="absolute inset-0 bg-gradient-to-r from-emerald-100/20 to-green-100/20"></div>
+
       {/* Header */}
-      <div className="bg-white/90 backdrop-blur-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="bg-blue-600 p-2 rounded-lg">
-                <BarChart3 className="w-6 h-6 text-white" />
+      <div className="fixed top-0 left-0 right-0 z-50 bg-white/20 backdrop-blur-2xl border-b border-white/30 shadow-2xl">
+        <div className="bg-gradient-to-r from-white/10 via-white/5 to-white/10 backdrop-blur-3xl">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <div className="w-12 h-12 relative p-1 rounded-xl bg-white/20 backdrop-blur-sm border border-white/30">
+                  <Image
+                    src="/logo.png"
+                    alt="FSFVI Logo"
+                    fill
+                    className="object-contain rounded-lg"
+                  />
+                </div>
+                <div>
+                  <h1 className="text-2xl font-bold bg-gradient-to-r from-emerald-600 to-green-600 bg-clip-text text-transparent drop-shadow-sm">
+                    FSFVI
+                  </h1>
+                  <p className="text-sm text-gray-700 font-medium drop-shadow-sm">Food System Vulnerability Index</p>
+                </div>
               </div>
-              <div>
-                <h1 className="text-xl font-bold text-gray-900">FSFVI</h1>
-                <p className="text-xs text-gray-600">Food System Vulnerability Index</p>
-              </div>
+              <Link href="/">
+                <Button variant="outline" size="sm" className="bg-white/30 hover:bg-white/40 border-white/40 hover:border-white/60 backdrop-blur-sm text-gray-800 shadow-lg">
+                  <ArrowLeft className="w-4 h-4 mr-2" />
+                  Back to Home
+                </Button>
+              </Link>
             </div>
-            <Link href="/">
-              <Button variant="outline" size="sm">
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Back to Home
-              </Button>
-            </Link>
           </div>
         </div>
       </div>
 
       {/* Main Content */}
-      <div className="flex items-center justify-center px-4 sm:px-6 lg:px-8 py-8">
-        <Card className="w-full max-w-md shadow-xl border-0 bg-white/95 backdrop-blur-sm">
-          <CardHeader className="space-y-1 text-center pb-6">
-            <div className="bg-green-100 p-3 rounded-full w-fit mx-auto mb-4">
-              <UserPlus className="w-8 h-8 text-green-600" />
+      <div className="relative z-10 flex items-center justify-center px-4 sm:px-6 lg:px-8 py-12 pt-28">
+        <div className="w-full max-w-md">
+          {/* Logo and Title Section */}
+          <div className="text-center mb-8">
+            <div className="w-20 h-20 mx-auto mb-6 relative">
+              <Image
+                src="/logo.png"
+                alt="FSFVI Logo"
+                fill
+                className="object-contain"
+              />
             </div>
-            <CardTitle className="text-2xl font-bold text-gray-900">Join FSFVI</CardTitle>
-            <CardDescription className="text-gray-600">
-              Create your account to start analyzing food system vulnerabilities
-            </CardDescription>
-          </CardHeader>
+            <h2 className="text-3xl font-bold text-gray-900 mb-2">Join FSFVI</h2>
+            <p className="text-gray-600">Create your account to start analyzing food system vulnerabilities</p>
+          </div>
 
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)}>
-              <CardContent className="space-y-4">
-                {error && (
-                  <div className="bg-red-50 border-l-4 border-red-400 p-4 rounded-md">
-                    <div className="flex">
-                      <AlertCircle className="w-5 h-5 text-red-400 mr-3 mt-0.5" />
-                      <p className="text-sm text-red-700">{error}</p>
+          <Card className="shadow-2xl border-0 bg-white/95 backdrop-blur-sm">
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)}>
+                <CardContent className="p-8 space-y-6">
+                  {error && (
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                      <div className="flex">
+                        <AlertCircle className="w-5 h-5 text-red-500 mr-3 mt-0.5" />
+                        <p className="text-sm text-red-700">{error}</p>
+                      </div>
                     </div>
-                  </div>
-                )}
-
-                <div className="grid grid-cols-2 gap-3">
-                  <FormField
-                    control={form.control}
-                    name="firstName"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-gray-700 font-medium text-sm">First Name</FormLabel>
-                        <FormControl>
-                          <Input 
-                            {...field} 
-                            type="text"
-                            placeholder="First name"
-                            disabled={isLoading}
-                            className="h-11 border-gray-200 focus:border-blue-500 focus:ring-blue-500"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="lastName"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-gray-700 font-medium text-sm">Last Name</FormLabel>
-                        <FormControl>
-                          <Input 
-                            {...field} 
-                            type="text"
-                            placeholder="Last name"
-                            disabled={isLoading}
-                            className="h-11 border-gray-200 focus:border-blue-500 focus:ring-blue-500"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-
-                <FormField
-                  control={form.control}
-                  name="username"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-gray-700 font-medium">Username</FormLabel>
-                      <FormControl>
-                        <div className="relative">
-                          <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-                          <Input 
-                            {...field} 
-                            type="text"
-                            placeholder="Choose a username"
-                            disabled={isLoading}
-                            className="pl-10 h-11 border-gray-200 focus:border-blue-500 focus:ring-blue-500"
-                          />
-                        </div>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
                   )}
-                />
 
-                <FormField
-                  control={form.control}
-                  name="email"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-gray-700 font-medium">Email</FormLabel>
-                      <FormControl>
-                        <div className="relative">
-                          <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-                          <Input 
-                            {...field} 
-                            type="email"
-                            placeholder="Enter your email"
-                            disabled={isLoading}
-                            className="pl-10 h-11 border-gray-200 focus:border-blue-500 focus:ring-blue-500"
-                          />
-                        </div>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="password"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-gray-700 font-medium">Password</FormLabel>
-                      <FormControl>
-                        <div className="relative">
-                          <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-                          <Input 
-                            {...field} 
-                            type="password"
-                            placeholder="Create a strong password"
-                            disabled={isLoading}
-                            className="pl-10 h-11 border-gray-200 focus:border-blue-500 focus:ring-blue-500"
-                          />
-                        </div>
-                      </FormControl>
-                      {passwordValue && (
-                        <div className="mt-2 space-y-1">
-                          <div className="flex items-center space-x-1 text-xs">
-                            <CheckCircle className={`w-3 h-3 ${passwordStrength.hasLength ? 'text-green-500' : 'text-gray-300'}`} />
-                            <span className={passwordStrength.hasLength ? 'text-green-600' : 'text-gray-500'}>8+ characters</span>
-                          </div>
-                          <div className="flex items-center space-x-1 text-xs">
-                            <CheckCircle className={`w-3 h-3 ${passwordStrength.hasUpper && passwordStrength.hasLower ? 'text-green-500' : 'text-gray-300'}`} />
-                            <span className={passwordStrength.hasUpper && passwordStrength.hasLower ? 'text-green-600' : 'text-gray-500'}>Upper & lowercase</span>
-                          </div>
-                          <div className="flex items-center space-x-1 text-xs">
-                            <CheckCircle className={`w-3 h-3 ${passwordStrength.hasNumber ? 'text-green-500' : 'text-gray-300'}`} />
-                            <span className={passwordStrength.hasNumber ? 'text-green-600' : 'text-gray-500'}>At least one number</span>
-                          </div>
-                        </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="firstName"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-gray-700 font-semibold text-sm">First Name</FormLabel>
+                          <FormControl>
+                            <Input 
+                              {...field} 
+                              type="text"
+                              placeholder="First name"
+                              disabled={isLoading}
+                              className="h-11 border-gray-200 focus:border-emerald-500 focus:ring-emerald-500 bg-white/80 backdrop-blur-sm"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
                       )}
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                    />
 
-                <FormField
-                  control={form.control}
-                  name="confirmPassword"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-gray-700 font-medium">Confirm Password</FormLabel>
-                      <FormControl>
-                        <div className="relative">
-                          <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-                          <Input 
-                            {...field} 
-                            type="password"
-                            placeholder="Confirm your password"
-                            disabled={isLoading}
-                            className="pl-10 h-11 border-gray-200 focus:border-blue-500 focus:ring-blue-500"
-                          />
-                        </div>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </CardContent>
+                    <FormField
+                      control={form.control}
+                      name="lastName"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-gray-700 font-semibold text-sm">Last Name</FormLabel>
+                          <FormControl>
+                            <Input 
+                              {...field} 
+                              type="text"
+                              placeholder="Last name"
+                              disabled={isLoading}
+                              className="h-11 border-gray-200 focus:border-emerald-500 focus:ring-emerald-500 bg-white/80 backdrop-blur-sm"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
 
-              <CardFooter className="flex flex-col space-y-6 pt-4">
-                <Button 
-                  type="submit" 
-                  className="w-full h-11 bg-green-600 hover:bg-green-700 text-white font-medium" 
-                  disabled={isLoading}
-                >
-                  {isLoading ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                      Creating Account...
-                    </>
-                  ) : (
-                    'Create Account'
-                  )}
-                </Button>
+                  <FormField
+                    control={form.control}
+                    name="username"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-gray-700 font-semibold">Username</FormLabel>
+                        <FormControl>
+                          <div className="relative group">
+                            <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-emerald-500 transition-colors" />
+                            <Input 
+                              {...field} 
+                              type="text"
+                              placeholder="Choose a username"
+                              disabled={isLoading}
+                              className="pl-10 h-11 border-gray-200 focus:border-emerald-500 focus:ring-emerald-500 bg-white/80 backdrop-blur-sm"
+                            />
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
-                <div className="text-center space-y-4">
-                  <div className="relative">
-                    <div className="absolute inset-0 flex items-center">
-                      <div className="w-full border-t border-gray-200"></div>
+                  <FormField
+                    control={form.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-gray-700 font-semibold">Email</FormLabel>
+                        <FormControl>
+                          <div className="relative group">
+                            <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-emerald-500 transition-colors" />
+                            <Input 
+                              {...field} 
+                              type="email"
+                              placeholder="Enter your email"
+                              disabled={isLoading}
+                              className="pl-10 h-11 border-gray-200 focus:border-emerald-500 focus:ring-emerald-500 bg-white/80 backdrop-blur-sm"
+                            />
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="password"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-gray-700 font-semibold">Password</FormLabel>
+                        <FormControl>
+                          <div className="relative group">
+                            <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-emerald-500 transition-colors" />
+                            <Input 
+                              {...field} 
+                              type="password"
+                              placeholder="Create a strong password"
+                              disabled={isLoading}
+                              className="pl-10 h-11 border-gray-200 focus:border-emerald-500 focus:ring-emerald-500 bg-white/80 backdrop-blur-sm"
+                            />
+                          </div>
+                        </FormControl>
+                        {passwordValue && (
+                          <div className="mt-3 space-y-2">
+                            <div className="flex items-center space-x-2 text-xs">
+                              <CheckCircle className={`w-4 h-4 ${passwordStrength.hasLength ? 'text-emerald-500' : 'text-gray-300'}`} />
+                              <span className={passwordStrength.hasLength ? 'text-emerald-600' : 'text-gray-500'}>8+ characters</span>
+                            </div>
+                            <div className="flex items-center space-x-2 text-xs">
+                              <CheckCircle className={`w-4 h-4 ${passwordStrength.hasUpper && passwordStrength.hasLower ? 'text-emerald-500' : 'text-gray-300'}`} />
+                              <span className={passwordStrength.hasUpper && passwordStrength.hasLower ? 'text-emerald-600' : 'text-gray-500'}>Upper & lowercase</span>
+                            </div>
+                            <div className="flex items-center space-x-2 text-xs">
+                              <CheckCircle className={`w-4 h-4 ${passwordStrength.hasNumber ? 'text-emerald-500' : 'text-gray-300'}`} />
+                              <span className={passwordStrength.hasNumber ? 'text-emerald-600' : 'text-gray-500'}>At least one number</span>
+                            </div>
+                          </div>
+                        )}
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="confirmPassword"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-gray-700 font-semibold">Confirm Password</FormLabel>
+                        <FormControl>
+                          <div className="relative group">
+                            <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-emerald-500 transition-colors" />
+                            <Input 
+                              {...field} 
+                              type="password"
+                              placeholder="Confirm your password"
+                              disabled={isLoading}
+                              className="pl-10 h-11 border-gray-200 focus:border-emerald-500 focus:ring-emerald-500 bg-white/80 backdrop-blur-sm"
+                            />
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <Button 
+                    type="submit" 
+                    className="w-full h-12 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-200" 
+                    disabled={isLoading}
+                  >
+                    {isLoading ? (
+                      <>
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                        Creating Account...
+                      </>
+                    ) : (
+                      <>
+                        <UserPlus className="w-5 h-5 mr-2" />
+                        Create Account
+                      </>
+                    )}
+                  </Button>
+                </CardContent>
+
+                <CardFooter className="px-8 pb-8">
+                  <div className="w-full text-center space-y-6">
+                    <div className="relative">
+                      <div className="absolute inset-0 flex items-center">
+                        <div className="w-full border-t border-gray-200"></div>
+                      </div>
+                      <div className="relative flex justify-center text-sm">
+                        <span className="px-4 bg-white text-gray-500">Already have an account?</span>
+                      </div>
                     </div>
-                    <div className="relative flex justify-center text-sm">
-                      <span className="px-4 bg-white text-gray-500">Already have an account?</span>
+                    
+                    <Link href="/auth/login" className="block">
+                      <Button variant="outline" className="w-full h-12 border-gray-200 hover:bg-gray-50 hover:border-gray-300 transition-all duration-200">
+                        Sign In Instead
+                      </Button>
+                    </Link>
+                    
+                    <div className="text-xs text-gray-500 text-center">
+                      <p>🔒 By creating an account, you agree to our Terms of Service</p>
                     </div>
                   </div>
-                  
-                  <Link href="/auth/login">
-                    <Button variant="outline" className="w-full h-11 border-gray-200 hover:bg-gray-50">
-                      Sign In Instead
-                    </Button>
-                  </Link>
-                  
-                  <div className="text-xs text-gray-500 text-center">
-                    <p>By creating an account, you agree to our Terms of Service</p>
-                  </div>
-                </div>
-              </CardFooter>
-            </form>
-          </Form>
-        </Card>
+                </CardFooter>
+              </form>
+            </Form>
+          </Card>
+        </div>
       </div>
     </div>
   );

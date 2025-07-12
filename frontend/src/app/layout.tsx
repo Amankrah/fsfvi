@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "FSFVI - Food System Financing Vulnerability Index",
+  title: "FSFVI - Food System Financial Vulnerability Index",
   description: "Analyze and optimize food system financing vulnerabilities",
 };
 
