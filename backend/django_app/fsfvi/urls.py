@@ -34,6 +34,7 @@ urlpatterns = [
         
         # File Upload and Processing endpoints
         path('upload-csv/', views.upload_csv_file, name='upload-csv'),
+        path('upload-dummy-data/', views.upload_dummy_data, name='upload-dummy-data'),
         path('my-files/', views.get_user_uploaded_files, name='user-files'),
         path('sessions/<str:session_id>/file-info/', views.get_session_with_file, name='session-file-info'),
         path('sessions/<str:session_id>/reprocess/', views.reprocess_uploaded_file, name='reprocess-file'),

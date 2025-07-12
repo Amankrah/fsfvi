@@ -177,19 +177,22 @@ class DataProcessingService:
             data_summary = prep.get_data_summary()
             
             # Prepare component data
-            components_data, total_budget = prep.prepare_component_data(session.country_name)
+            components_data, calculated_total_budget = prep.prepare_component_data(session.country_name)
             
             # Validate against system
             validation_results = prep.validate_against_system(components_data)
             
-            # Update session with total budget
-            logger.info(f"Data Processing Service: Updating session total_budget to ${total_budget:.1f}M")
-            session.total_budget = total_budget
-            session.status = 'data_processed'
-            session.save()
-            
             # Create component records in database
             self._create_components(session, components_data)
+            
+            # Recalculate total budget from actual component allocations to ensure consistency
+            actual_total_budget = sum(comp_data['financial_allocation'] for comp_data in components_data)
+            
+            # Update session with the actual total budget from components
+            logger.info(f"Data Processing Service: Calculated budget: ${calculated_total_budget:.1f}M, Actual component sum: ${actual_total_budget:.1f}M")
+            session.total_budget = actual_total_budget
+            session.status = 'data_processed'
+            session.save()
             
             # Update uploaded file with processing results
             uploaded_file.processing_status = 'processed'
@@ -204,7 +207,7 @@ class DataProcessingService:
                 'success': True,
                 'summary': {
                     'total_records': data_summary['total_records'],
-                    'total_budget': total_budget,
+                    'total_budget': actual_total_budget,
                     'components_count': len(components_data),
                     'data_quality_score': uploaded_file.data_quality_score,
                     'validation_status': validation_results['status'],

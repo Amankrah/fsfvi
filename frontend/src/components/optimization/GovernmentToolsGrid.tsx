@@ -69,7 +69,7 @@ export const GovernmentToolsGrid: React.FC<GovernmentToolsGridProps> = ({
     {
       id: 'multi-year',
       name: 'Multi-Year Strategic Plan',
-      description: 'Long-term budget planning with target achievement roadmap',
+      description: 'Long-term cumulative new budget planning with target achievement roadmap (current allocations remain fixed)',
       icon: Calendar,
       enabled: true,
       category: 'strategic',

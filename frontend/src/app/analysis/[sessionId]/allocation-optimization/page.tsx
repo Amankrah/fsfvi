@@ -195,9 +195,28 @@ export default function AllocationOptimizationPage() {
       // SECOND: Auto-run basic optimization using the correct budget
       const result = await analysisAPI.optimizeAllocation(sessionId, token, 'hybrid', 0);
       
-      // Set optimization results (do NOT use this for total budget)
+      // Set optimization results - Use the flattened structure at top level, not the nested optimization_results
       if (result && typeof result === 'object') {
-        setOptimizationResults(prev => ({ ...prev, basic: result.optimization_results || result }));
+        // Extract optimization data from the top level response
+        const optimizationData = {
+          success: result.success !== undefined ? result.success : true,
+          original_fsfvi: result.original_fsfvi || 0,
+          optimal_fsfvi: result.optimal_fsfvi || 0,
+          relative_improvement_percent: result.relative_improvement_percent || 0,
+          efficiency_gain_percent: result.efficiency_gain_percent || 0,
+          total_reallocation_amount: result.total_reallocation_amount || 0,
+          reallocation_intensity_percent: result.reallocation_intensity_percent || 0,
+          budget_utilization_percent: result.budget_utilization_percent || 0,
+          optimal_allocations: result.optimal_allocations || [],
+          current_allocations: result.current_allocations || [],
+          iterations: result.iterations || 0,
+          solver: result.solver || 'unknown',
+          mathematical_compliance: result.mathematical_compliance !== undefined ? result.mathematical_compliance : true,
+          constraints_applied: result.constraints_applied || [],
+          component_analysis: result.component_analysis || result.optimization_results?.component_analysis,
+        };
+        
+        setOptimizationResults(prev => ({ ...prev, basic: optimizationData }));
         setActiveResultsView('optimization'); // Set active view to optimization
       } else {
         throw new Error('Invalid optimization response format');
@@ -261,8 +280,38 @@ export default function AllocationOptimizationPage() {
         mode,
         optimizationConfig.newBudgetAmount
       );
-      setOptimizationResults(prev => ({ ...prev, basic: result }));
-      return result;
+      
+      // Debug logging - let's see what we got from backend
+      console.log('runBasicOptimization received result keys:', Object.keys(result));
+      console.log('runBasicOptimization received values:', {
+        original_fsfvi: result.original_fsfvi,
+        optimal_fsfvi: result.optimal_fsfvi,
+        relative_improvement_percent: result.relative_improvement_percent,
+        efficiency_gain_percent: result.efficiency_gain_percent,
+        total_reallocation_amount: result.total_reallocation_amount
+      });
+      
+      // Extract the flattened optimization data from the top level response
+      const optimizationData = {
+        success: result.success !== undefined ? result.success : true,
+        original_fsfvi: result.original_fsfvi || 0,
+        optimal_fsfvi: result.optimal_fsfvi || 0,
+        relative_improvement_percent: result.relative_improvement_percent || 0,
+        efficiency_gain_percent: result.efficiency_gain_percent || 0,
+        total_reallocation_amount: result.total_reallocation_amount || 0,
+        reallocation_intensity_percent: result.reallocation_intensity_percent || 0,
+        budget_utilization_percent: result.budget_utilization_percent || 0,
+        optimal_allocations: result.optimal_allocations || [],
+        current_allocations: result.current_allocations || [],
+        iterations: result.iterations || 0,
+        solver: result.solver || 'unknown',
+        mathematical_compliance: result.mathematical_compliance !== undefined ? result.mathematical_compliance : true,
+        constraints_applied: result.constraints_applied || [],
+        component_analysis: result.component_analysis || result.optimization_results?.component_analysis,
+      };
+      
+      setOptimizationResults(prev => ({ ...prev, basic: optimizationData }));
+      return optimizationData;
     });
   };
 

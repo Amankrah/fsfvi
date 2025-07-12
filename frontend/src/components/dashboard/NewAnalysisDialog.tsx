@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -9,19 +9,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { 
-  Upload, 
-  FileText, 
-  AlertCircle, 
-  CheckCircle2, 
-  X, 
-  Download,
-  Info,
-  Loader2
-} from 'lucide-react';
 import { dataAPI } from '@/lib/api';
 
 interface AnalysisFormData {
@@ -33,114 +20,64 @@ interface AnalysisFormData {
 }
 
 interface NewAnalysisDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
+  isOpen: boolean;
+  onClose: () => void;
   onSuccess: (sessionId: string) => void;
 }
 
 export const NewAnalysisDialog: React.FC<NewAnalysisDialogProps> = ({
-  open,
-  onOpenChange,
+  isOpen,
+  onClose,
   onSuccess
 }) => {
+  const [step, setStep] = useState<'details' | 'processing'>('details');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [dragActive, setDragActive] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
-  const [error, setError] = useState<string>('');
-  const [step, setStep] = useState<'upload' | 'details' | 'processing'>('upload');
-  
-  // Form state
+  const [error, setError] = useState<string | null>(null);
+  const [useDummyData, setUseDummyData] = useState(false);
   const [formData, setFormData] = useState<AnalysisFormData>({
     country_name: '',
-    fiscal_year: new Date().getFullYear(),
+    fiscal_year: 2024,
     currency: 'USD',
     budget_unit: 'millions',
-    description: '',
+    description: ''
   });
 
-  const handleDrag = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.type === 'dragenter' || e.type === 'dragover') {
-      setDragActive(true);
-    } else if (e.type === 'dragleave') {
-      setDragActive(false);
+  // Automatically set country name to "Dummy" when dummy data mode is selected
+  useEffect(() => {
+    if (useDummyData) {
+      setFormData(prev => ({ ...prev, country_name: 'Dummy' }));
     }
-  }, []);
-
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragActive(false);
-
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      handleFile(e.dataTransfer.files[0]);
-    }
-  }, []);
+  }, [useDummyData]);
 
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      handleFile(e.target.files[0]);
+    const file = e.target.files?.[0];
+    if (file) {
+      setSelectedFile(file);
+      setError(null);
     }
-  };
-
-  const handleFile = (file: File) => {
-    setError('');
-    
-    // Validate file type
-    if (!file.name.toLowerCase().endsWith('.csv')) {
-      setError('Please select a CSV file');
-      return;
-    }
-
-    // Validate file size (max 50MB)
-    if (file.size > 50 * 1024 * 1024) {
-      setError('File size must be less than 50MB');
-      return;
-    }
-
-    setSelectedFile(file);
-    setStep('details');
-  };
-
-  const removeFile = () => {
-    setSelectedFile(null);
-    setStep('upload');
-    setError('');
   };
 
   const handleInputChange = (field: keyof AnalysisFormData, value: string | number) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }));
+    setFormData(prev => ({ ...prev, [field]: value }));
   };
 
   const validateForm = (): string | null => {
     if (!formData.country_name.trim()) {
       return 'Country name is required';
     }
-    if (formData.country_name.length < 2) {
-      return 'Country name must be at least 2 characters';
-    }
     if (formData.fiscal_year < 2000 || formData.fiscal_year > 2030) {
       return 'Fiscal year must be between 2000 and 2030';
-    }
-    if (!formData.currency.trim()) {
-      return 'Currency is required';
-    }
-    if (!formData.budget_unit) {
-      return 'Budget unit is required';
     }
     return null;
   };
 
-  const onSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!selectedFile) {
-      setError('Please select a file');
+    if (!useDummyData && !selectedFile) {
+      setError('Please select a file or choose to use dummy data');
       return;
     }
 
@@ -155,15 +92,28 @@ export const NewAnalysisDialog: React.FC<NewAnalysisDialogProps> = ({
     setUploadProgress(0);
 
     try {
-      // Create FormData for file upload
+      // Create FormData for upload
       const uploadFormData = new FormData();
-      uploadFormData.append('file', selectedFile);
-      uploadFormData.append('country_name', formData.country_name);
-      uploadFormData.append('fiscal_year', formData.fiscal_year.toString());
-      uploadFormData.append('currency', formData.currency);
-      uploadFormData.append('budget_unit', formData.budget_unit);
-      if (formData.description.trim()) {
-        uploadFormData.append('description', formData.description);
+      
+      if (useDummyData) {
+        // For dummy data, we don't need a file
+        uploadFormData.append('country_name', formData.country_name);
+        uploadFormData.append('fiscal_year', formData.fiscal_year.toString());
+        uploadFormData.append('currency', formData.currency);
+        uploadFormData.append('budget_unit', formData.budget_unit);
+        if (formData.description.trim()) {
+          uploadFormData.append('description', formData.description);
+        }
+      } else {
+        // For real file upload
+        uploadFormData.append('file', selectedFile!);
+        uploadFormData.append('country_name', formData.country_name);
+        uploadFormData.append('fiscal_year', formData.fiscal_year.toString());
+        uploadFormData.append('currency', formData.currency);
+        uploadFormData.append('budget_unit', formData.budget_unit);
+        if (formData.description.trim()) {
+          uploadFormData.append('description', formData.description);
+        }
       }
 
       // Simulate upload progress
@@ -177,8 +127,10 @@ export const NewAnalysisDialog: React.FC<NewAnalysisDialogProps> = ({
         });
       }, 200);
 
-      // Upload and process file
-      const result = await dataAPI.uploadCSV(uploadFormData);
+      // Upload and process file or dummy data
+      const result = useDummyData 
+        ? await dataAPI.uploadDummyData(uploadFormData)
+        : await dataAPI.uploadCSV(uploadFormData);
 
       clearInterval(progressInterval);
       setUploadProgress(100);
@@ -200,165 +152,153 @@ export const NewAnalysisDialog: React.FC<NewAnalysisDialogProps> = ({
 
   const resetDialog = () => {
     setSelectedFile(null);
-    setStep('upload');
-    setError('');
+    setStep('details');
+    setError(null);
     setUploadProgress(0);
     setUploading(false);
+    setUseDummyData(false);
     setFormData({
       country_name: '',
-      fiscal_year: new Date().getFullYear(),
+      fiscal_year: 2024,
       currency: 'USD',
       budget_unit: 'millions',
-      description: '',
+      description: ''
     });
   };
 
   const handleClose = () => {
     if (!uploading) {
       resetDialog();
-      onOpenChange(false);
+      onClose();
     }
   };
 
   return (
-    <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-2xl">
+    <Dialog open={isOpen} onOpenChange={handleClose}>
+      <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
-          <DialogTitle className="flex items-center">
-            <FileText className="w-5 h-5 mr-2" />
-            Start New FSFVI Analysis
-          </DialogTitle>
+          <DialogTitle>Start New Analysis</DialogTitle>
           <DialogDescription>
-            Upload your country&apos;s food system data to begin vulnerability analysis and optimization.
+            Upload your food system data or use sample data to begin analysis
           </DialogDescription>
         </DialogHeader>
 
-        {step === 'upload' && (
-          <div className="space-y-6">
-            {/* File Upload Area */}
-            <div
-              className={`relative border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
-                dragActive 
-                  ? 'border-blue-400 bg-blue-50' 
-                  : 'border-gray-300 hover:border-gray-400'
-              }`}
-              onDragEnter={handleDrag}
-              onDragLeave={handleDrag}
-              onDragOver={handleDrag}
-              onDrop={handleDrop}
-            >
-              <input
-                type="file"
-                accept=".csv"
-                onChange={handleFileInput}
-                className="absolute inset-0 opacity-0 cursor-pointer"
-                aria-label="Upload CSV file"
-              />
+        {step === 'details' && (
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Data Source Selection */}
+            <div className="space-y-4">
+              <div className="flex items-center space-x-2">
+                <input
+                  type="radio"
+                  id="upload-file"
+                  name="data-source"
+                  checked={!useDummyData}
+                  onChange={() => setUseDummyData(false)}
+                  className="h-4 w-4"
+                />
+                <label htmlFor="upload-file" className="text-sm font-medium">
+                  Upload CSV File
+                </label>
+              </div>
               
-              <Upload className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
-                Upload CSV File
-              </h3>
-              <p className="text-gray-600 mb-4">
-                Drag and drop your file here, or click to select
-              </p>
-              <Button type="button">
-                Choose File
-              </Button>
+              <div className="flex items-center space-x-2">
+                <input
+                  type="radio"
+                  id="use-dummy"
+                  name="data-source"
+                  checked={useDummyData}
+                  onChange={() => setUseDummyData(true)}
+                  className="h-4 w-4"
+                />
+                <label htmlFor="use-dummy" className="text-sm font-medium">
+                  Use Dummy Data (Test Mode)
+                </label>
+              </div>
             </div>
 
-            {error && (
-              <div className="flex items-center space-x-2 text-red-600 bg-red-50 p-3 rounded-lg">
-                <AlertCircle className="h-4 w-4" />
-                <span className="text-sm">{error}</span>
+            {/* File Upload Section */}
+            {!useDummyData && (
+              <div className="space-y-4">
+                <div>
+                  <label htmlFor="file" className="block text-sm font-medium mb-2">
+                    Upload CSV File
+                  </label>
+                  <input
+                    id="file"
+                    type="file"
+                    accept=".csv"
+                    onChange={handleFileInput}
+                    className="w-full p-2 border border-gray-300 rounded-md"
+                    required
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Upload a CSV file with your food system data
+                  </p>
+                </div>
               </div>
             )}
 
-            {/* Data Requirements */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base flex items-center">
-                  <Info className="w-4 h-4 mr-2" />
-                  Data Requirements
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="text-sm text-gray-600">
-                  <p className="mb-3">Your CSV file should contain columns for:</p>
-                  <ul className="space-y-1 list-disc list-inside">
-                    <li>Component/Sector names</li>
-                    <li>Financial expenditure/budget amounts</li>
-                    <li>Performance values (optional)</li>
-                    <li>Benchmark/target values (optional)</li>
-                  </ul>
-                </div>
-                
-                <div className="pt-3 border-t">
-                  <Button variant="outline" size="sm">
-                    <Download className="w-4 h-4 mr-2" />
-                    Download Template
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
-        {step === 'details' && selectedFile && (
-          <form onSubmit={onSubmit} className="space-y-6">
-            {/* Selected File Info */}
-            <Card>
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <CheckCircle2 className="h-5 w-5 text-green-600" />
-                    <div>
-                      <p className="font-medium">{selectedFile.name}</p>
-                      <p className="text-sm text-gray-600">
-                        {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
-                      </p>
-                    </div>
+            {/* Dummy Data Info */}
+            {useDummyData && (
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded-md">
+                <div className="flex items-start space-x-2">
+                  <div className="text-blue-600 mt-0.5">
+                    <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                    </svg>
                   </div>
-                  <Button variant="ghost" size="sm" onClick={removeFile} type="button">
-                    <X className="h-4 w-4" />
-                  </Button>
+                  <div>
+                    <h4 className="text-sm font-medium text-blue-800">Test Mode</h4>
+                    <p className="text-sm text-blue-700 mt-1">
+                      This will use sample data to demonstrate the analysis platform. 
+                      Perfect for exploring features without uploading your own data.
+                    </p>
+                  </div>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            )}
 
             {/* Analysis Details Form */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="country_name">Country Name *</Label>
-                <Input
+                <label htmlFor="country_name" className="block text-sm font-medium">
+                  Country Name *
+                </label>
+                <input
                   id="country_name"
+                  type="text"
                   placeholder="e.g., Kenya, Ghana, Nigeria"
                   value={formData.country_name}
                   onChange={(e) => handleInputChange('country_name', e.target.value)}
+                  className="w-full p-2 border border-gray-300 rounded-md"
                   required
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="fiscal_year">Fiscal Year *</Label>
-                <Input
+                <label htmlFor="fiscal_year" className="block text-sm font-medium">
+                  Fiscal Year *
+                </label>
+                <input
                   id="fiscal_year"
                   type="number"
-                  placeholder={new Date().getFullYear().toString()}
+                  placeholder="2024"
                   value={formData.fiscal_year}
                   onChange={(e) => handleInputChange('fiscal_year', parseInt(e.target.value) || 0)}
+                  className="w-full p-2 border border-gray-300 rounded-md"
                   required
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="currency">Currency *</Label>
+                <label htmlFor="currency" className="block text-sm font-medium">
+                  Currency *
+                </label>
                 <select
                   id="currency"
                   value={formData.currency}
                   onChange={(e) => handleInputChange('currency', e.target.value)}
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                  aria-label="Select currency"
+                  className="w-full p-2 border border-gray-300 rounded-md"
                   required
                 >
                   <option value="USD">USD</option>
@@ -371,13 +311,14 @@ export const NewAnalysisDialog: React.FC<NewAnalysisDialogProps> = ({
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="budget_unit">Budget Unit *</Label>
+                <label htmlFor="budget_unit" className="block text-sm font-medium">
+                  Budget Unit *
+                </label>
                 <select
                   id="budget_unit"
                   value={formData.budget_unit}
                   onChange={(e) => handleInputChange('budget_unit', e.target.value)}
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                  aria-label="Select budget unit"
+                  className="w-full p-2 border border-gray-300 rounded-md"
                   required
                 >
                   <option value="thousands">Thousands</option>
@@ -388,59 +329,60 @@ export const NewAnalysisDialog: React.FC<NewAnalysisDialogProps> = ({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="description">Description (Optional)</Label>
+              <label htmlFor="description" className="block text-sm font-medium">
+                Description (Optional)
+              </label>
               <textarea
                 id="description"
                 placeholder="Brief description of this analysis..."
                 value={formData.description}
                 onChange={(e) => handleInputChange('description', e.target.value)}
-                className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                className="w-full p-2 border border-gray-300 rounded-md min-h-[80px]"
               />
             </div>
 
             {error && (
               <div className="flex items-center space-x-2 text-red-600 bg-red-50 p-3 rounded-lg">
-                <AlertCircle className="h-4 w-4" />
+                <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
                 <span className="text-sm">{error}</span>
               </div>
             )}
 
-            <div className="flex justify-end space-x-3">
+            <div className="flex justify-end space-x-2">
               <Button type="button" variant="outline" onClick={handleClose}>
                 Cancel
               </Button>
               <Button type="submit" disabled={uploading}>
-                Start Analysis
+                {useDummyData ? 'Load Sample Data' : 'Upload & Process'}
               </Button>
             </div>
           </form>
         )}
 
         {step === 'processing' && (
-          <div className="space-y-6 text-center">
-            <div className="flex flex-col items-center">
-              <Loader2 className="h-12 w-12 text-blue-600 animate-spin mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
-                Processing Your Data
+          <div className="space-y-6">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+              <h3 className="text-lg font-medium mb-2">
+                {useDummyData ? 'Loading Sample Data' : 'Processing Your Data'}
               </h3>
-              <p className="text-gray-600 mb-6">
-                Uploading and analyzing your food system data...
+              <p className="text-gray-600 mb-4">
+                {useDummyData 
+                  ? 'Setting up sample data for analysis...'
+                  : 'Analyzing your food system data...'
+                }
               </p>
+              
+              <div className="w-full bg-gray-200 rounded-full h-2">
+                <div 
+                  className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                  style={{ width: `${uploadProgress}%` }}
+                ></div>
+              </div>
+              <p className="text-sm text-gray-500 mt-2">{Math.round(uploadProgress)}%</p>
             </div>
-
-            {/* Progress Bar */}
-            <div className="w-full bg-gray-200 rounded-full h-2">
-              <div 
-                className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                style={{ width: `${uploadProgress}%` }}
-              />
-            </div>
-            
-            <p className="text-sm text-gray-600">
-              {uploadProgress < 50 ? 'Uploading file...' :
-               uploadProgress < 90 ? 'Processing data...' :
-               'Finalizing analysis setup...'}
-            </p>
           </div>
         )}
       </DialogContent>

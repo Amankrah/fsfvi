@@ -112,8 +112,9 @@ export const MultiYearResults: React.FC<MultiYearResultsProps> = ({ result }) =>
           </CardTitle>
           <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
             <p className="text-sm text-blue-800">
-              <strong>📊 Cumulative Approach:</strong> Current allocations remain fixed (already committed/spent). 
-              Each year adds new budget optimally allocated to maximize system improvements.
+              <strong>📊 Cumulative New Budget Approach:</strong> Current allocations remain fixed (already committed/spent). 
+              Each year adds new budget optimally allocated to maximize system improvements. All improvements 
+              are measured against the original baseline (current allocations only) to show true cumulative impact.
             </p>
           </div>
         </CardHeader>
@@ -285,7 +286,8 @@ export const MultiYearResults: React.FC<MultiYearResultsProps> = ({ result }) =>
                                      {newBudgetThisYear > 0 && (
                      <div className="mt-4 pt-3 border-t border-gray-200">
                        <p className="text-sm text-gray-600">
-                         <strong>Impact:</strong> {formatPercent(recommendation?.improvement_from_baseline)} cumulative improvement from baseline
+                         <strong>Cumulative Impact from Original Baseline:</strong> {formatPercent(recommendation?.improvement_from_baseline)} 
+                         total system improvement (includes all previous years&apos; new budget)
                        </p>
                      </div>
                    )}
@@ -306,7 +308,8 @@ export const MultiYearResults: React.FC<MultiYearResultsProps> = ({ result }) =>
           <div className="mt-2 p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
             <p className="text-sm text-emerald-800">
               <strong>💡 Implementation Strategy:</strong> Each year shows additional new budget being optimally allocated 
-              on top of previous years. Current allocations remain fixed throughout.
+              on top of previous years. Current allocations remain fixed throughout. All improvement percentages 
+              are cumulative from the original baseline (year 0 with current allocations only).
             </p>
           </div>
         </CardHeader>
@@ -359,7 +362,7 @@ export const MultiYearResults: React.FC<MultiYearResultsProps> = ({ result }) =>
                       <p className="font-bold text-blue-900">{recommendation?.projected_fsfvi?.toFixed(6) || '0.000000'}</p>
                     </div>
                     <div className="text-center p-3 bg-green-50 rounded-lg">
-                      <p className="text-xs text-green-600">Cumulative Improvement</p>
+                      <p className="text-xs text-green-600">Cumulative Improvement from Original Baseline</p>
                       <p className="font-bold text-green-900">{formatPercent(recommendation?.improvement_from_baseline)}</p>
                     </div>
                     <div className="text-center p-3 bg-purple-50 rounded-lg">
@@ -390,12 +393,17 @@ export const MultiYearResults: React.FC<MultiYearResultsProps> = ({ result }) =>
                   )}
 
                   {/* Standard Transition Analysis */}
-                  {recommendation?.transition_analysis && (
+                  {recommendation?.transition_analysis && typeof recommendation?.transition_analysis?.total_reallocation === 'number' && (
                     <div className="mt-3 p-3 bg-gray-50 rounded-lg">
-                      <h5 className="text-sm font-semibold text-gray-800 mb-2">Transition Analysis</h5>
+                      <h5 className="text-sm font-semibold text-gray-800 mb-2">
+                        Transition Analysis
+                        {parseInt(year) === Object.keys(yearlyRecommendations).map(Number).sort()[0] && (
+                          <span className="text-xs text-gray-600 ml-2">(vs. original baseline)</span>
+                        )}
+                      </h5>
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
                         <div>
-                          <span className="text-gray-600">Reallocation:</span>
+                          <span className="text-gray-600">Total Changes:</span>
                           <span className="font-medium ml-1">
                             {formatCurrency(recommendation?.transition_analysis?.total_reallocation || 0)}
                           </span>
@@ -413,6 +421,11 @@ export const MultiYearResults: React.FC<MultiYearResultsProps> = ({ result }) =>
                           </span>
                         </div>
                       </div>
+                      {parseInt(year) === Object.keys(yearlyRecommendations).map(Number).sort()[0] && (
+                        <div className="mt-2 text-xs text-blue-600">
+                          Shows allocation changes from adding ${formatCurrency(recommendation?.new_budget_this_year || 0).replace('$', '').replace('M', '')}M new budget to original baseline
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

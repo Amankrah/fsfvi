@@ -2,10 +2,10 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { Plus, TrendingUp, Code, ExternalLink } from 'lucide-react';
+import { Plus, TrendingUp, Play, Video } from 'lucide-react';
 import { DashboardStats } from './DashboardStats';
 import { SessionsList } from './SessionsList';
 import { NewAnalysisDialog } from './NewAnalysisDialog';
@@ -67,7 +67,6 @@ export const Dashboard: React.FC = () => {
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [showNewAnalysis, setShowNewAnalysis] = useState(false);
-  const [activeTab, setActiveTab] = useState<'overview' | 'api-docs'>('overview');
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -145,8 +144,13 @@ export const Dashboard: React.FC = () => {
           <div className="flex justify-between items-center py-6">
             <div className="flex items-center space-x-6">
               <div className="flex items-center space-x-3">
-                <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-purple-600 rounded-xl flex items-center justify-center">
-                  <TrendingUp className="h-7 w-7 text-white" />
+                <div className="w-12 h-12 relative">
+                  <Image
+                    src="/logo.png"
+                    alt="FSFVI Logo"
+                    fill
+                    className="object-contain"
+                  />
                 </div>
                 <div>
                   <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">
@@ -156,30 +160,7 @@ export const Dashboard: React.FC = () => {
                 </div>
               </div>
             </div>
-            
-            {/* Tab Navigation */}
-            <div className="hidden md:flex items-center space-x-1 bg-gray-100 rounded-lg p-1">
-              <button
-                onClick={() => setActiveTab('overview')}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
-                  activeTab === 'overview' 
-                    ? 'bg-white text-blue-600 shadow-sm' 
-                    : 'text-gray-600 hover:text-blue-600'
-                }`}
-              >
-                Overview
-              </button>
-              <button
-                onClick={() => setActiveTab('api-docs')}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
-                  activeTab === 'api-docs' 
-                    ? 'bg-white text-blue-600 shadow-sm' 
-                    : 'text-gray-600 hover:text-blue-600'
-                }`}
-              >
-                API Documentation
-              </button>
-            </div>
+
 
             <div className="flex items-center space-x-4">
               <div className="text-right">
@@ -198,149 +179,152 @@ export const Dashboard: React.FC = () => {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
-        {activeTab === 'overview' && (
-          <>
-            {/* Enhanced Welcome Section */}
-            <div className="mb-8">
-              <div className="bg-gradient-to-r from-blue-600 via-blue-700 to-purple-700 rounded-2xl px-8 py-10 text-white relative overflow-hidden">
-                <div className="absolute inset-0 opacity-20" style={{
-                  backgroundImage: "url(\"data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%239C92AC' fill-opacity='0.1'%3E%3Ccircle cx='30' cy='30' r='4'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E\")"
-                }}></div>
-                <div className="relative flex items-center justify-between">
-                  <div className="flex-1">
-                    <h2 className="text-3xl font-bold mb-3">
-                      Welcome back, {user.first_name || user.username}! 👋
-                    </h2>
-                    <p className="text-blue-100 mb-6 text-lg max-w-2xl leading-relaxed">
-                      Analyze food system vulnerabilities with mathematical precision using our comprehensive 
-                      FSFVI framework. Optimize new budget allocations with realistic government planning that 
-                      preserves current commitments while maximizing impact.
-                    </p>
-                    <div className="flex flex-wrap gap-4">
+        {/* Enhanced Welcome Section with Video Demo */}
+        <div className="mb-8">
+          <div className="bg-gradient-to-r from-blue-600 via-blue-700 to-purple-700 rounded-2xl px-8 py-10 text-white relative overflow-hidden">
+            <div className="absolute inset-0 opacity-20" style={{
+              backgroundImage: "url(\"data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%239C92AC' fill-opacity='0.1'%3E%3Ccircle cx='30' cy='30' r='4'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E\")"
+            }}></div>
+            <div className="relative">
+              {/* Welcome Header */}
+              <div className="text-center mb-8">
+                <h2 className="text-3xl font-bold mb-3">
+                  Welcome back, {user.first_name || user.username}! 👋
+                </h2>
+                <p className="text-blue-100 mb-6 text-lg max-w-3xl mx-auto leading-relaxed">
+                  Analyze food system vulnerabilities with mathematical precision using our comprehensive 
+                  FSFVI framework. Optimize new budget allocations with realistic government planning that 
+                  preserves current commitments while maximizing impact.
+                </p>
+              </div>
+
+              {/* Video Demo Section */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+                {/* Left: Video Player */}
+                <div className="order-2 lg:order-1">
+                  <div className="relative bg-black/30 backdrop-blur-sm rounded-xl overflow-hidden border border-white/20">
+                    {/* Video placeholder */}
+                    <div className="aspect-video bg-gradient-to-br from-gray-800/80 to-gray-900/80 flex items-center justify-center">
+                      <div className="text-center text-white">
+                        <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-3 backdrop-blur-sm hover:bg-white/30 transition-colors cursor-pointer">
+                          <Play className="h-8 w-8 text-white ml-1" />
+                        </div>
+                        <h4 className="text-lg font-semibold mb-1">Platform Tutorial</h4>
+                        <p className="text-blue-200 text-sm">Learn FSFVI in 5 minutes</p>
+                      </div>
+                    </div>
+                    
+                    {/* Video overlay for future implementation */}
+                    {/* 
+                    <iframe 
+                      className="w-full h-full absolute inset-0"
+                      src="YOUR_VIDEO_URL_HERE"
+                      title="FSFVI Platform Demonstration"
+                      frameBorder="0"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                    ></iframe>
+                    */}
+                  </div>
+                </div>
+
+                {/* Right: Features & CTA */}
+                <div className="order-1 lg:order-2">
+                  <div className="space-y-6">
+                    <div>
+                      <h3 className="text-xl font-semibold text-white mb-4">
+                        What you&apos;ll learn:
+                      </h3>
+                      <div className="space-y-3">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">
+                            <TrendingUp className="h-4 w-4 text-white" />
+                          </div>
+                          <span className="text-blue-100">Complete analysis workflow</span>
+                        </div>
+                        <div className="flex items-center space-x-3">
+                          <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">
+                            <Video className="h-4 w-4 text-white" />
+                          </div>
+                          <span className="text-blue-100">Budget optimization setup</span>
+                        </div>
+                        <div className="flex items-center space-x-3">
+                          <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">
+                            <Play className="h-4 w-4 text-white" />
+                          </div>
+                          <span className="text-blue-100">Results interpretation</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="pt-4">
+                      <p className="text-blue-200 mb-4 text-sm">
+                        Ready to start your analysis?
+                      </p>
                       <Button 
                         onClick={() => setShowNewAnalysis(true)}
                         size="lg"
-                        className="bg-white text-blue-600 hover:bg-blue-50 border-0 shadow-lg"
+                        className="bg-white text-blue-600 hover:bg-blue-50 border-0 shadow-lg w-full lg:w-auto"
                       >
                         <Plus className="w-5 h-5 mr-2" />
                         Start New Analysis
                       </Button>
-                      <Button 
-                        variant="outline" 
-                        size="lg"
-                        className="border-white/30 text-blue-600 hover:bg-white/10 backdrop-blur-sm"
-                        onClick={() => setActiveTab('api-docs')}
-                      >
-                        <Code className="w-5 h-5 mr-2" />
-                        API Documentation
-                      </Button>
-
-                    </div>
-                  </div>
-                  <div className="hidden xl:block">
-                    <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/20">
-                      <div className="text-center">
-                        <div className="w-16 h-16 bg-white/20 rounded-xl flex items-center justify-center mx-auto mb-4">
-                          <TrendingUp className="h-8 w-8 text-white" />
-                        </div>
-                        <div className="text-sm text-blue-100 font-medium">FSFVI Analysis</div>
-                        <div className="text-xs text-blue-200">Ready for Deployment</div>
-                      </div>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
+          </div>
+        </div>
 
-            {/* Enhanced Dashboard Stats */}
-            <DashboardStats data={dashboardData} />
+        {/* Enhanced Dashboard Stats */}
+        <DashboardStats data={dashboardData} />
 
-            {/* Enhanced Analysis Workflow */}
-            <div className="mt-12">
-              <AnalysisWorkflow 
-                sessionId={dashboardData?.component_distribution?.session_id || null}
-                countryName={dashboardData?.component_distribution?.country_name || null}
-                onAnalysisComplete={() => {
-                  // Reload dashboard data after analysis
-                  if (user) {
-                    dataAPI.getDashboard().then(setDashboardData).catch(console.error);
-                  }
-                }}
-              />
-            </div>
+        {/* Enhanced Analysis Workflow */}
+        <div className="mt-12">
+          <AnalysisWorkflow 
+            sessionId={dashboardData?.component_distribution?.session_id || null}
+            countryName={dashboardData?.component_distribution?.country_name || null}
+            onAnalysisComplete={() => {
+              // Reload dashboard data after analysis
+              if (user) {
+                dataAPI.getDashboard().then(setDashboardData).catch(console.error);
+              }
+            }}
+          />
+        </div>
 
-
-
-            {/* Enhanced Sessions List */}
-            <div className="mt-12">
-              <div className="flex items-center justify-between mb-8">
-                <div>
-                  <h3 className="text-2xl font-bold text-gray-900">Analysis History</h3>
-                  <p className="text-gray-600 mt-1">
-                    Manage your FSFVI analysis sessions and track progress over time
-                  </p>
-                </div>
-                <Button 
-                  onClick={() => setShowNewAnalysis(true)}
-                  className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  New Analysis
-                </Button>
-              </div>
-              
-              <SessionsList 
-                sessions={dashboardData?.recent_sessions || []} 
-                onSessionDeleted={handleSessionDeleted}
-              />
-            </div>
-
-
-          </>
-        )}
-
-        {activeTab === 'api-docs' && (
-          <div className="space-y-8">
-            {/* API Documentation Header */}
-            <div className="text-center">
-              <h2 className="text-3xl font-bold text-gray-900 mb-4">FSFVI API Documentation</h2>
-              <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-                Integrate FSFVI analysis capabilities into your national food system management platforms
+        {/* Enhanced Sessions List */}
+        <div className="mt-12">
+          <div className="flex items-center justify-between mb-8">
+            <div>
+              <h3 className="text-2xl font-bold text-gray-900">Analysis History</h3>
+              <p className="text-gray-600 mt-1">
+                Manage your FSFVI analysis sessions and track progress over time
               </p>
             </div>
-
-            {/* Coming Soon Message */}
-            <Card className="border-0 shadow-xl">
-              <CardContent className="p-12 text-center">
-                <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-purple-600 rounded-xl flex items-center justify-center mx-auto mb-6">
-                  <Code className="h-8 w-8 text-white" />
-                </div>
-                <h3 className="text-2xl font-bold text-gray-900 mb-4">API Documentation Coming Soon</h3>
-                <p className="text-gray-600 text-lg mb-6 max-w-2xl mx-auto">
-                  We&apos;re preparing comprehensive API documentation and developer resources. 
-                  Check back soon for detailed integration guides and endpoint specifications.
-                </p>
-                <div className="flex justify-center space-x-4">
-                  <Button 
-                    variant="outline"
-                    onClick={() => window.open('http://localhost:8001/docs', '_blank')}
-                  >
-                    <ExternalLink className="w-4 h-4 mr-2" />
-                    Interactive API Docs
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+            <Button 
+              onClick={() => setShowNewAnalysis(true)}
+              className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              New Analysis
+            </Button>
           </div>
-        )}
+          
+          <SessionsList 
+            sessions={dashboardData?.recent_sessions || []} 
+            onSessionDeleted={handleSessionDeleted}
+          />
+        </div>
 
 
       </main>
 
       {/* New Analysis Dialog */}
       <NewAnalysisDialog 
-        open={showNewAnalysis}
-        onOpenChange={setShowNewAnalysis}
+        isOpen={showNewAnalysis}
+        onClose={() => setShowNewAnalysis(false)}
         onSuccess={handleNewAnalysisSuccess}
       />
     </div>

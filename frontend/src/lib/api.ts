@@ -87,6 +87,15 @@ export const dataAPI = {
     return response.data;
   },
 
+  uploadDummyData: async (formData: FormData) => {
+    const response = await api.post('/django-api/upload-dummy-data/', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
+
   getDashboard: async () => {
     const response = await api.get('/django-api/dashboard/');
     return response.data;

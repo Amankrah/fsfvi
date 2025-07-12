@@ -25,6 +25,7 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor
 import os
 import sys
+import pandas as pd
 
 # Import service layer and schemas - SINGLE SOURCE OF TRUTH
 from fsfvi_service import create_fsfvi_services
@@ -441,13 +442,64 @@ async def optimize_allocation(
         await _save_optimization_results(session_id, optimization_result)
         await _update_session_status(session_id, current_user['id'], f'optimization_completed_{optimization_mode}')
         
-        return {
+        # Structure response to match frontend expectations
+        # Map the optimization result fields to what OptimizationResults.tsx expects
+        
+        frontend_result = optimization_result.copy()
+        
+        # Map field names from backend to frontend expectations
+        if 'baseline_fsfvi' in optimization_result:
+            frontend_result['original_fsfvi'] = optimization_result['baseline_fsfvi']
+        if 'optimal_fsfvi' in optimization_result:
+            frontend_result['optimal_fsfvi'] = optimization_result['optimal_fsfvi']
+        
+        # Handle improvement metrics - these come nested in 'improvement' dict from backend
+        if 'improvement' in optimization_result:
+            improvement = optimization_result['improvement']
+            frontend_result['relative_improvement_percent'] = improvement.get('relative_improvement_percent', 0)
+            frontend_result['efficiency_gain_percent'] = improvement.get('efficiency_gain_percent', 0)
+            frontend_result['total_reallocation_amount'] = improvement.get('total_allocation_change', improvement.get('total_reallocation_amount', 0))
+            frontend_result['reallocation_intensity_percent'] = improvement.get('reallocation_intensity_percent', 0)
+            frontend_result['budget_utilization_percent'] = improvement.get('budget_utilization_percent', 0)
+            
+        else:
+            # Fallback values if improvement dict is missing
+            logger.warning("No 'improvement' key found in optimization_result, using fallback values")
+            frontend_result.setdefault('relative_improvement_percent', 0)
+            frontend_result.setdefault('efficiency_gain_percent', 0)
+            frontend_result.setdefault('total_reallocation_amount', 0)
+            frontend_result.setdefault('reallocation_intensity_percent', 0)
+            frontend_result.setdefault('budget_utilization_percent', 0)
+        
+        # Map current_allocations/optimal_allocations (already correctly named)
+        if 'current_allocations' in optimization_result:
+            frontend_result['current_allocations'] = optimization_result['current_allocations']
+        if 'optimal_allocations' in optimization_result:
+            frontend_result['optimal_allocations'] = optimization_result['optimal_allocations']
+        
+        # Ensure required fields exist
+        frontend_result.setdefault('success', optimization_result.get('success', True))
+        frontend_result.setdefault('iterations', optimization_result.get('iterations', 0))
+        frontend_result.setdefault('solver', optimization_result.get('solver', 'unknown'))
+        frontend_result.setdefault('mathematical_compliance', optimization_result.get('mathematical_compliance', True))
+        frontend_result.setdefault('constraints_applied', optimization_result.get('constraints_applied', []))
+        
+        # Check component analysis
+        component_analysis = frontend_result.get('component_analysis', {})
+        if not component_analysis:
+            logger.warning("No component analysis found in optimization result")
+        
+        response = {
             "session_id": session_id,
             "country": session_data['country_name'],
             "optimization_mode": optimization_mode,
+            "next_step": "Call /generate_reports for comprehensive reporting",
+            # Include both the original nested structure and flattened structure for compatibility
             "optimization_results": optimization_result,
-            "next_step": "Call /generate_reports for comprehensive reporting"
+            **frontend_result  # Spread the flattened result at top level
         }
+        
+        return response
         
     except Exception as e:
         logger.error(f"Optimization error: {str(e)}")
@@ -1556,8 +1608,46 @@ async def _update_session_status(session_id: str, user_id: int, status: str):
 async def _save_optimization_results(session_id: str, optimization_result: Dict[str, Any]):
     """Save optimization results - delegates to Django integration"""
     if DJANGO_INTEGRATION:
+        # Map optimization result fields to Django model fields
+        django_optimization_data = {
+            'original_fsfvi': optimization_result.get('baseline_fsfvi', 0),
+            'optimized_fsfvi': optimization_result.get('optimal_fsfvi', 0),
+            'improvement_potential': optimization_result.get('improvement', {}).get('absolute_improvement', 0),
+            'reallocation_intensity': optimization_result.get('improvement', {}).get('reallocation_intensity_percent', 0),
+            'optimization_method': optimization_result.get('method', 'hybrid'),
+            'constraints': optimization_result.get('constraints_applied', []),
+            'absolute_gap': optimization_result.get('improvement', {}).get('absolute_improvement', 0),
+            'gap_ratio': optimization_result.get('improvement', {}).get('relative_improvement_percent', 0),
+            'efficiency_index': optimization_result.get('improvement', {}).get('efficiency_gain_percent', 0)
+        }
+        
+        # Prepare component optimizations if available
+        component_optimizations = None
+        if 'component_analysis' in optimization_result and 'components' in optimization_result['component_analysis']:
+            components = optimization_result['component_analysis']['components']
+            current_allocations = optimization_result.get('current_allocations', [])
+            optimal_allocations = optimization_result.get('optimal_allocations', [])
+            
+            component_optimizations = []
+            for i, comp in enumerate(components):
+                if i < len(current_allocations) and i < len(optimal_allocations):
+                    original_allocation = current_allocations[i]
+                    optimized_allocation = optimal_allocations[i]
+                    allocation_change = optimized_allocation - original_allocation
+                    allocation_change_percent = (allocation_change / original_allocation * 100) if original_allocation > 0 else 0
+                    
+                    component_optimizations.append({
+                        'component_id': comp.get('component_id', str(i)),
+                        'original_allocation': original_allocation,
+                        'optimized_allocation': optimized_allocation,
+                        'allocation_change': allocation_change,
+                        'allocation_change_percent': allocation_change_percent,
+                        'implementation_complexity': comp.get('implementation_complexity', 'medium'),
+                        'reallocation_priority': comp.get('reallocation_priority', 'medium')
+                    })
+        
         await run_django_operation(
-            django_integration.save_optimization_results, session_id, optimization_result
+            django_integration.save_optimization_results, session_id, django_optimization_data, component_optimizations
         )
 
 
@@ -1664,6 +1754,36 @@ def _structure_system_vulnerability_response(
         "mathematical_interpretation": mathematical_interpretation,
         "executive_summary": executive_summary
     }
+
+
+@app.get("/dummy_data", summary="Get Dummy Data for Testing")
+async def get_dummy_data():
+    """Serve dummy data for testing the analysis platform"""
+    try:
+        # Path to dummy data file
+        dummy_file_path = os.path.join(os.path.dirname(__file__), '..', '..', 'docs', 'dummy_data_sample.csv')
+        
+        if not os.path.exists(dummy_file_path):
+            raise HTTPException(status_code=404, detail="Dummy data file not found")
+        
+        # Read the dummy data
+        df = pd.read_csv(dummy_file_path)
+        
+        # Convert to CSV string
+        csv_content = df.to_csv(index=False)
+        
+        return {
+            "message": "Dummy data loaded successfully",
+            "filename": "dummy_data_sample.csv",
+            "rows": len(df),
+            "columns": list(df.columns),
+            "data_preview": df.head(5).to_dict('records'),
+            "csv_content": csv_content
+        }
+        
+    except Exception as e:
+        logger.error(f"Error loading dummy data: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to load dummy data: {str(e)}")
 
 
 if __name__ == "__main__":

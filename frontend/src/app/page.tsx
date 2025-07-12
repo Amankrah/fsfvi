@@ -3,12 +3,12 @@
 import React from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { 
-  BarChart3, 
   TrendingUp, 
   Shield, 
   FileText, 
@@ -109,8 +109,13 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <nav className="flex justify-between items-center">
             <div className="flex items-center space-x-3">
-              <div className="bg-blue-600 p-2 rounded-lg">
-                <BarChart3 className="w-6 h-6 text-white" />
+              <div className="w-10 h-10 relative">
+                <Image
+                  src="/logo.png"
+                  alt="FSFVI Logo"
+                  fill
+                  className="object-contain"
+                />
               </div>
               <div>
                 <h1 className="text-xl font-bold text-gray-900">FSFVI</h1>
@@ -285,8 +290,13 @@ export default function Home() {
         <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
           <div className="text-center">
             <div className="flex items-center justify-center space-x-2 mb-4">
-              <div className="bg-blue-600 p-2 rounded-lg">
-                <BarChart3 className="w-5 h-5 text-white" />
+              <div className="w-8 h-8 relative">
+                <Image
+                  src="/logo.png"
+                  alt="FSFVI Logo"
+                  fill
+                  className="object-contain"
+                />
               </div>
               <span className="text-lg font-semibold text-gray-900">FSFVI</span>
             </div>

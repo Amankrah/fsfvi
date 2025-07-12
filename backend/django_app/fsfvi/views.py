@@ -637,4 +637,70 @@ def health_check(request):
     status_code = 200 if health_status['status'] == 'healthy' else 503
     return Response(health_status, status=status_code)
 
+@csrf_exempt
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def upload_dummy_data(request):
+    """Upload and process dummy data for testing"""
+    try:
+        # Get additional parameters
+        country_name = request.data.get('country_name', 'Sample Country')
+        fiscal_year = int(request.data.get('fiscal_year', 2024))
+        currency = request.data.get('currency', 'USD')
+        budget_unit = request.data.get('budget_unit', 'millions')
+        
+        # Get dummy data from FastAPI
+        import requests
+        fastapi_url = "http://localhost:8001/dummy_data"
+        
+        try:
+            response = requests.get(fastapi_url)
+            response.raise_for_status()
+            dummy_data = response.json()
+        except requests.RequestException as e:
+            return Response({
+                'error': f'Failed to fetch dummy data from FastAPI: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+        # Create a virtual file from the dummy data
+        from django.core.files.base import ContentFile
+        csv_content = dummy_data['csv_content']
+        virtual_file = ContentFile(csv_content.encode('utf-8'), name='dummy_data_sample.csv')
+        
+        # Process the dummy data using the existing service
+        result = data_processing_service.upload_and_process_csv(
+            user=request.user,
+            file_content=virtual_file.read(),
+            filename='dummy_data_sample.csv',
+            country_name=country_name,
+            fiscal_year=fiscal_year,
+            currency=currency,
+            budget_unit=budget_unit
+        )
+        
+        if result['success']:
+            return Response({
+                'message': 'Dummy data uploaded and processed successfully',
+                'session_id': result['session_id'],
+                'uploaded_file_id': result['uploaded_file_id'],
+                'summary': result['summary'],
+                'components': result['components'],
+                'data_info': {
+                    'rows': dummy_data['rows'],
+                    'columns': dummy_data['columns'],
+                    'preview': dummy_data['data_preview']
+                },
+                'next_step': 'Use session_id to proceed with analysis'
+            }, status=status.HTTP_201_CREATED)
+        else:
+            return Response({
+                'error': result['error'],
+                'session_id': result.get('session_id'),
+                'uploaded_file_id': result.get('uploaded_file_id')
+            }, status=status.HTTP_400_BAD_REQUEST)
+            
+    except Exception as e:
+        return Response({'error': f'Dummy data upload failed: {str(e)}'}, 
+                       status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
