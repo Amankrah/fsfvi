@@ -130,24 +130,7 @@ export const OptimizationResults: React.FC<OptimizationResultsProps> = ({ result
     }
   };
 
-  const getComponentsImproved = () => {
-    if (isNewBudgetOptimization) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return safeValue((resultData.component_analysis as any)?.summary?.components_receiving_new_budget);
-    } else {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return (resultData.component_analysis as any)?.summary?.components_improved || 0;
-    }
-  };
 
-  const getComponentsSacrificed = () => {
-    if (isNewBudgetOptimization) {
-      return 0; // No sacrificed components in new budget optimization
-    } else {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return (resultData.component_analysis as any)?.summary?.components_sacrificed || 0;
-    }
-  };
 
   const hasStrategicReallocation = () => {
     if (isNewBudgetOptimization) {
@@ -423,7 +406,7 @@ export const OptimizationResults: React.FC<OptimizationResultsProps> = ({ result
           </CardHeader>
           <CardContent>
             <div className="mb-4 p-4 bg-gray-50 rounded-lg">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
                 <div className="text-center">
                   <p className="text-sm text-gray-600">
                     {isNewBudgetOptimization ? 'Receiving New Budget' : 'Budget Increased'}
@@ -448,16 +431,6 @@ export const OptimizationResults: React.FC<OptimizationResultsProps> = ({ result
                   </p>
                   <p className="text-xs text-gray-500">
                     {isNewBudgetOptimization ? 'of new budget' : 'components'}
-                  </p>
-                </div>
-                <div className="text-center">
-                  <p className="text-sm text-gray-600">Vulnerability Improved</p>
-                  <p className="text-2xl font-bold text-blue-600">
-                    {getComponentsImproved()}
-                  </p>
-                  <p className="text-xs text-gray-500">
-                    {isNewBudgetOptimization ? 'through new funding' : 
-                     `(${getComponentsSacrificed()} strategic tradeoffs)`}
                   </p>
                 </div>
               </div>

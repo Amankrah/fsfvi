@@ -23,7 +23,9 @@ import {
   Database,
   Sparkles,
   Award,
-  ChevronRight
+  ChevronRight,
+  ExternalLink,
+  Linkedin
 } from 'lucide-react';
 
 export default function Home() {
@@ -357,37 +359,7 @@ export default function Home() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
-            {/* Emmanuel Amankrah Kwofie */}
-            <Card className="group border-0 shadow-xl hover:shadow-2xl transition-all duration-500 bg-white/95 backdrop-blur-sm overflow-hidden transform hover:scale-105">
-              <CardContent className="p-0">
-                <div className="relative h-80 bg-gradient-to-br from-blue-50 to-blue-100">
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent"></div>
-                  <Image
-                    src="/images/emmanuel_amankrah_kwofie.jpg"
-                    alt="Emmanuel Amankrah Kwofie"
-                    fill
-                    className="object-cover"
-                  />
-                </div>
-                <div className="p-8">
-                  <div className="flex items-center mb-4">
-                    <div className="w-3 h-3 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full mr-3"></div>
-                    <Badge className="bg-blue-50 text-blue-800 border-blue-200">
-                      Technical Lead
-                    </Badge>
-                  </div>
-                  <h3 className="text-xl font-bold text-gray-900 mb-2">
-                    Emmanuel Amankrah Kwofie
-                  </h3>
-                  <p className="text-blue-600 font-semibold mb-4">
-                    Software Engineer & Cloud Architect
-                  </p>
-                  <p className="text-gray-700 text-sm leading-relaxed font-medium">
-                    Expert in scalable system architecture and advanced data analytics. Specializes in building robust platforms for complex policy analysis and government decision-making tools.
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
+            
 
             {/* John M. Ulimwengu */}
             <Card className="group border-0 shadow-xl hover:shadow-2xl transition-all duration-500 bg-white/95 backdrop-blur-sm overflow-hidden transform hover:scale-105">
@@ -414,9 +386,81 @@ export default function Home() {
                   <p className="text-emerald-600 font-semibold mb-4">
                     Senior Research Fellow at IFPRI
                   </p>
-                  <p className="text-gray-700 text-sm leading-relaxed font-medium">
+                  <p className="text-gray-700 text-sm leading-relaxed font-medium mb-6">
                     Leading food policy researcher with extensive experience in agricultural economics and food security analysis. Expert in developing evidence-based policy frameworks.
                   </p>
+                  <div className="flex space-x-4 pt-4 border-t border-gray-100">
+                    <a 
+                      href="https://www.linkedin.com/in/john-ulimwengu-003a32208/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center text-emerald-600 hover:text-emerald-700 transition-colors"
+                    >
+                      <Linkedin className="w-4 h-4 mr-1" />
+                      <span className="text-sm font-medium">LinkedIn</span>
+                    </a>
+                    <a 
+                      href="https://www.ifpri.org/profile/john-ulimwengu/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center text-emerald-600 hover:text-emerald-700 transition-colors"
+                    >
+                      <ExternalLink className="w-4 h-4 mr-1" />
+                      <span className="text-sm font-medium">Profile</span>
+                    </a>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Emmanuel Amankrah Kwofie */}
+            <Card className="group border-0 shadow-xl hover:shadow-2xl transition-all duration-500 bg-white/95 backdrop-blur-sm overflow-hidden transform hover:scale-105">
+              <CardContent className="p-0">
+                <div className="relative h-80 bg-gradient-to-br from-blue-50 to-blue-100">
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent"></div>
+                  <Image
+                    src="/images/emmanuel_amankrah_kwofie.jpg"
+                    alt="Emmanuel Amankrah Kwofie"
+                    fill
+                    className="object-cover"
+                  />
+                </div>
+                <div className="p-8">
+                  <div className="flex items-center mb-4">
+                    <div className="w-3 h-3 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full mr-3"></div>
+                    <Badge className="bg-blue-50 text-blue-800 border-blue-200">
+                      Technical Lead
+                    </Badge>
+                  </div>
+                  <h3 className="text-xl font-bold text-gray-900 mb-2">
+                    Emmanuel Amankrah Kwofie
+                  </h3>
+                  <p className="text-blue-600 font-semibold mb-4">
+                    Software Engineer & Cloud Architect
+                  </p>
+                  <p className="text-gray-700 text-sm leading-relaxed font-medium mb-6">
+                    Expert in scalable system architecture and advanced data analytics. Specializes in building robust platforms for complex policy analysis and government decision-making tools.
+                  </p>
+                  <div className="flex space-x-4 pt-4 border-t border-gray-100">
+                    <a 
+                      href="https://www.linkedin.com/in/eakwofie/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center text-blue-600 hover:text-blue-700 transition-colors"
+                    >
+                      <Linkedin className="w-4 h-4 mr-1" />
+                      <span className="text-sm font-medium">LinkedIn</span>
+                    </a>
+                    <a 
+                      href="https://www.eakwofie.com/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center text-blue-600 hover:text-blue-700 transition-colors"
+                    >
+                      <ExternalLink className="w-4 h-4 mr-1" />
+                      <span className="text-sm font-medium">Website</span>
+                    </a>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -446,9 +490,29 @@ export default function Home() {
                   <p className="text-purple-600 font-semibold mb-4">
                     Professor at McGill University
                   </p>
-                  <p className="text-gray-700 text-sm leading-relaxed font-medium">
+                  <p className="text-gray-700 text-sm leading-relaxed font-medium mb-6">
                     Academic expert in food systems research and policy analysis. Brings deep theoretical knowledge and practical experience in agricultural development and food security.
                   </p>
+                  <div className="flex space-x-4 pt-4 border-t border-gray-100">
+                    <a 
+                      href="https://www.linkedin.com/in/ebenezer-miezah-kwofie-phd-99511421/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center text-purple-600 hover:text-purple-700 transition-colors"
+                    >
+                      <Linkedin className="w-4 h-4 mr-1" />
+                      <span className="text-sm font-medium">LinkedIn</span>
+                    </a>
+                    <a 
+                      href="https://www.mcgill.ca/macdonald/ebenezer-miezah-kwofie"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center text-purple-600 hover:text-purple-700 transition-colors"
+                    >
+                      <ExternalLink className="w-4 h-4 mr-1" />
+                      <span className="text-sm font-medium">Profile</span>
+                    </a>
+                  </div>
                 </div>
               </CardContent>
             </Card>
