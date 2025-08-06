@@ -257,6 +257,7 @@ export const MultiYearResults: React.FC<MultiYearResultsProps> = ({ result }) =>
                       <p className="text-sm text-gray-600">New Budget This Year</p>
                       <p className="font-bold text-green-600">{formatCurrency(newBudgetThisYear)}</p>
                     </div>
+
                   </div>
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

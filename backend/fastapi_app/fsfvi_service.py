@@ -2280,7 +2280,7 @@ class FSFVIOptimizationService:
     def multi_year_optimization(
         self,
         components: List[Dict[str, Any]],
-        budget_scenarios: Dict[int, float],  # {year: budget}
+        budget_scenarios: Dict[int, float] | Dict[str, Any],  # Enhanced to support strategies
         target_fsfvi: Optional[float] = None,
         target_year: Optional[int] = None,
         method: str = 'hybrid',
@@ -2288,14 +2288,21 @@ class FSFVIOptimizationService:
         constraints: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """
-        Multi-year optimization for government fiscal planning
+        ENHANCED Multi-year optimization for government fiscal planning
+        
+        Now supports multiple budget allocation strategies:
+        1. Fixed Annual: Same amount each year (legacy format)
+        2. Percentage Growth: Compound growth over time
+        3. Custom: Specific amounts for each year
+        4. Algorithm-Based: Dynamic allocation based on economic/political factors
         
         This function helps governments plan budget allocation across multiple fiscal years
-        to achieve food system resilience targets and crisis preparedness.
+        to achieve food system resilience targets and crisis preparedness with sophisticated
+        budget strategies that reflect real-world economic and political decision-making.
         
         Args:
             components: Current component data
-            budget_scenarios: Budget allocation by year {year: total_budget}
+            budget_scenarios: Budget allocation by year {year: budget} OR strategy config
             target_fsfvi: Target FSFVI score to achieve
             target_year: Year to achieve target by
             method: Weighting method
@@ -2303,34 +2310,57 @@ class FSFVIOptimizationService:
             constraints: Additional constraints
             
         Returns:
-            Multi-year optimization plan with yearly budget recommendations
+            Enhanced multi-year optimization plan with strategy insights
         """
         constraints = constraints or {}
         
-        # Validate inputs
-        if not budget_scenarios:
-            raise ValueError("Budget scenarios must be provided")
+        # Enhanced budget scenario processing
+        if isinstance(budget_scenarios, dict):
+            # Check if this is a strategy configuration
+            if 'budgetStrategy' in budget_scenarios:
+                # Process strategy configuration
+                strategy_config = budget_scenarios
+                processed_budget_scenarios = self._process_budget_strategy_config(
+                    strategy_config, components
+                )
+                logger.info(f"Processed budget strategy '{strategy_config['budgetStrategy']}' into {len(processed_budget_scenarios)} year scenarios")
+            else:
+                # Legacy format: direct year-budget mapping
+                processed_budget_scenarios = {int(k): v for k, v in budget_scenarios.items()}
+                strategy_config = None
+        else:
+            raise ValueError("Budget scenarios must be a dictionary")
+        
+        # Validate processed scenarios
+        if not processed_budget_scenarios:
+            raise ValueError("No budget scenarios provided after processing")
         
         current_year = datetime.now().year
-        planning_years = sorted(budget_scenarios.keys())
+        planning_years = sorted(processed_budget_scenarios.keys())
         
-        # Initialize multi-year planning
+        # Initialize enhanced multi-year planning
         multi_year_plan = {
             'planning_horizon': {
                 'start_year': min(planning_years),
                 'end_year': max(planning_years),
                 'total_years': len(planning_years)
             },
-            'budget_scenarios': budget_scenarios,
+            'budget_scenarios': processed_budget_scenarios,
             'optimization_method': method,
             'analysis_scenario': scenario,
             'yearly_recommendations': {},
             'trajectory_analysis': {},
             'target_achievement': {},
-            'crisis_preparedness': {}
+            'crisis_preparedness': {},
+            'budget_strategy': strategy_config or {'budgetStrategy': 'legacy'}
         }
         
-        # NEW APPROACH: Use current allocations as fixed baseline (already spent)
+        # Add algorithm insights if using algorithm strategy
+        if strategy_config and strategy_config.get('budgetStrategy') == 'algorithm':
+            multi_year_plan['algorithm_insights'] = self._generate_algorithm_insights(
+                strategy_config, processed_budget_scenarios, components
+            )
+        
         # Calculate ORIGINAL baseline FSFVI with current allocations only (no optimization)
         original_baseline_fsfvi_result = self.calculation_service.calculate_fsfvi(
             components, method=method, scenario=scenario
@@ -2340,22 +2370,28 @@ class FSFVIOptimizationService:
         multi_year_plan['baseline'] = {
             'year': current_year,
             'fsfvi': original_baseline_fsfvi,
-            'optimal_fsfvi': original_baseline_fsfvi,  # No optimization - current state
+            'optimal_fsfvi': original_baseline_fsfvi,
             'components': [],
             'note': 'Baseline represents current allocations (fixed/already spent) without optimization'
         }
         
         # CUMULATIVE NEW BUDGET OPTIMIZATION: Each year adds new budget to previous optimizations
-        cumulative_components = [comp.copy() for comp in components]  # Start with original current allocations
+        cumulative_components = [comp.copy() for comp in components]
         cumulative_new_budget_total = 0
         trajectory_data = []
         
         for year in planning_years:
-            year_new_budget = budget_scenarios[year]
+            year_new_budget = processed_budget_scenarios[year]
             cumulative_new_budget_total += year_new_budget
             
-            # NEW BUDGET OPTIMIZATION: Keep current allocations fixed, optimize only new budget
+            # Enhanced constraints for strategy-based optimization
             year_constraints = constraints.copy()
+            
+            # Add strategy-specific constraints
+            if strategy_config:
+                year_constraints.update(self._generate_strategy_constraints(
+                    strategy_config, year, year_new_budget
+                ))
             
             # Target-based constraints
             if target_fsfvi and target_year and year <= target_year:
@@ -2367,97 +2403,95 @@ class FSFVIOptimizationService:
             
             # Optimize NEW BUDGET ONLY for this year
             year_result = self.optimize_allocation(
-                cumulative_components,  # Components with current + previous new budget allocations
-                year_new_budget,        # This year's NEW budget
+                cumulative_components,
+                year_new_budget,
                 method, 
                 scenario, 
                 year_constraints,
-                new_budget_only=True,   # FORCE new budget optimization
+                new_budget_only=True,
                 new_budget_amount=year_new_budget
             )
             
-            # If optimization successful, update cumulative components with new allocations
+            # If optimization successful, update cumulative components
             if year_result.get('success', False) and 'optimal_new_allocations' in year_result:
-                # Add this year's new optimal allocations to cumulative components
                 for i, new_allocation in enumerate(year_result['optimal_new_allocations']):
                     if i < len(cumulative_components):
                         cumulative_components[i]['financial_allocation'] += new_allocation
             
             # Calculate CUMULATIVE FSFVI with all new budget optimizations applied
-            # This represents the total system state after adding this year's optimized new budget
             cumulative_fsfvi_result = self.calculation_service.calculate_fsfvi(
                 cumulative_components, method=method, scenario=scenario
             )
             cumulative_fsfvi = cumulative_fsfvi_result['fsfvi_value']
             
-            # Calculate improvement from ORIGINAL baseline (always compare to baseline with no new budget)
+            # Calculate improvement from ORIGINAL baseline
             improvement_from_baseline = ((original_baseline_fsfvi - cumulative_fsfvi) / original_baseline_fsfvi) * 100
             
-            logger.info(f"=== YEAR {year} CUMULATIVE IMPACT ===")
-            logger.info(f"Original baseline FSFVI (no new budget): {original_baseline_fsfvi:.6f}")
-            logger.info(f"Cumulative FSFVI (with {cumulative_new_budget_total:.1f}M new budget): {cumulative_fsfvi:.6f}")
-            logger.info(f"Cumulative improvement from baseline: {improvement_from_baseline:.2f}%")
-            logger.info(f"New budget this year: ${year_new_budget:.1f}M")
+            logger.info(f"=== YEAR {year} ENHANCED CUMULATIVE IMPACT ===")
+            logger.info(f"Budget Strategy: {strategy_config.get('budgetStrategy', 'legacy') if strategy_config else 'legacy'}")
+            logger.info(f"Original baseline FSFVI: {original_baseline_fsfvi:.6f}")
+            logger.info(f"Cumulative FSFVI: {cumulative_fsfvi:.6f}")
+            logger.info(f"Cumulative improvement: {improvement_from_baseline:.2f}%")
             
-            # Calculate transition analysis (changes from previous year)
+            # Enhanced transition analysis
             if len(trajectory_data) > 0:
-                # Get previous year's total allocations for transition analysis
                 previous_total_allocations = [comp['financial_allocation'] for comp in cumulative_components]
-                # Subtract this year's new allocations to get previous state
                 for i, new_allocation in enumerate(year_result.get('optimal_new_allocations', [])):
                     if i < len(previous_total_allocations):
                         previous_total_allocations[i] -= new_allocation
             else:
-                # FIRST YEAR: Compare original allocations to allocations after first year's new budget
                 previous_total_allocations = [comp['financial_allocation'] for comp in components]
             
             current_total_allocations = [comp['financial_allocation'] for comp in cumulative_components]
-            
-            # Debug logging for transition analysis
-            logger.info(f"=== YEAR {year} TRANSITION ANALYSIS ===")
-            logger.info(f"Previous allocations: {[round(x, 1) for x in previous_total_allocations]}")
-            logger.info(f"Current allocations: {[round(x, 1) for x in current_total_allocations]}")
-            logger.info(f"Year new budget: ${year_new_budget:.1f}M")
             
             transition_analysis = self._analyze_year_transition(
                 previous_total_allocations, current_total_allocations, year_new_budget
             )
             
-            # Store yearly recommendation
-            multi_year_plan['yearly_recommendations'][year] = {
+            # Enhanced yearly recommendation with strategy insights
+            yearly_recommendation = {
                 'new_budget_this_year': year_new_budget,
                 'cumulative_new_budget': cumulative_new_budget_total,
                 'current_allocations_total': sum(comp['financial_allocation'] for comp in components),
                 'total_budget_after_new': sum(comp['financial_allocation'] for comp in cumulative_components),
                 'optimal_new_allocations': year_result.get('optimal_new_allocations', []),
                 'total_allocations_after_optimization': current_total_allocations,
-                'projected_fsfvi': cumulative_fsfvi,  # Use cumulative FSFVI, not year-specific result
+                'projected_fsfvi': cumulative_fsfvi,
                 'improvement_from_baseline': improvement_from_baseline,
                 'component_analysis': year_result.get('component_analysis', {}),
                 'transition_analysis': transition_analysis,
                 'implementation_complexity': self._assess_yearly_implementation(year_result, transition_analysis),
                 'crisis_resilience_score': self._calculate_crisis_resilience(cumulative_components, current_total_allocations, method),
-                'optimization_type': 'cumulative_new_budget'
+                'optimization_type': 'enhanced_cumulative_new_budget'
             }
             
-            # Track trajectory
+            # Add strategy-specific insights
+            if strategy_config:
+                yearly_recommendation.update(self._generate_yearly_strategy_insights(
+                    strategy_config, year, year_new_budget, yearly_recommendation
+                ))
+            
+            multi_year_plan['yearly_recommendations'][year] = yearly_recommendation
+            
+            # Track enhanced trajectory
             trajectory_data.append({
                 'year': year,
-                'fsfvi': cumulative_fsfvi,  # Use cumulative FSFVI for trajectory tracking
+                'fsfvi': cumulative_fsfvi,
                 'new_budget': year_new_budget,
                 'cumulative_new_budget': cumulative_new_budget_total,
-                'improvement': improvement_from_baseline
+                'improvement': improvement_from_baseline,
+                'budget_strategy': strategy_config.get('budgetStrategy', 'legacy') if strategy_config else 'legacy'
             })
         
-        # Analyze trajectory
-        multi_year_plan['trajectory_analysis'] = self._analyze_multi_year_trajectory(
-            trajectory_data, target_fsfvi, target_year
+        # Enhanced trajectory analysis
+        multi_year_plan['trajectory_analysis'] = self._analyze_enhanced_trajectory(
+            trajectory_data, target_fsfvi, target_year, strategy_config
         )
         
         # Target achievement analysis
         if target_fsfvi and target_year:
             multi_year_plan['target_achievement'] = self._analyze_target_achievement(
-                trajectory_data, target_fsfvi, target_year, budget_scenarios
+                trajectory_data, target_fsfvi, target_year, processed_budget_scenarios
             )
         
         # Crisis preparedness analysis
@@ -2465,12 +2499,416 @@ class FSFVIOptimizationService:
             multi_year_plan['yearly_recommendations'], method
         )
         
-        # Generate government recommendations
-        multi_year_plan['government_recommendations'] = self._generate_government_recommendations(
-            multi_year_plan, target_fsfvi, target_year
+        # Enhanced government recommendations
+        multi_year_plan['government_recommendations'] = self._generate_enhanced_government_recommendations(
+            multi_year_plan, target_fsfvi, target_year, strategy_config
         )
         
         return multi_year_plan
+
+    def _process_budget_strategy_config(
+        self, 
+        strategy_config: Dict[str, Any], 
+        components: List[Dict[str, Any]]
+    ) -> Dict[int, float]:
+        """
+        Process budget strategy configuration into yearly budget scenarios
+        
+        Args:
+            strategy_config: Strategy configuration
+            components: Component data for context
+            
+        Returns:
+            Dictionary of {year: budget_amount}
+        """
+        budget_strategy = strategy_config.get('budgetStrategy', 'fixed_annual')
+        start_year = strategy_config.get('startYear', 2024)
+        end_year = strategy_config.get('endYear', 2029)
+        base_budget = strategy_config.get('baseBudget', 500.0)
+        
+        budget_scenarios = {}
+        
+        if budget_strategy == 'fixed_annual':
+            # Fixed amount each year
+            for year in range(start_year, end_year + 1):
+                budget_scenarios[year] = base_budget
+                
+        elif budget_strategy == 'percentage_growth':
+            # Compound growth over time
+            growth_rate = strategy_config.get('budgetGrowthRate', 0.05)
+            for year in range(start_year, end_year + 1):
+                year_index = year - start_year
+                budget_scenarios[year] = base_budget * (1 + growth_rate) ** year_index
+                
+        elif budget_strategy == 'custom':
+            # Custom amounts for each year
+            custom_budgets = strategy_config.get('customYearBudgets', {})
+            for year in range(start_year, end_year + 1):
+                budget_scenarios[year] = custom_budgets.get(str(year), base_budget)
+                
+        elif budget_strategy == 'algorithm':
+            # Algorithm-based dynamic allocation
+            budget_scenarios = self._calculate_algorithm_based_budget(
+                strategy_config, components
+            )
+            
+        else:
+            raise ValueError(f"Unknown budget strategy: {budget_strategy}")
+        
+        return budget_scenarios
+
+    def _calculate_algorithm_based_budget(
+        self, 
+        strategy_config: Dict[str, Any], 
+        components: List[Dict[str, Any]]
+    ) -> Dict[int, float]:
+        """
+        Calculate algorithm-based budget allocation using economic and political factors
+        
+        This implements a sophisticated budget allocation algorithm that considers:
+        1. Economic cycles (GDP growth, inflation, fiscal constraints)
+        2. Political priorities (election cycles, policy stability)
+        3. Performance-based adjustments (system improvements)
+        4. Crisis response mechanisms (external shocks)
+        
+        Args:
+            strategy_config: Algorithm configuration
+            components: Component data for performance context
+            
+        Returns:
+            Dictionary of {year: budget_amount}
+        """
+        algorithm_config = strategy_config.get('algorithmConfig', {})
+        start_year = strategy_config.get('startYear', 2024)
+        end_year = strategy_config.get('endYear', 2029)
+        base_budget = strategy_config.get('baseBudget', 500.0)
+        
+        # Algorithm parameters
+        baseline_growth = algorithm_config.get('baselineGrowthRate', 0.03)
+        economic_cycle_impact = algorithm_config.get('economicCycleImpact', 0.15)
+        political_priority_shift = algorithm_config.get('politicalPriorityShift', 0.10)
+        performance_adjustment = algorithm_config.get('performanceBasedAdjustment', 0.20)
+        crisis_response_factor = algorithm_config.get('crisisResponseFactor', 0.25)
+        
+        # Economic assumptions
+        economic_assumptions = algorithm_config.get('economicAssumptions', {})
+        inflation_rate = economic_assumptions.get('inflationRate', 0.03)
+        gdp_growth_rate = economic_assumptions.get('gdpGrowthRate', 0.025)
+        fiscal_constraints = economic_assumptions.get('fiscalConstraints', 'moderate')
+        
+        # Political context
+        political_context = algorithm_config.get('politicalContext', {})
+        election_cycle = political_context.get('electionCycle', 4)
+        current_election_year = political_context.get('currentElectionYear', 2024)
+        policy_stability = political_context.get('policyStability', 'stable')
+        
+        # Performance-based context from components
+        system_performance = self._analyze_system_performance(components)
+        
+        budget_scenarios = {}
+        
+        for year in range(start_year, end_year + 1):
+            year_index = year - start_year
+            
+            # 1. Base growth with inflation adjustment
+            base_growth_factor = (1 + baseline_growth) ** year_index
+            inflation_adjusted = base_growth_factor * (1 + inflation_rate) ** year_index
+            
+            # 2. Economic cycle factor (simulated business cycle)
+            cycle_phase = (year_index / 8.0) * 2 * np.pi  # 8-year cycle
+            economic_cycle_factor = 1 + economic_cycle_impact * 0.5 * (1 + np.sin(cycle_phase))
+            
+            # 3. Political priority factor (election cycle effects)
+            years_to_election = (current_election_year - year) % election_cycle
+            if years_to_election <= 1:  # Election year or pre-election
+                political_factor = 1 + political_priority_shift
+            elif years_to_election == 2:  # Post-election adjustment
+                political_factor = 1 - political_priority_shift * 0.5
+            else:  # Mid-cycle stability
+                political_factor = 1.0
+                
+            # Adjust for policy stability
+            if policy_stability == 'volatile':
+                political_factor *= 1 + 0.1 * np.random.uniform(-1, 1)
+            elif policy_stability == 'unstable':
+                political_factor *= 1 + 0.2 * np.random.uniform(-1, 1)
+            
+            # 4. Performance-based adjustment using actual system data
+            performance_factor = 1 + performance_adjustment * system_performance['improvement_potential']
+            performance_factor = max(0.8, min(1.5, performance_factor))  # Bound between 80%-150%
+            
+            # 5. Crisis response factor (external shocks)
+            crisis_factor = 1.0
+            if year_index == 2:  # Simulated crisis in year 3
+                crisis_factor = 1 + crisis_response_factor
+            elif year_index == 3:  # Recovery phase
+                crisis_factor = 1 + crisis_response_factor * 0.5
+            
+            # 6. Fiscal constraint factor
+            fiscal_factor = 1.0
+            if fiscal_constraints == 'high':
+                fiscal_factor = 0.9  # 10% reduction
+            elif fiscal_constraints == 'low':
+                fiscal_factor = 1.1  # 10% increase
+            
+            # Combine all factors
+            total_factor = (
+                inflation_adjusted * 
+                economic_cycle_factor * 
+                political_factor * 
+                performance_factor * 
+                crisis_factor * 
+                fiscal_factor
+            )
+            
+            # Calculate final budget
+            year_budget = base_budget * total_factor
+            
+            # Ensure reasonable bounds (50% to 300% of base budget)
+            year_budget = max(base_budget * 0.5, min(base_budget * 3.0, year_budget))
+            
+            budget_scenarios[year] = float(year_budget)
+        
+        return budget_scenarios
+
+    def _analyze_system_performance(self, components: List[Dict[str, Any]]) -> Dict[str, float]:
+        """Analyze system performance for algorithm-based budget calculation"""
+        from fsfvi_core import calculate_performance_gap
+        from config import get_component_performance_preference
+        
+        performance_gaps = []
+        vulnerabilities = []
+        
+        for comp in components:
+            prefer_higher = get_component_performance_preference(comp['component_type'])
+            gap = calculate_performance_gap(comp['observed_value'], comp['benchmark_value'], prefer_higher)
+            performance_gaps.append(gap)
+            
+            # Estimate vulnerability
+            sensitivity = comp.get('sensitivity_parameter', 0.001)
+            vulnerability = gap / (1 + sensitivity * comp['financial_allocation'])
+            vulnerabilities.append(vulnerability)
+        
+        avg_gap = np.mean(performance_gaps)
+        avg_vulnerability = np.mean(vulnerabilities)
+        
+        return {
+            'avg_performance_gap': avg_gap,
+            'avg_vulnerability': avg_vulnerability,
+            'improvement_potential': avg_gap * 0.5,  # Conservative estimate
+            'system_stability': 1 - np.std(vulnerabilities)
+        }
+
+    def _generate_strategy_constraints(
+        self, 
+        strategy_config: Dict[str, Any], 
+        year: int, 
+        year_budget: float
+    ) -> Dict[str, Any]:
+        """Generate strategy-specific constraints for optimization"""
+        constraints = {}
+        
+        budget_strategy = strategy_config.get('budgetStrategy', 'fixed_annual')
+        
+        if budget_strategy == 'algorithm':
+            # Algorithm-based constraints adapt to economic conditions
+            algorithm_config = strategy_config.get('algorithmConfig', {})
+            
+            # Adjust constraints based on economic cycle
+            if year_budget > strategy_config.get('baseBudget', 500) * 1.2:
+                # High budget year - more aggressive constraints
+                constraints['transitionLimit'] = 40
+                constraints['maxAllocation'] = 50
+            else:
+                # Normal/low budget year - conservative constraints
+                constraints['transitionLimit'] = 20
+                constraints['maxAllocation'] = 35
+        
+        elif budget_strategy == 'percentage_growth':
+            # Growth-based constraints
+            growth_rate = strategy_config.get('budgetGrowthRate', 0.05)
+            if growth_rate > 0.1:  # High growth
+                constraints['transitionLimit'] = 35
+            else:  # Normal growth
+                constraints['transitionLimit'] = 25
+        
+        return constraints
+
+    def _generate_yearly_strategy_insights(
+        self,
+        strategy_config: Dict[str, Any],
+        year: int,
+        year_budget: float,
+        yearly_recommendation: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Generate strategy-specific insights for yearly recommendations"""
+        insights = {}
+        
+        budget_strategy = strategy_config.get('budgetStrategy', 'fixed_annual')
+        
+        insights['budget_strategy_type'] = budget_strategy
+        insights['budget_determination'] = self._explain_budget_determination(
+            strategy_config, year, year_budget
+        )
+        
+        if budget_strategy == 'algorithm':
+            insights['algorithm_factors'] = self._explain_algorithm_factors(
+                strategy_config, year, year_budget
+            )
+        
+        return insights
+
+    def _explain_budget_determination(
+        self, 
+        strategy_config: Dict[str, Any], 
+        year: int, 
+        year_budget: float
+    ) -> str:
+        """Explain how the budget for this year was determined"""
+        budget_strategy = strategy_config.get('budgetStrategy', 'fixed_annual')
+        base_budget = strategy_config.get('baseBudget', 500)
+        
+        if budget_strategy == 'fixed_annual':
+            return f"Fixed annual budget of ${year_budget:.1f}M as configured"
+        
+        elif budget_strategy == 'percentage_growth':
+            growth_rate = strategy_config.get('budgetGrowthRate', 0.05)
+            year_index = year - strategy_config.get('startYear', 2024)
+            return f"Compound growth: ${base_budget:.1f}M × (1 + {growth_rate*100:.1f}%)^{year_index} = ${year_budget:.1f}M"
+        
+        elif budget_strategy == 'custom':
+            return f"Custom budget allocation of ${year_budget:.1f}M as specified for {year}"
+        
+        elif budget_strategy == 'algorithm':
+            change_percent = ((year_budget - base_budget) / base_budget) * 100
+            return f"Algorithm-based allocation: ${year_budget:.1f}M ({change_percent:+.1f}% from base)"
+        
+        return f"Budget: ${year_budget:.1f}M"
+
+    def _explain_algorithm_factors(
+        self, 
+        strategy_config: Dict[str, Any], 
+        year: int, 
+        year_budget: float
+    ) -> Dict[str, Any]:
+        """Explain the algorithm factors that influenced this year's budget"""
+        algorithm_config = strategy_config.get('algorithmConfig', {})
+        base_budget = strategy_config.get('baseBudget', 500)
+        
+        factors = {
+            'base_budget': base_budget,
+            'final_budget': year_budget,
+            'total_change_percent': ((year_budget - base_budget) / base_budget) * 100,
+            'contributing_factors': []
+        }
+        
+        # Add explanations for major factors
+        if algorithm_config.get('economicCycleImpact', 0) > 0:
+            factors['contributing_factors'].append('Economic cycle adjustment applied')
+        
+        if algorithm_config.get('politicalPriorityShift', 0) > 0:
+            factors['contributing_factors'].append('Political priority cycle adjustment')
+        
+        if algorithm_config.get('performanceBasedAdjustment', 0) > 0:
+            factors['contributing_factors'].append('Performance-based adjustment applied')
+        
+        return factors
+
+    def _analyze_enhanced_trajectory(
+        self,
+        trajectory_data: List[Dict[str, Any]],
+        target_fsfvi: Optional[float],
+        target_year: Optional[int],
+        strategy_config: Optional[Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        """Analyze enhanced trajectory with strategy insights"""
+        
+        # Call base trajectory analysis
+        base_analysis = self._analyze_multi_year_trajectory(
+            trajectory_data, target_fsfvi, target_year
+        )
+        
+        # Add strategy-specific insights
+        if strategy_config:
+            base_analysis['budget_strategy'] = strategy_config.get('budgetStrategy', 'unknown')
+            base_analysis['strategy_effectiveness'] = self._evaluate_strategy_effectiveness(
+                trajectory_data, strategy_config
+            )
+        
+        return base_analysis
+
+    def _evaluate_strategy_effectiveness(
+        self,
+        trajectory_data: List[Dict[str, Any]],
+        strategy_config: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Evaluate the effectiveness of the chosen budget strategy"""
+        
+        budget_strategy = strategy_config.get('budgetStrategy', 'fixed_annual')
+        
+        # Calculate strategy metrics
+        budgets = [d['new_budget'] for d in trajectory_data]
+        improvements = [d['improvement'] for d in trajectory_data]
+        
+        budget_volatility = np.std(budgets) / np.mean(budgets) if budgets else 0
+        improvement_consistency = 1 - (np.std(improvements) / np.mean(improvements)) if improvements and np.mean(improvements) > 0 else 0
+        
+        effectiveness = {
+            'budget_volatility': budget_volatility,
+            'improvement_consistency': improvement_consistency,
+            'strategy_rating': 'stable' if budget_volatility < 0.2 else 'volatile',
+            'recommendation': ''
+        }
+        
+        if budget_strategy == 'algorithm':
+            effectiveness['recommendation'] = 'Algorithm adapts to economic conditions - monitor for excessive volatility'
+        elif budget_strategy == 'percentage_growth':
+            effectiveness['recommendation'] = 'Steady growth strategy - predictable but may not respond to crises'
+        elif budget_strategy == 'custom':
+            effectiveness['recommendation'] = 'Custom strategy allows precise control - ensure alignment with priorities'
+        else:
+            effectiveness['recommendation'] = 'Fixed strategy provides stability - consider growth adjustments'
+        
+        return effectiveness
+
+    def _generate_enhanced_government_recommendations(
+        self,
+        multi_year_plan: Dict[str, Any],
+        target_fsfvi: Optional[float],
+        target_year: Optional[int],
+        strategy_config: Optional[Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        """Generate enhanced government recommendations with strategy insights"""
+        
+        # Get base recommendations
+        base_recommendations = self._generate_government_recommendations(
+            multi_year_plan, target_fsfvi, target_year
+        )
+        
+        # Add strategy-specific recommendations
+        if strategy_config:
+            budget_strategy = strategy_config.get('budgetStrategy', 'fixed_annual')
+            
+            # Strategy-specific immediate actions
+            if budget_strategy == 'algorithm':
+                base_recommendations['immediate_actions'].insert(0, 
+                    'Monitor algorithm performance and adjust parameters as needed')
+            elif budget_strategy == 'percentage_growth':
+                base_recommendations['immediate_actions'].insert(0,
+                    'Ensure sustainable growth rate given fiscal constraints')
+            
+            # Strategy-specific long-term vision
+            strategy_vision = {
+                'algorithm': 'Develop adaptive budget mechanisms that respond to economic cycles',
+                'percentage_growth': 'Maintain steady growth trajectory with periodic reviews',
+                'custom': 'Implement precise budget targeting based on strategic priorities',
+                'fixed_annual': 'Establish stable funding foundation for long-term planning'
+            }
+            
+            base_recommendations['long_term_vision'].insert(0, 
+                strategy_vision.get(budget_strategy, 'Optimize budget strategy for system needs'))
+        
+        return base_recommendations
 
     @handle_optimization_error
     def scenario_comparison_optimization(

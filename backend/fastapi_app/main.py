@@ -25,7 +25,9 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor
 import os
 import sys
+import json
 import pandas as pd
+import numpy as np
 
 # Import service layer and schemas - SINGLE SOURCE OF TRUTH
 from fsfvi_service import create_fsfvi_services
@@ -393,7 +395,6 @@ async def optimize_allocation(
         # Parse constraints
         parsed_constraints = None
         if constraints:
-            import json
             parsed_constraints = json.loads(constraints)
         
         if optimization_mode == "new_budget":
@@ -548,7 +549,6 @@ async def optimize_new_budget(
         # Parse constraints
         parsed_constraints = None
         if constraints:
-            import json
             parsed_constraints = json.loads(constraints)
         
         # Validate new budget
@@ -598,7 +598,7 @@ async def optimize_new_budget(
 @app.post("/multi_year_optimization", summary="Multi-Year Budget Planning")
 async def multi_year_optimization(
     session_id: str = Form(...),
-    budget_scenarios: str = Form(...),  # JSON string of {year: budget}
+    budget_scenarios: str = Form(...),  # Enhanced: JSON string of budget config or {year: budget}
     target_fsfvi: Optional[float] = Form(default=None),
     target_year: Optional[int] = Form(default=None),
     method: str = Form(default="hybrid"),
@@ -606,24 +606,57 @@ async def multi_year_optimization(
     constraints: Optional[str] = Form(default=None),
     current_user: dict = Depends(get_current_user)
 ):
-    """Multi-year optimization for government fiscal planning"""
+    """
+    ENHANCED Multi-Year Budget Planning with Dynamic Strategies
+    
+    Supports multiple budget allocation strategies:
+    1. Fixed Annual: Same amount each year
+    2. Percentage Growth: Compound growth over time
+    3. Custom: Specific amounts for each year
+    4. Algorithm-Based: Dynamic allocation based on economic/political factors
+    
+    Budget scenarios can be:
+    - Simple format: {year: budget_amount}
+    - Enhanced format: {budgetStrategy: 'type', ...config}
+    """
     try:
         # Get session data
-        session_data = await _get_session_data(session_id, current_user['id'])
-        components = await _get_session_components(session_id)
+        session_data = await _get_session_data(session_id, current_user["id"])
+        session_info = {
+            'country_name': session_data.get('country_name', 'Unknown'),
+            'total_budget': session_data.get('total_budget', 0),
+            'fiscal_year': session_data.get('fiscal_year', 2024)
+        }
         
-        # Parse inputs
-        import json
-        budget_scenarios_dict = json.loads(budget_scenarios)
+        # Parse budget scenarios - enhanced to support strategies
+        budget_config = json.loads(budget_scenarios)
+        
+        # Determine if this is a strategy configuration or simple budget scenarios
+        if isinstance(budget_config, dict) and 'budgetStrategy' in budget_config:
+            # New strategy-based configuration
+            strategy_config = budget_config
+            processed_budget_scenarios = await _process_budget_strategy(
+                strategy_config, session_info, current_user["id"]
+            )
+            logger.info(f"Processed budget strategy '{strategy_config['budgetStrategy']}' into scenarios: {processed_budget_scenarios}")
+        else:
+            # Legacy simple budget scenarios
+            processed_budget_scenarios = budget_config
+            logger.info(f"Using legacy budget scenarios: {processed_budget_scenarios}")
+        
+        # Parse constraints
         parsed_constraints = json.loads(constraints) if constraints else {}
         
-        # Convert year keys to integers
-        budget_scenarios_dict = {int(year): budget for year, budget in budget_scenarios_dict.items()}
+        # Get components for optimization
+        components = await _get_session_components(session_id)
         
-        # Delegate to service layer
+        # Create optimization service
+        calculation_service, optimization_service, _ = get_services()
+        
+        # Enhanced multi-year optimization with strategy support
         result = optimization_service.multi_year_optimization(
             components=components,
-            budget_scenarios=budget_scenarios_dict,
+            budget_scenarios=processed_budget_scenarios,
             target_fsfvi=target_fsfvi,
             target_year=target_year,
             method=method,
@@ -631,20 +664,261 @@ async def multi_year_optimization(
             constraints=parsed_constraints
         )
         
-        # Save results and update session
-        await _save_optimization_results(session_id, result)
-        await _update_session_status(session_id, current_user['id'], 'multi_year_planning_completed')
+        # Add strategy insights to result
+        if 'budgetStrategy' in budget_config:
+            result['budget_strategy'] = budget_config
+            if budget_config['budgetStrategy'] == 'algorithm':
+                result['algorithm_insights'] = await _generate_algorithm_insights(
+                    budget_config, processed_budget_scenarios, session_info
+                )
+        
+        # Update session status
+        await _update_session_status(session_id, current_user["id"], "multi_year_optimization_complete")
         
         return {
             "session_id": session_id,
-            "country": session_data['country_name'],
+            "country": session_info['country_name'],
+            "optimization_type": "enhanced_multi_year_planning",
+            "budget_strategy": budget_config.get('budgetStrategy', 'legacy'),
             "multi_year_plan": result,
-            "analysis_type": "multi_year_optimization"
+            "next_step": "Review multi-year budget allocation recommendations"
         }
         
     except Exception as e:
         logger.error(f"Multi-year optimization error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Multi-year optimization failed: {str(e)}")
+
+
+async def _process_budget_strategy(
+    strategy_config: dict, 
+    session_info: dict, 
+    user_id: int
+) -> dict:
+    """
+    Process budget strategy configuration into yearly budget scenarios
+    
+    Args:
+        strategy_config: Budget strategy configuration
+        session_info: Session information
+        user_id: User ID
+        
+    Returns:
+        Dictionary of {year: budget_amount}
+    """
+    budget_strategy = strategy_config.get('budgetStrategy', 'fixed_annual')
+    start_year = strategy_config.get('startYear', 2024)
+    end_year = strategy_config.get('endYear', 2029)
+    base_budget = strategy_config.get('baseBudget', 500.0)
+    
+    budget_scenarios = {}
+    
+    if budget_strategy == 'fixed_annual':
+        # Fixed amount each year
+        for year in range(start_year, end_year + 1):
+            budget_scenarios[year] = base_budget
+            
+    elif budget_strategy == 'percentage_growth':
+        # Compound growth over time
+        growth_rate = strategy_config.get('budgetGrowthRate', 0.05)
+        for year in range(start_year, end_year + 1):
+            year_index = year - start_year
+            budget_scenarios[year] = base_budget * (1 + growth_rate) ** year_index
+            
+    elif budget_strategy == 'custom':
+        # Custom amounts for each year
+        custom_budgets = strategy_config.get('customYearBudgets', {})
+        for year in range(start_year, end_year + 1):
+            budget_scenarios[year] = custom_budgets.get(str(year), base_budget)
+            
+    elif budget_strategy == 'algorithm':
+        # Algorithm-based dynamic allocation
+        budget_scenarios = await _calculate_algorithm_based_budget(
+            strategy_config, session_info, user_id
+        )
+        
+    else:
+        raise ValueError(f"Unknown budget strategy: {budget_strategy}")
+    
+    return budget_scenarios
+
+
+async def _calculate_algorithm_based_budget(
+    strategy_config: dict, 
+    session_info: dict, 
+    user_id: int
+) -> dict:
+    """
+    Calculate algorithm-based budget allocation using economic and political factors
+    
+    This implements a sophisticated budget allocation algorithm that considers:
+    1. Economic cycles (GDP growth, inflation, fiscal constraints)
+    2. Political priorities (election cycles, policy stability)
+    3. Performance-based adjustments (system improvements)
+    4. Crisis response mechanisms (external shocks)
+    
+    Args:
+        strategy_config: Algorithm configuration
+        session_info: Session information
+        user_id: User ID
+        
+    Returns:
+        Dictionary of {year: budget_amount}
+    """
+    algorithm_config = strategy_config.get('algorithmConfig', {})
+    start_year = strategy_config.get('startYear', 2024)
+    end_year = strategy_config.get('endYear', 2029)
+    base_budget = strategy_config.get('baseBudget', 500.0)
+    
+    # Algorithm parameters
+    baseline_growth = algorithm_config.get('baselineGrowthRate', 0.03)
+    economic_cycle_impact = algorithm_config.get('economicCycleImpact', 0.15)
+    political_priority_shift = algorithm_config.get('politicalPriorityShift', 0.10)
+    performance_adjustment = algorithm_config.get('performanceBasedAdjustment', 0.20)
+    crisis_response_factor = algorithm_config.get('crisisResponseFactor', 0.25)
+    
+    # Economic assumptions
+    economic_assumptions = algorithm_config.get('economicAssumptions', {})
+    inflation_rate = economic_assumptions.get('inflationRate', 0.03)
+    gdp_growth_rate = economic_assumptions.get('gdpGrowthRate', 0.025)
+    fiscal_constraints = economic_assumptions.get('fiscalConstraints', 'moderate')
+    
+    # Political context
+    political_context = algorithm_config.get('politicalContext', {})
+    election_cycle = political_context.get('electionCycle', 4)
+    current_election_year = political_context.get('currentElectionYear', 2024)
+    policy_stability = political_context.get('policyStability', 'stable')
+    
+    budget_scenarios = {}
+    
+    for year in range(start_year, end_year + 1):
+        year_index = year - start_year
+        
+        # 1. Base growth with inflation adjustment
+        base_growth_factor = (1 + baseline_growth) ** year_index
+        inflation_adjusted = base_growth_factor * (1 + inflation_rate) ** year_index
+        
+        # 2. Economic cycle factor (simulated business cycle)
+        cycle_phase = (year_index / 8.0) * 2 * 3.14159  # 8-year cycle
+        economic_cycle_factor = 1 + economic_cycle_impact * 0.5 * (1 + np.sin(cycle_phase))
+        
+        # 3. Political priority factor (election cycle effects)
+        years_to_election = (current_election_year - year) % election_cycle
+        if years_to_election <= 1:  # Election year or pre-election
+            political_factor = 1 + political_priority_shift
+        elif years_to_election == 2:  # Post-election adjustment
+            political_factor = 1 - political_priority_shift * 0.5
+        else:  # Mid-cycle stability
+            political_factor = 1.0
+            
+        # Adjust for policy stability
+        if policy_stability == 'volatile':
+            political_factor *= 1 + 0.1 * np.random.uniform(-1, 1)
+        elif policy_stability == 'unstable':
+            political_factor *= 1 + 0.2 * np.random.uniform(-1, 1)
+        
+        # 4. Performance-based adjustment (simulated system improvement)
+        # Assume system performance improves over time, reducing budget needs
+        performance_factor = 1 - performance_adjustment * (year_index / 10.0)
+        performance_factor = max(0.7, performance_factor)  # Cap at 30% reduction
+        
+        # 5. Crisis response factor (external shocks)
+        crisis_factor = 1.0
+        if year_index == 2:  # Simulated crisis in year 3
+            crisis_factor = 1 + crisis_response_factor
+        elif year_index == 3:  # Recovery phase
+            crisis_factor = 1 + crisis_response_factor * 0.5
+        
+        # 6. Fiscal constraint factor
+        fiscal_factor = 1.0
+        if fiscal_constraints == 'high':
+            fiscal_factor = 0.9  # 10% reduction due to fiscal constraints
+        elif fiscal_constraints == 'low':
+            fiscal_factor = 1.1  # 10% increase due to fiscal expansion
+        
+        # Combine all factors
+        total_factor = (
+            inflation_adjusted * 
+            economic_cycle_factor * 
+            political_factor * 
+            performance_factor * 
+            crisis_factor * 
+            fiscal_factor
+        )
+        
+        # Calculate final budget
+        year_budget = base_budget * total_factor
+        
+        # Ensure reasonable bounds (50% to 300% of base budget)
+        year_budget = max(base_budget * 0.5, min(base_budget * 3.0, year_budget))
+        
+        budget_scenarios[year] = float(year_budget)
+    
+    return budget_scenarios
+
+
+async def _generate_algorithm_insights(
+    strategy_config: dict, 
+    budget_scenarios: dict, 
+    session_info: dict
+) -> dict:
+    """
+    Generate insights about the algorithm-based budget allocation
+    
+    Args:
+        strategy_config: Strategy configuration
+        budget_scenarios: Calculated budget scenarios
+        session_info: Session information
+        
+    Returns:
+        Dictionary with algorithm insights
+    """
+    algorithm_config = strategy_config.get('algorithmConfig', {})
+    
+    # Analyze budget trajectory
+    budget_values = list(budget_scenarios.values())
+    min_budget = min(budget_values)
+    max_budget = max(budget_values)
+    avg_budget = sum(budget_values) / len(budget_values)
+    
+    # Economic cycle analysis
+    economic_cycle_phase = "expansion" if budget_values[-1] > avg_budget else "contraction"
+    
+    # Political priority adjustments
+    political_priority_adjustments = {}
+    for year, budget in budget_scenarios.items():
+        if budget > avg_budget * 1.1:
+            political_priority_adjustments[str(year)] = "high_priority"
+        elif budget < avg_budget * 0.9:
+            political_priority_adjustments[str(year)] = "budget_constraint"
+        else:
+            political_priority_adjustments[str(year)] = "stable"
+    
+    # Performance-driven changes
+    performance_driven_changes = {}
+    for i, (year, budget) in enumerate(budget_scenarios.items()):
+        if i > 0:
+            prev_budget = list(budget_scenarios.values())[i-1]
+            change = (budget - prev_budget) / prev_budget
+            performance_driven_changes[str(year)] = change
+    
+    # Crisis response activations
+    crisis_response_activations = []
+    for year, budget in budget_scenarios.items():
+        if budget > avg_budget * 1.2:
+            crisis_response_activations.append(f"Crisis response activated in {year}")
+    
+    return {
+        "economic_cycle_phase": economic_cycle_phase,
+        "political_priority_adjustments": political_priority_adjustments,
+        "performance_driven_changes": performance_driven_changes,
+        "crisis_response_activations": crisis_response_activations,
+        "budget_trajectory": {
+            "min_budget": min_budget,
+            "max_budget": max_budget,
+            "avg_budget": avg_budget,
+            "volatility": (max_budget - min_budget) / avg_budget
+        }
+    }
 
 
 @app.post("/scenario_comparison", summary="Crisis Scenario Comparison")
@@ -663,7 +937,6 @@ async def scenario_comparison(
         components = await _get_session_components(session_id)
         
         # Parse inputs
-        import json
         scenarios_list = json.loads(scenarios)
         methods_list = json.loads(methods)
         parsed_constraints = json.loads(constraints) if constraints else {}
@@ -714,7 +987,6 @@ async def budget_sensitivity_analysis(
         components = await _get_session_components(session_id)
         
         # Parse inputs
-        import json
         variations_list = json.loads(budget_variations)
         parsed_constraints = json.loads(constraints) if constraints else {}
         
@@ -760,7 +1032,6 @@ async def interactive_optimization(
         components = await _get_session_components(session_id)
         
         # Parse inputs
-        import json
         adjustments_dict = json.loads(user_adjustments)
         parsed_constraints = json.loads(constraints) if constraints else {}
         
@@ -806,7 +1077,6 @@ async def target_based_optimization(
         components = await _get_session_components(session_id)
         
         # Parse constraints
-        import json
         parsed_constraints = json.loads(constraints) if constraints else {}
         parsed_constraints['target_fsfvi'] = target_fsfvi
         parsed_constraints['target_year'] = target_year
@@ -855,7 +1125,6 @@ async def crisis_resilience_assessment(
         components = await _get_session_components(session_id)
         
         # Parse test scenarios
-        import json
         scenarios_list = json.loads(test_scenarios)
         
         # Calculate baseline FSFVI

@@ -21,7 +21,8 @@ import {
   dataAPI,
   MultiYearPlan, 
   BudgetSensitivityAnalysis,
-  ComponentOptimizationResult
+  ComponentOptimizationResult,
+  BudgetStrategyConfig
 } from '@/lib/api';
 
 // Import dedicated optimization components
@@ -82,6 +83,17 @@ interface PlanningHorizon {
   startYear: number;
   endYear: number;
   annualNewBudget: number; // Changed from budgetGrowth to annual new budget amount in millions
+  budgetStrategy: 'fixed_annual' | 'percentage_growth' | 'custom' | 'algorithm'; // New: Budget strategy type
+  budgetGrowthRate?: number; // New: 5% annual growth
+  customYearBudgets?: Record<number, number>; // New: Custom budgets for specific years
+  customYearGrowthRates?: Record<number, number>; // New: Custom growth rates for specific years
+  algorithmConfig?: { // New: Algorithm-based budget configuration
+    economicCycleImpact: number;
+    politicalPriorityShift: number;
+    performanceBasedAdjustment: number;
+    crisisResponseFactor: number;
+    baselineGrowthRate: number;
+  };
 }
 
 interface MultiYearConfig {
@@ -91,6 +103,17 @@ interface MultiYearConfig {
   priorityAreas: string[];
   riskTolerance: 'low' | 'medium' | 'high';
   implementationSpeed: 'gradual' | 'moderate' | 'aggressive';
+  budgetStrategy: 'fixed_annual' | 'custom' | 'algorithm'; // New: Strategy selection
+  economicAssumptions?: { // New: Economic context
+    inflationRate: number;
+    gdpGrowthRate: number;
+    fiscalConstraints: 'low' | 'moderate' | 'high';
+  };
+  politicalContext?: { // New: Political context
+    electionCycle: number;
+    currentElectionYear: number;
+    policyStability: 'stable' | 'volatile' | 'unstable';
+  };
 }
 
 interface SessionInfo {
@@ -128,7 +151,18 @@ export default function AllocationOptimizationPage() {
   const [planningHorizon, setPlanningHorizon] = useState<PlanningHorizon>({
     startYear: new Date().getFullYear(),
     endYear: new Date().getFullYear() + 5,
-    annualNewBudget: 500 // Annual new budget amount in millions USD
+    annualNewBudget: 500, // Annual new budget amount in millions USD
+    budgetStrategy: 'fixed_annual', // New: Budget strategy type
+    budgetGrowthRate: 0.05, // New: 5% annual growth
+    customYearBudgets: {}, // New: Custom budgets for specific years
+    customYearGrowthRates: {}, // New: Custom growth rates for specific years
+    algorithmConfig: { // New: Algorithm-based budget configuration
+      economicCycleImpact: 0.15,
+      politicalPriorityShift: 0.10,
+      performanceBasedAdjustment: 0.20,
+      crisisResponseFactor: 0.25,
+      baselineGrowthRate: 0.03
+    }
   });
 
   // Enhanced multi-year configuration state
@@ -136,7 +170,18 @@ export default function AllocationOptimizationPage() {
     configured: false,
     priorityAreas: [],
     riskTolerance: 'medium',
-    implementationSpeed: 'moderate'
+    implementationSpeed: 'moderate',
+    budgetStrategy: 'fixed_annual', // New: Strategy selection
+    economicAssumptions: { // New: Economic context
+      inflationRate: 0.03,
+      gdpGrowthRate: 0.025,
+      fiscalConstraints: 'moderate'
+    },
+    politicalContext: { // New: Political context
+      electionCycle: 4,
+      currentElectionYear: 2024,
+      policyStability: 'stable'
+    }
   });
 
   // Budget Impact Analysis configuration state
@@ -327,23 +372,70 @@ export default function AllocationOptimizationPage() {
     await runAnalysis('multi-year', async () => {
       const token = getToken();
       
-      // NEW BUDGET APPROACH: Generate scenarios for NEW BUDGET each year
-      const budgetScenarios: Record<number, number> = {};
+      // ENHANCED BUDGET STRATEGY: Send strategy configuration to backend
+      let budgetConfiguration: Record<number, number> | BudgetStrategyConfig;
       
-      // Base new budget amount per year from planning horizon configuration
-      const baseNewBudgetPerYear = planningHorizon.annualNewBudget || 500;
-      
-      // Apply implementation speed adjustments to new budget amounts
-      let adjustedNewBudget = baseNewBudgetPerYear;
-      if (multiYearConfig.implementationSpeed === 'aggressive') {
-        adjustedNewBudget *= 1.5; // 50% higher new budget for aggressive implementation
-      } else if (multiYearConfig.implementationSpeed === 'gradual') {
-        adjustedNewBudget *= 0.7; // 30% lower new budget for gradual implementation
-      }
-      
-      // Each year gets the same new budget amount (not cumulative)
-      for (let year = planningHorizon.startYear; year <= planningHorizon.endYear; year++) {
-        budgetScenarios[year] = adjustedNewBudget;
+      // For algorithm strategy, send full configuration to backend
+      if (planningHorizon.budgetStrategy === 'algorithm') {
+        budgetConfiguration = {
+          budgetStrategy: planningHorizon.budgetStrategy,
+          startYear: planningHorizon.startYear,
+          endYear: planningHorizon.endYear,
+          baseBudget: planningHorizon.annualNewBudget || 500,
+          algorithmConfig: {
+            baselineGrowthRate: planningHorizon.algorithmConfig?.baselineGrowthRate || 0.03,
+            economicCycleImpact: planningHorizon.algorithmConfig?.economicCycleImpact || 0.15,
+            politicalPriorityShift: planningHorizon.algorithmConfig?.politicalPriorityShift || 0.10,
+            performanceBasedAdjustment: planningHorizon.algorithmConfig?.performanceBasedAdjustment || 0.20,
+            crisisResponseFactor: planningHorizon.algorithmConfig?.crisisResponseFactor || 0.25,
+            economicAssumptions: {
+              inflationRate: multiYearConfig.economicAssumptions?.inflationRate || 0.03,
+              gdpGrowthRate: multiYearConfig.economicAssumptions?.gdpGrowthRate || 0.025,
+              fiscalConstraints: multiYearConfig.economicAssumptions?.fiscalConstraints || 'moderate'
+            },
+            politicalContext: {
+              electionCycle: multiYearConfig.politicalContext?.electionCycle || 4,
+              currentElectionYear: multiYearConfig.politicalContext?.currentElectionYear || 2024,
+              policyStability: multiYearConfig.politicalContext?.policyStability || 'stable'
+            }
+          }
+        };
+        
+        console.log('Sending algorithm strategy configuration to backend:', budgetConfiguration);
+        
+      } else if (planningHorizon.budgetStrategy === 'percentage_growth') {
+        // Send percentage growth strategy configuration
+        budgetConfiguration = {
+          budgetStrategy: planningHorizon.budgetStrategy,
+          startYear: planningHorizon.startYear,
+          endYear: planningHorizon.endYear,
+          baseBudget: planningHorizon.annualNewBudget || 500,
+          budgetGrowthRate: planningHorizon.budgetGrowthRate || 0.05
+        };
+        
+        console.log('Sending percentage growth strategy configuration to backend:', budgetConfiguration);
+        
+      } else if (planningHorizon.budgetStrategy === 'custom') {
+        // Send custom strategy configuration
+        budgetConfiguration = {
+          budgetStrategy: planningHorizon.budgetStrategy,
+          startYear: planningHorizon.startYear,
+          endYear: planningHorizon.endYear,
+          customYearBudgets: planningHorizon.customYearBudgets || {}
+        };
+        
+        console.log('Sending custom strategy configuration to backend:', budgetConfiguration);
+        
+      } else {
+        // Fixed annual strategy - can use either strategy config or simple budget scenarios
+        budgetConfiguration = {
+          budgetStrategy: 'fixed_annual',
+          startYear: planningHorizon.startYear,
+          endYear: planningHorizon.endYear,
+          baseBudget: planningHorizon.annualNewBudget || 500
+        };
+        
+        console.log('Sending fixed annual strategy configuration to backend:', budgetConfiguration);
       }
       
       // Enhanced constraints for new budget optimization
@@ -355,13 +447,15 @@ export default function AllocationOptimizationPage() {
                         multiYearConfig.implementationSpeed === 'gradual' ? 15 : 30,
         // Add risk tolerance adjustments
         riskTolerance: multiYearConfig.riskTolerance,
-        priorityAreas: multiYearConfig.priorityAreas
+        priorityAreas: multiYearConfig.priorityAreas,
+        // Add implementation speed as constraint
+        implementationSpeed: multiYearConfig.implementationSpeed
       };
       
       const result = await analysisAPI.multiYearOptimization(
         sessionId,
         token,
-        budgetScenarios,
+        budgetConfiguration,
         multiYearConfig.targetFsfvi,
         multiYearConfig.targetYear,
         'hybrid',
@@ -371,7 +465,7 @@ export default function AllocationOptimizationPage() {
       
       // Extract the multi-year plan data from the response
       const multiYearPlan = result.multi_year_plan || result;
-      console.log('Extracted multi-year plan (new budget approach):', multiYearPlan);
+      console.log('Extracted multi-year plan (enhanced strategy approach):', multiYearPlan);
       
       setOptimizationResults(prev => ({ ...prev, multiYear: multiYearPlan }));
       return multiYearPlan;
@@ -844,7 +938,7 @@ export default function AllocationOptimizationPage() {
                   {/* Planning Horizon */}
                   <div>
                     <h4 className="font-semibold text-gray-900 mb-3">Planning Horizon</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Start Year</label>
                         <input
@@ -869,207 +963,313 @@ export default function AllocationOptimizationPage() {
                           aria-label="Planning end year"
                         />
                       </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Annual New Budget (Million USD)</label>
-                        <input
-                          type="number"
-                          min={50}
-                          max={5000}
-                          step={50}
-                          value={planningHorizon.annualNewBudget || 500}
-                          onChange={(e) => setPlanningHorizon(prev => ({ ...prev, annualNewBudget: parseFloat(e.target.value) || 500 }))}
-                          className="w-full border border-gray-300 rounded-md px-3 py-2"
-                          aria-label="Annual new budget amount in millions USD"
-                        />
-                        <p className="text-xs text-gray-500 mt-1">Additional budget allocated each year (current allocations remain fixed)</p>
-                      </div>
                     </div>
                   </div>
 
-                  {/* Target Configuration */}
+                  {/* Budget Strategy Selection */}
                   <div>
-                    <h4 className="font-semibold text-gray-900 mb-3">Performance Targets</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <h4 className="font-semibold text-gray-900 mb-3">Budget Strategy</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Target FSFVI Score</label>
-                        <input
-                          type="number"
-                          step="0.001"
-                          min="0.001"
-                          max="0.1"
-                          value={multiYearConfig.targetFsfvi ? multiYearConfig.targetFsfvi.toString() : ''}
-                          onChange={(e) => setMultiYearConfig(prev => ({ 
-                            ...prev, 
-                            targetFsfvi: e.target.value && !isNaN(parseFloat(e.target.value)) ? parseFloat(e.target.value) : undefined 
-                          }))}
-                          placeholder="e.g., 0.015"
-                          className="w-full border border-gray-300 rounded-md px-3 py-2"
-                        />
-                        <p className="text-xs text-gray-500 mt-1">Lower scores indicate better performance</p>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Target Achievement Year</label>
-                        <input
-                          type="number"
-                          min={planningHorizon.startYear + 1}
-                          max={planningHorizon.endYear}
-                          value={multiYearConfig.targetYear ? multiYearConfig.targetYear.toString() : ''}
-                          onChange={(e) => setMultiYearConfig(prev => ({ 
-                            ...prev, 
-                            targetYear: e.target.value && !isNaN(parseInt(e.target.value)) ? parseInt(e.target.value) : undefined 
-                          }))}
-                          placeholder={`e.g., ${planningHorizon.startYear + 3}`}
-                          className="w-full border border-gray-300 rounded-md px-3 py-2"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Implementation Strategy */}
-                  <div>
-                    <h4 className="font-semibold text-gray-900 mb-3">Implementation Strategy</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Implementation Speed</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Strategy Type</label>
                         <select
-                          value={multiYearConfig.implementationSpeed}
-                          onChange={(e) => setMultiYearConfig(prev => ({ 
+                          value={planningHorizon.budgetStrategy}
+                          onChange={(e) => setPlanningHorizon(prev => ({ 
                             ...prev, 
-                            implementationSpeed: e.target.value as 'gradual' | 'moderate' | 'aggressive'
+                            budgetStrategy: e.target.value as 'fixed_annual' | 'percentage_growth' | 'custom' | 'algorithm'
                           }))}
                           className="w-full border border-gray-300 rounded-md px-3 py-2"
-                          aria-label="Implementation speed selection"
+                          aria-label="Budget strategy selection"
                         >
-                          <option value="gradual">Gradual (15% max annual change)</option>
-                          <option value="moderate">Moderate (30% max annual change)</option>
-                          <option value="aggressive">Aggressive (50% max annual change)</option>
+                          <option value="fixed_annual">Fixed Annual Amount</option>
+                          <option value="percentage_growth">Percentage Growth</option>
+                          <option value="custom">Custom Year-by-Year</option>
+                          <option value="algorithm">Algorithm-Based</option>
                         </select>
                       </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Risk Tolerance</label>
-                        <select
-                          value={multiYearConfig.riskTolerance}
-                          onChange={(e) => setMultiYearConfig(prev => ({ 
-                            ...prev, 
-                            riskTolerance: e.target.value as 'low' | 'medium' | 'high'
-                          }))}
-                          className="w-full border border-gray-300 rounded-md px-3 py-2"
-                          aria-label="Risk tolerance level selection"
-                        >
-                          <option value="low">Low (Conservative approach)</option>
-                          <option value="medium">Medium (Balanced approach)</option>
-                          <option value="high">High (Bold transformation)</option>
-                        </select>
-                      </div>
+                      
+                      {/* Fixed Annual Amount */}
+                      {planningHorizon.budgetStrategy === 'fixed_annual' && (
+                                                  <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Annual New Budget (Million USD)</label>
+                            <input
+                              type="number"
+                              min={50}
+                              max={5000}
+                              step={50}
+                              value={planningHorizon.annualNewBudget || 500}
+                              onChange={(e) => setPlanningHorizon(prev => ({ ...prev, annualNewBudget: parseFloat(e.target.value) || 500 }))}
+                              className="w-full border border-gray-300 rounded-md px-3 py-2"
+                              aria-label="Annual new budget amount in millions USD"
+                            />
+                          </div>
+                      )}
+                      
+                      {/* Percentage Growth */}
+                      {planningHorizon.budgetStrategy === 'percentage_growth' && (
+                        <>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Base Budget (Million USD)</label>
+                            <input
+                              type="number"
+                              min={50}
+                              max={5000}
+                              step={50}
+                              value={planningHorizon.annualNewBudget || 500}
+                              onChange={(e) => setPlanningHorizon(prev => ({ ...prev, annualNewBudget: parseFloat(e.target.value) || 500 }))}
+                              className="w-full border border-gray-300 rounded-md px-3 py-2"
+                              aria-label="Annual new budget amount in millions USD"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Annual Growth Rate (%)</label>
+                            <input
+                              type="number"
+                              min={-20}
+                              max={30}
+                              step={0.5}
+                              value={(planningHorizon.budgetGrowthRate || 0.05) * 100}
+                              onChange={(e) => setPlanningHorizon(prev => ({ ...prev, budgetGrowthRate: parseFloat(e.target.value) / 100 || 0.05 }))}
+                              className="w-full border border-gray-300 rounded-md px-3 py-2"
+                              aria-label="Annual budget growth rate percentage"
+                            />
+                          </div>
+                        </>
+                      )}
                     </div>
                   </div>
 
-                  {/* Priority Areas */}
-                  <div>
-                    <h4 className="font-semibold text-gray-900 mb-3">Priority Focus Areas</h4>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                      {['agricultural_development', 'infrastructure', 'governance_institutions', 'nutrition_health', 'climate_natural_resources', 'social_protection_equity'].map(area => (
-                        <label key={area} className="flex items-center space-x-2 p-2 border rounded hover:bg-gray-50">
+                  {/* Custom Year-by-Year Configuration */}
+                  {planningHorizon.budgetStrategy === 'custom' && (
+                    <div>
+                      <h4 className="font-semibold text-gray-900 mb-3">Custom Budget by Year</h4>
+                      <div className="space-y-3 max-h-64 overflow-y-auto">
+                        {Array.from({ length: planningHorizon.endYear - planningHorizon.startYear + 1 }, (_, i) => {
+                          const year = planningHorizon.startYear + i;
+                          return (
+                            <div key={year} className="flex items-center space-x-4 p-3 bg-gray-50 rounded-lg">
+                              <div className="w-16 text-sm font-medium text-gray-700">
+                                {year}
+                              </div>
+                              <div className="flex-1">
+                                <input
+                                  type="number"
+                                  min={0}
+                                  max={10000}
+                                  step={50}
+                                  value={planningHorizon.customYearBudgets?.[year] || 500}
+                                  onChange={(e) => setPlanningHorizon(prev => ({
+                                    ...prev,
+                                    customYearBudgets: {
+                                      ...prev.customYearBudgets,
+                                      [year]: parseFloat(e.target.value) || 500
+                                    }
+                                  }))}
+                                  className="w-full border border-gray-300 rounded-md px-3 py-2"
+                                  placeholder="Budget (Million USD)"
+                                />
+                              </div>
+                              <div className="w-24 text-xs text-gray-500">
+                                Million USD
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Algorithm-Based Configuration */}
+                  {planningHorizon.budgetStrategy === 'algorithm' && (
+                    <div>
+                      <h4 className="font-semibold text-gray-900 mb-3">Algorithm-Based Budget Strategy</h4>
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Base Budget (Million USD)</label>
                           <input
-                            type="checkbox"
-                            checked={multiYearConfig.priorityAreas.includes(area)}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setMultiYearConfig(prev => ({ 
-                                  ...prev, 
-                                  priorityAreas: [...prev.priorityAreas, area] 
-                                }));
-                              } else {
-                                setMultiYearConfig(prev => ({ 
-                                  ...prev, 
-                                  priorityAreas: prev.priorityAreas.filter(a => a !== area) 
-                                }));
-                              }
-                            }}
-                            className="text-blue-600"
+                            type="number"
+                            min={50}
+                            max={5000}
+                            step={50}
+                            value={planningHorizon.annualNewBudget || 500}
+                            onChange={(e) => setPlanningHorizon(prev => ({ ...prev, annualNewBudget: parseFloat(e.target.value) || 500 }))}
+                            className="w-full border border-gray-300 rounded-md px-3 py-2"
+                            aria-label="Base budget amount for algorithm-based strategy"
                           />
-                          <span className="text-sm">{area.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
+                        </div>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                  <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Baseline Growth Rate (%)</label>
+                          <input
+                            type="number"
+                            min={-5}
+                            max={15}
+                            step={0.5}
+                            value={(planningHorizon.algorithmConfig?.baselineGrowthRate || 0.03) * 100}
+                            onChange={(e) => setPlanningHorizon(prev => ({
+                              ...prev,
+                              algorithmConfig: {
+                                ...prev.algorithmConfig!,
+                                baselineGrowthRate: parseFloat(e.target.value) / 100 || 0.03
+                              }
+                            }))}
+                            className="w-full border border-gray-300 rounded-md px-3 py-2"
+                            aria-label="Baseline growth rate percentage"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Economic Cycle Impact (%)</label>
+                          <input
+                            type="number"
+                            min={0}
+                            max={50}
+                            step={1}
+                            value={(planningHorizon.algorithmConfig?.economicCycleImpact || 0.15) * 100}
+                            onChange={(e) => setPlanningHorizon(prev => ({
+                              ...prev,
+                              algorithmConfig: {
+                                ...prev.algorithmConfig!,
+                                economicCycleImpact: parseFloat(e.target.value) / 100 || 0.15
+                              }
+                            }))}
+                            className="w-full border border-gray-300 rounded-md px-3 py-2"
+                            aria-label="Economic cycle impact percentage"
+                          />
+                        </div>
+                        </div>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Political Priority Shift (%)</label>
+                            <input
+                              type="number"
+                              min={0}
+                              max={30}
+                              step={1}
+                              value={(planningHorizon.algorithmConfig?.politicalPriorityShift || 0.10) * 100}
+                              onChange={(e) => setPlanningHorizon(prev => ({
+                                ...prev,
+                                algorithmConfig: {
+                                  ...prev.algorithmConfig!,
+                                  politicalPriorityShift: parseFloat(e.target.value) / 100 || 0.10
+                                }
+                              }))}
+                              className="w-full border border-gray-300 rounded-md px-3 py-2"
+                              aria-label="Political priority shift percentage"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Performance Adjustment (%)</label>
+                            <input
+                              type="number"
+                              min={0}
+                              max={40}
+                              step={1}
+                              value={(planningHorizon.algorithmConfig?.performanceBasedAdjustment || 0.20) * 100}
+                              onChange={(e) => setPlanningHorizon(prev => ({
+                                ...prev,
+                                algorithmConfig: {
+                                  ...prev.algorithmConfig!,
+                                  performanceBasedAdjustment: parseFloat(e.target.value) / 100 || 0.20
+                                }
+                              }))}
+                              className="w-full border border-gray-300 rounded-md px-3 py-2"
+                              aria-label="Performance-based adjustment percentage"
+                            />
+                          </div>
+                        </div>
 
-                  {/* Financial Impact Summary */}
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Crisis Response Factor (%)</label>
+                          <input
+                            type="number"
+                            min={0}
+                            max={50}
+                            step={1}
+                            value={(planningHorizon.algorithmConfig?.crisisResponseFactor || 0.25) * 100}
+                            onChange={(e) => setPlanningHorizon(prev => ({
+                              ...prev,
+                              algorithmConfig: {
+                                ...prev.algorithmConfig!,
+                                crisisResponseFactor: parseFloat(e.target.value) / 100 || 0.25
+                              }
+                            }))}
+                            className="w-full border border-gray-300 rounded-md px-3 py-2"
+                            aria-label="Crisis response factor percentage"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Budget Preview */}
                   <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                    <h4 className="font-semibold text-blue-900 mb-3">💰 Financial Impact Summary</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                      <div>
-                        <span className="text-blue-700">Planning Period:</span>
-                        <span className="font-bold text-blue-900 ml-2">
-                          {planningHorizon.endYear - planningHorizon.startYear + 1} years
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-blue-700">Annual New Budget:</span>
-                        <span className="font-bold text-blue-900 ml-2">
-                          ${planningHorizon.annualNewBudget || 500}M
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-blue-700">Total New Investment:</span>
-                        <span className="font-bold text-blue-900 ml-2">
-                          ${((planningHorizon.endYear - planningHorizon.startYear + 1) * (planningHorizon.annualNewBudget || 500)).toFixed(0)}M
-                        </span>
-                      </div>
-                    </div>
-                    <div className="mt-3 pt-3 border-t border-blue-200">
-                      <div className="text-sm text-blue-800">
-                        <span>Current Budget (Fixed): </span>
-                        <span className="font-bold">${sessionInfo?.total_budget?.toFixed(0) || '2,900'}M</span>
-                        <span className="ml-4">Final Year Total: </span>
-                        <span className="font-bold">
-                          ${((sessionInfo?.total_budget || 2900) + ((planningHorizon.endYear - planningHorizon.startYear + 1) * (planningHorizon.annualNewBudget || 500))).toFixed(0)}M
-                        </span>
-                      </div>
+                    <h4 className="font-semibold text-blue-900 mb-3">💰 Budget Preview</h4>
+                    <div className="space-y-2 text-sm">
+                      {(() => {
+                        const years = Array.from({ length: planningHorizon.endYear - planningHorizon.startYear + 1 }, (_, i) => planningHorizon.startYear + i);
+                        let totalNewBudget = 0;
+                        
+                        const budgetByYear = years.map(year => {
+                          let yearBudget = 0;
+                          
+                          if (planningHorizon.budgetStrategy === 'fixed_annual') {
+                            yearBudget = planningHorizon.annualNewBudget || 500;
+                          } else if (planningHorizon.budgetStrategy === 'percentage_growth') {
+                            const yearIndex = year - planningHorizon.startYear;
+                            yearBudget = (planningHorizon.annualNewBudget || 500) * Math.pow(1 + (planningHorizon.budgetGrowthRate || 0.05), yearIndex);
+                          } else if (planningHorizon.budgetStrategy === 'custom') {
+                            yearBudget = planningHorizon.customYearBudgets?.[year] || 500;
+                          } else if (planningHorizon.budgetStrategy === 'algorithm') {
+                            // Simplified preview - actual algorithm runs in backend
+                            const yearIndex = year - planningHorizon.startYear;
+                            const baseGrowth = Math.pow(1 + (planningHorizon.algorithmConfig?.baselineGrowthRate || 0.03), yearIndex);
+                            const cyclicalFactor = 1 + 0.1 * Math.sin(yearIndex * 0.5); // Simulated economic cycle
+                            yearBudget = (planningHorizon.annualNewBudget || 500) * baseGrowth * cyclicalFactor;
+                          }
+                          
+                          totalNewBudget += yearBudget;
+                          return { year, budget: yearBudget };
+                        });
+                        
+                        return (
+                          <div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <div>
+                                <span className="text-blue-700">Strategy:</span>
+                                <span className="font-bold text-blue-900 ml-2">
+                                  {planningHorizon.budgetStrategy === 'fixed_annual' ? 'Fixed Annual' :
+                                   planningHorizon.budgetStrategy === 'percentage_growth' ? 'Percentage Growth' :
+                                   planningHorizon.budgetStrategy === 'custom' ? 'Custom Year-by-Year' :
+                                   planningHorizon.budgetStrategy === 'algorithm' ? 'Algorithm-Based' : 'Unknown'}
+                                </span>
+                              </div>
+                              <div>
+                                <span className="text-blue-700">Total New Investment:</span>
+                                <span className="font-bold text-blue-900 ml-2">
+                                  ${totalNewBudget.toFixed(0)}M
+                                </span>
+                              </div>
+                            </div>
+                            <div className="mt-3 space-y-1">
+                              {budgetByYear.map(({ year, budget }) => (
+                                <div key={year} className="flex justify-between text-xs">
+                                  <span className="text-blue-700">{year}:</span>
+                                  <span className="font-medium text-blue-900">${budget.toFixed(0)}M</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </div>
                   </div>
-
-                  {/* Action Buttons */}
                   <div className="flex justify-between pt-4 border-t">
-                    <Button 
-                      variant="outline" 
-                      onClick={() => setShowMultiYearConfig(false)}
-                    >
-                      Cancel
-                    </Button>
+                    <Button variant="outline" onClick={() => setShowMultiYearConfig(false)}>Cancel</Button>
                     <Button 
                       onClick={() => {
-                        // Validation for multi-year configuration
-                        const planningYears = planningHorizon.endYear - planningHorizon.startYear + 1;
-                        const totalNewBudget = planningYears * planningHorizon.annualNewBudget;
-                        const currentBudget = sessionInfo?.total_budget || 2900;
-                        
-                        // Validate reasonable values
-                        if (planningYears < 3) {
-                          alert('Multi-year planning requires at least 3 years. Please extend the end year.');
-                          return;
-                        }
-                        if (planningYears > 10) {
-                          alert('Multi-year planning beyond 10 years may be unrealistic. Please reduce the planning horizon.');
-                          return;
-                        }
-                        if (planningHorizon.annualNewBudget < 50) {
-                          alert('Annual new budget should be at least $50M for meaningful impact.');
-                          return;
-                        }
-                        if (planningHorizon.annualNewBudget > currentBudget) {
-                          alert(`Annual new budget ($${planningHorizon.annualNewBudget}M) exceeds current total budget ($${currentBudget}M). Consider a more realistic amount.`);
-                          return;
-                        }
-                        if (totalNewBudget > currentBudget * 3) {
-                          const confirm = window.confirm(
-                            `Total new investment over ${planningYears} years would be $${totalNewBudget.toFixed(0)}M, ` +
-                            `which is ${(totalNewBudget/currentBudget).toFixed(1)}x the current budget. ` +
-                            `This may be unrealistic. Continue anyway?`
-                          );
-                          if (!confirm) return;
-                        }
-                        
+                        // Set configuration as completed
                         setMultiYearConfig(prev => ({ ...prev, configured: true }));
                         setShowMultiYearConfig(false);
                         // Set view back to show results when ready
@@ -1081,7 +1281,6 @@ export default function AllocationOptimizationPage() {
                       Save Configuration
                     </Button>
                   </div>
-
                 </CardContent>
               </Card>
             )}

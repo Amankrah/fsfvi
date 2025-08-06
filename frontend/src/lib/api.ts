@@ -379,26 +379,45 @@ export const analysisAPI = {
   multiYearOptimization: async (
     sessionId: string, 
     token: string, 
-    budgetScenarios: Record<number, number>, 
+    budgetScenarios: Record<number, number> | BudgetStrategyConfig, // Enhanced to support strategies
     targetFsfvi?: number, 
     targetYear?: number, 
     method = 'hybrid', 
     scenario = 'normal_operations',
     constraints?: OptimizationConstraints
   ) => {
-    // Validate that budget scenarios contain new budget amounts
-    const budgetValues = Object.values(budgetScenarios);
-    if (budgetValues.length === 0) {
-      throw new Error('Budget scenarios must be provided for multi-year optimization');
-    }
-    
-    // Validate reasonable budget amounts
-    if (budgetValues.some(budget => budget <= 0)) {
-      throw new Error('All budget scenarios must be positive values (in millions USD)');
-    }
-    
-    if (budgetValues.some(budget => budget > 50000)) { // More than 50 billion per year
-      throw new Error('Budget amounts seem unreasonably large. Please check amounts (should be in millions USD)');
+    // Enhanced validation for different budget strategy types
+    if (typeof budgetScenarios === 'object' && 'budgetStrategy' in budgetScenarios) {
+      // New budget strategy configuration
+      const config = budgetScenarios as BudgetStrategyConfig;
+      
+      // Validate strategy-specific requirements
+      if (config.budgetStrategy === 'percentage_growth' && (!config.budgetGrowthRate || !config.baseBudget)) {
+        throw new Error('Base budget and growth rate are required for percentage growth strategy');
+      }
+      
+      if (config.budgetStrategy === 'custom' && (!config.customYearBudgets || Object.keys(config.customYearBudgets).length === 0)) {
+        throw new Error('Custom year budgets are required for custom strategy');
+      }
+      
+      if (config.budgetStrategy === 'algorithm' && (!config.algorithmConfig || !config.baseBudget)) {
+        throw new Error('Algorithm configuration and base budget are required for algorithm strategy');
+      }
+    } else {
+      // Legacy format: simple budget scenarios
+      const budgetValues = Object.values(budgetScenarios as Record<number, number>);
+      if (budgetValues.length === 0) {
+        throw new Error('Budget scenarios must be provided for multi-year optimization');
+      }
+      
+      // Validate reasonable budget amounts
+      if (budgetValues.some(budget => budget <= 0)) {
+        throw new Error('All budget scenarios must be positive values (in millions USD)');
+      }
+      
+      if (budgetValues.some(budget => budget > 50000)) { // More than 50 billion per year
+        throw new Error('Budget amounts seem unreasonably large. Please check amounts (should be in millions USD)');
+      }
     }
     
     const formData = new FormData();
@@ -983,5 +1002,44 @@ export interface NewBudgetGovernmentInsights {
     system_improvement: string;
     future_planning: string;
     risk_mitigation: string;
+  };
+}
+
+export interface BudgetStrategyConfig {
+  budgetStrategy: 'fixed_annual' | 'percentage_growth' | 'custom' | 'algorithm';
+  startYear: number;
+  endYear: number;
+  baseBudget?: number;
+  budgetGrowthRate?: number;
+  customYearBudgets?: Record<number, number>;
+  algorithmConfig?: AlgorithmBudgetConfig;
+}
+
+export interface AlgorithmBudgetConfig {
+  baselineGrowthRate: number;
+  economicCycleImpact: number;
+  politicalPriorityShift: number;
+  performanceBasedAdjustment: number;
+  crisisResponseFactor: number;
+  economicAssumptions?: {
+    inflationRate: number;
+    gdpGrowthRate: number;
+    fiscalConstraints: 'low' | 'moderate' | 'high';
+  };
+  politicalContext?: {
+    electionCycle: number;
+    currentElectionYear: number;
+    policyStability: 'stable' | 'volatile' | 'unstable';
+  };
+}
+
+// Enhanced multi-year plan types
+export interface EnhancedMultiYearPlan extends MultiYearPlan {
+  budget_strategy: BudgetStrategyConfig;
+  algorithm_insights?: {
+    economic_cycle_phase: string;
+    political_priority_adjustments: Record<string, number>;
+    performance_driven_changes: Record<string, number>;
+    crisis_response_activations: string[];
   };
 } 
