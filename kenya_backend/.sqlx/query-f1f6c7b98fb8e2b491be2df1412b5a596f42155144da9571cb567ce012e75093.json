@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT COUNT(*) as count\n            FROM security_events\n            WHERE event_type = 'LOGIN_ATTEMPT'\n            AND success = false\n            AND timestamp > datetime('now', '-1 hour')\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "count",
+        "ordinal": 0,
+        "type_info": "Int"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "f1f6c7b98fb8e2b491be2df1412b5a596f42155144da9571cb567ce012e75093"
+}

@@ -1,0 +1,120 @@
+@import "tailwindcss";
+
+@theme {
+  --color-kenya-black: #000000;
+  --color-kenya-red: #BB0000;
+  --color-kenya-green: #006600;
+  --color-kenya-white: #FFFFFF;
+  --color-kenya-dark-green: #004d00;
+  --color-kenya-light-green: #00cc00;
+  --color-kenya-dark-red: #990000;
+  --color-kenya-light-red: #ff3333;
+  --color-kenya-gold: #FFD700;
+  --color-kenya-accent: #FFA500;
+}
+
+* {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: linear-gradient(to bottom right, rgba(0, 102, 0, 0.05), white, rgba(187, 0, 0, 0.05));
+}
+
+.glass {
+  background-color: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.glass-dark {
+  background-color: rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(0, 0, 0, 0.2);
+}
+
+.glass-kenya {
+  background: linear-gradient(to right, rgba(0, 102, 0, 0.1), rgba(255, 255, 255, 0.1), rgba(187, 0, 0, 0.1));
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.btn-kenya {
+  background: linear-gradient(to right, var(--color-kenya-green), var(--color-kenya-red));
+  color: white;
+  font-weight: 600;
+  padding: 0.5rem 1.5rem;
+  border-radius: 0.5rem;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+  transition: all 300ms;
+  transform: scale(1);
+}
+
+.btn-kenya:hover {
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+  transform: scale(1.05);
+}
+
+.text-gradient-kenya {
+  background: linear-gradient(to right, var(--color-kenya-green), var(--color-kenya-black), var(--color-kenya-red));
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.card-glass {
+  background-color: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 1rem;
+  padding: 1.5rem;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  transition: all 300ms;
+}
+
+.card-glass:hover {
+  box-shadow: 0 35px 60px -15px rgba(0, 0, 0, 0.3);
+}
+
+.section-padding {
+  padding-left: 1rem;
+  padding-right: 1rem;
+  max-width: 80rem;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+@media (min-width: 640px) {
+  .section-padding {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .section-padding {
+    padding-left: 2rem;
+    padding-right: 2rem;
+  }
+}
+
+.animation-delay-2000 {
+  animation-delay: 2s;
+}
+
+.animation-delay-4000 {
+  animation-delay: 4s;
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-20px);
+  }
+}
+
+.animate-float {
+  animation: float 6s ease-in-out infinite;
+}

@@ -1,0 +1,37 @@
+DEVELOPMENT.md
+
+# Python cache files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.so
+.Python
+
+# Virtual environment
+venv/
+env/
+
+# Logs
+logs/
+*.log
+
+# Django
+db.sqlite3
+media/
+staticfiles/
+
+# Security files
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+.env
+.env.local
+.env.production
+.env.development
+
+# Ignore Django migration files in apps (keep package file)
+**/migrations/*
+!**/migrations/__init__.py
