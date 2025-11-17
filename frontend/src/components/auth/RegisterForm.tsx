@@ -135,7 +135,7 @@ export const RegisterForm: React.FC = () => {
                   <h1 className="text-2xl font-bold bg-gradient-to-r from-emerald-600 to-green-600 bg-clip-text text-transparent drop-shadow-sm">
                     FSFVI
                   </h1>
-                  <p className="text-sm text-gray-700 font-medium drop-shadow-sm">Food System Financial Vulnerability Index</p>
+                  <p className="text-sm text-gray-700 font-medium drop-shadow-sm">Food System Financing Intelligence</p>
                 </div>
               </div>
               <Link href="/">
@@ -162,7 +162,7 @@ export const RegisterForm: React.FC = () => {
                 className="object-contain"
               />
             </div>
-            <h2 className="text-3xl font-bold text-gray-900 mb-2">Join FSFVI</h2>
+            <h2 className="text-3xl font-bold text-gray-900 mb-2">Join FSFI</h2>
             <p className="text-gray-600">Create your account to start analyzing food system vulnerabilities</p>
           </div>
 

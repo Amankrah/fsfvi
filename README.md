@@ -1,15 +1,15 @@
-# 🌾 Food System Financing Vulnerability Index (FSFVI)
+# 🌾 Food System Financing Intelligence (FSFI)
 
-A comprehensive platform for analyzing food system vulnerabilities and optimizing financial allocations using the 3FS (Financing for Food Systems) methodology.
+A comprehensive platform for analyzing food system vulnerabilities and optimizing financial allocations using the 3FS (Financing for Food Systems) methodology and the Food System Financing Vulnerability Index (FSFVI).
 
 ## 🎯 Overview
 
-The FSFVI platform is designed to help governments, development organizations, and financial institutions assess food system vulnerabilities, optimize budget allocation, and develop strategic plans for food security. The system implements a sophisticated mathematical framework that combines performance gap analysis with financial optimization to deliver actionable insights for improving food system resilience.
+The FSFI platform is designed to help governments, development organizations, and financial institutions assess food system vulnerabilities, optimize budget allocation, and develop strategic plans for food security. The system implements a sophisticated mathematical framework that combines performance gap analysis with financial optimization to deliver actionable insights for improving food system resilience.
 
 ### Key Features
 
 - 🔍 **Vulnerability Assessment**: Analyze vulnerabilities across 8 food system components based on 3FS methodology
-- 💰 **Financial Optimization**: AI-powered recommendations for optimal resource allocation
+- 💰 **Financial Optimization**: Data-driven recommendations for optimal resource allocation
 - 📊 **Performance Gap Analysis**: Comprehensive analysis of performance gaps against global benchmarks
 - 🎯 **Strategic Planning**: Multi-year planning and roadmap development
 - 🔒 **Enterprise Security**: Government-grade security and authentication
@@ -17,7 +17,7 @@ The FSFVI platform is designed to help governments, development organizations, a
 
 ## 🏗️ System Architecture
 
-The FSFVI platform consists of four main components:
+The FSFI platform consists of four main components:
 
 ```
 ┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
@@ -352,15 +352,15 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 - **Backend Issues**: Create GitHub issue with `backend` label
 - **Frontend Issues**: Create GitHub issue with `frontend` label
-- **Security Concerns**: Email security@fsfvi.ai (do not create public issues)
+- **Security Concerns**: Email security@fsfi.org (do not create public issues)
 - **API Questions**: Check [API Documentation](http://localhost:8000/docs) first
 
 ### Contact Information
 
-- **General Inquiries**: info@fsfvi.ai
-- **Kenya Specific**: kenya@fsfvi.ai
-- **Technical Support**: support@fsfvi.ai
-- **Security Issues**: security@fsfvi.ai
+- **General Inquiries**: info@fsfi.org
+- **Kenya Specific**: kenya@fsfi.org
+- **Technical Support**: support@fsfi.org
+- **Security Issues**: security@fsfi.org
 
 ## 🗺️ Roadmap
 
@@ -380,4 +380,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-**🌾 Built with passion for global food security** | **© 2025 FSFVI.ai - All rights reserved**
+**🌾 Built with passion for global food security** | **© 2025 FSFI - All rights reserved**

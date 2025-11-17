@@ -56,7 +56,7 @@ export default function Home() {
               </div>
             </div>
           </div>
-          <p className="mt-6 text-gray-600 font-medium">Loading FSFVI Platform...</p>
+          <p className="mt-6 text-gray-600 font-medium">Loading FSFI Platform...</p>
         </div>
       </div>
     );
@@ -178,7 +178,7 @@ export default function Home() {
                   <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 via-blue-700 to-blue-800 bg-clip-text text-transparent drop-shadow-sm">
                     FSFVI
                   </h1>
-                  <p className="text-sm text-gray-700 font-medium drop-shadow-sm">Food System Financial Vulnerability Index</p>
+                  <p className="text-sm text-gray-700 font-medium drop-shadow-sm">Food System Financing Intelligence</p>
                 </div>
               </div>
               <div className="flex space-x-3">
@@ -220,8 +220,8 @@ export default function Home() {
           </h1>
           
           <p className="text-xl text-gray-700 max-w-4xl mx-auto mb-12 leading-relaxed font-medium">
-            Evidence-based analysis for government policymakers. Assess vulnerabilities, 
-            optimize allocations, and strengthen food security with AI-powered insights.
+            Evidence-based analysis for government policymakers. Assess vulnerabilities,
+            optimize allocations, and strengthen food security with data-driven insights.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-16">
@@ -274,7 +274,7 @@ export default function Home() {
                   Complete Analysis Workflow
                 </h2>
                 <p className="text-xl text-gray-700 max-w-4xl mx-auto font-medium">
-                  Experience the full FSFVI analysis process from data upload to multi-year strategic planning
+                  Experience the full analysis process from data upload to multi-year strategic planning
                 </p>
               </div>
 
@@ -532,7 +532,7 @@ export default function Home() {
                 Ready to Optimize Your Food System?
               </h2>
               <p className="text-xl mb-12 text-blue-100 max-w-2xl mx-auto font-medium">
-                Join government agencies using FSFVI for smarter policy decisions and strategic planning
+                Join government agencies using FSFI for smarter policy decisions and strategic planning
               </p>
               
               <div className="flex justify-center">
@@ -561,13 +561,13 @@ export default function Home() {
                   className="object-contain"
                 />
               </div>
-              <span className="text-2xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">FSFVI</span>
+              <span className="text-2xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">FSFI</span>
             </div>
             <p className="text-gray-700 mb-4 text-lg font-medium">
               Evidence-based food system optimization for government policymakers
             </p>
             <p className="text-gray-500 font-medium">
-              © {new Date().getFullYear()} FSFVI. Advanced analytics for food security.
+              © {new Date().getFullYear()} FSFI. Advanced analytics for food security.
             </p>
           </div>
         </div>

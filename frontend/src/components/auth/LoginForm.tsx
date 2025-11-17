@@ -71,7 +71,7 @@ export const LoginForm: React.FC = () => {
                   <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-700 bg-clip-text text-transparent drop-shadow-sm">
                     FSFVI
                   </h1>
-                  <p className="text-sm text-gray-700 font-medium drop-shadow-sm">Food System Financial Vulnerability Index</p>
+                  <p className="text-sm text-gray-700 font-medium drop-shadow-sm">Food System Financing Intelligence</p>
                 </div>
               </div>
               <Link href="/">
@@ -99,7 +99,7 @@ export const LoginForm: React.FC = () => {
               />
             </div>
             <h2 className="text-3xl font-bold text-gray-900 mb-2">Welcome Back</h2>
-            <p className="text-gray-600">Sign in to your FSFVI account to continue your analysis</p>
+            <p className="text-gray-600">Sign in to your FSFI account to continue your analysis</p>
           </div>
 
           <Card className="shadow-2xl border-0 bg-white/95 backdrop-blur-sm">
@@ -184,7 +184,7 @@ export const LoginForm: React.FC = () => {
                         <div className="w-full border-t border-gray-200"></div>
                       </div>
                       <div className="relative flex justify-center text-sm">
-                        <span className="px-4 bg-white text-gray-500">New to FSFVI?</span>
+                        <span className="px-4 bg-white text-gray-500">New to FSFI?</span>
                       </div>
                     </div>
                     
