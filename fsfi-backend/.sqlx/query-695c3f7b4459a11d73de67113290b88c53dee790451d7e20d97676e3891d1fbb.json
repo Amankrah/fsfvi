@@ -1,0 +1,149 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            id,\n            country_code,\n            country_name,\n            government_name,\n            government_type as \"government_type: crate::models::government::GovernmentType\",\n            tier as \"tier: crate::models::government::AccessTier\",\n            status as \"status: crate::models::government::GovernmentStatus\",\n            contact_email,\n            contact_phone,\n            primary_contact_name,\n            primary_contact_title,\n            api_quota_daily,\n            api_quota_monthly,\n            created_at,\n            activated_at,\n            expires_at\n        FROM governments\n        WHERE id = $1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "country_code",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "country_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "government_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "government_type: crate::models::government::GovernmentType",
+        "type_info": {
+          "Custom": {
+            "name": "government_type",
+            "kind": {
+              "Enum": [
+                "federal",
+                "state",
+                "regional",
+                "local",
+                "agency"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "tier: crate::models::government::AccessTier",
+        "type_info": {
+          "Custom": {
+            "name": "access_tier",
+            "kind": {
+              "Enum": [
+                "basic",
+                "standard",
+                "premium",
+                "enterprise"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "status: crate::models::government::GovernmentStatus",
+        "type_info": {
+          "Custom": {
+            "name": "government_status",
+            "kind": {
+              "Enum": [
+                "pending",
+                "active",
+                "suspended",
+                "revoked"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "contact_email",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 8,
+        "name": "contact_phone",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 9,
+        "name": "primary_contact_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 10,
+        "name": "primary_contact_title",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 11,
+        "name": "api_quota_daily",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 12,
+        "name": "api_quota_monthly",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 13,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 14,
+        "name": "activated_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 15,
+        "name": "expires_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "695c3f7b4459a11d73de67113290b88c53dee790451d7e20d97676e3891d1fbb"
+}
