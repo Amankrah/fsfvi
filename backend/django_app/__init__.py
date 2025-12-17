@@ -1,1 +1,0 @@
-# FSFVI Django Application 
