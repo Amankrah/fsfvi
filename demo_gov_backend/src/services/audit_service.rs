@@ -127,32 +127,6 @@ impl AuditService {
         .await
     }
 
-    /// Log token validation
-    pub async fn log_token_validation(
-        &self,
-        user_id: Option<Uuid>,
-        ip_address: &str,
-        user_agent: Option<&str>,
-        success: bool,
-        failure_reason: Option<&str>,
-    ) -> Result<(), sqlx::Error> {
-        let details = json!({
-            "failure_reason": failure_reason,
-            "timestamp": Utc::now().to_rfc3339()
-        });
-
-        self.log_security_event(
-            user_id,
-            "TOKEN_VALIDATION",
-            "Token validation attempt",
-            Some(ip_address),
-            user_agent,
-            success,
-            Some(details),
-        )
-        .await
-    }
-
     /// Log logout
     pub async fn log_logout(
         &self,

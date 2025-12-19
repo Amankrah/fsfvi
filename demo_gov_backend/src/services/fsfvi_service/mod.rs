@@ -24,6 +24,10 @@ pub mod error;
 pub use client::FsfviClient;
 pub use data_fetcher::DataFetcher;
 pub use error::FsfviServiceError;
+
+// Note: This export IS used in fsfvi_handler.rs (PeerCountryData, YearlyBudgetConstraint, etc.)
+// The compiler warning is a false positive due to glob re-exports
+#[allow(unused_imports)]
 pub use models::*;
 
 // Re-export service modules

@@ -5,8 +5,11 @@ use actix_web::{
 };
 use futures_util::future::LocalBoxFuture;
 use std::{
+    collections::HashMap,
     future::{ready, Ready},
     rc::Rc,
+    sync::{Arc, Mutex},
+    time::{SystemTime, UNIX_EPOCH},
 };
 
 /// Security headers middleware
@@ -105,16 +108,29 @@ where
     }
 }
 
-/// Rate limiting middleware (basic implementation)
+/// Rate limiting middleware
+/// CRITICAL: Protects government systems from abuse and ensures fair resource allocation
+/// Tracks requests per IP address per minute to prevent DoS attacks
 pub struct RateLimiting {
     max_requests_per_minute: u32,
+    // In-memory rate limit tracker: IP -> (timestamp, request_count)
+    // For production, use Redis for distributed rate limiting
+    request_tracker: Arc<Mutex<HashMap<String, (u64, u32)>>>,
 }
 
 impl RateLimiting {
     pub fn new(max_requests_per_minute: u32) -> Self {
         Self {
             max_requests_per_minute,
+            request_tracker: Arc::new(Mutex::new(HashMap::new())),
         }
+    }
+
+    fn get_current_minute() -> u64 {
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs() / 60
     }
 }
 
@@ -134,6 +150,7 @@ where
         ready(Ok(RateLimitingMiddleware {
             service: Rc::new(service),
             max_requests: self.max_requests_per_minute,
+            request_tracker: self.request_tracker.clone(),
         }))
     }
 }
@@ -141,6 +158,7 @@ where
 pub struct RateLimitingMiddleware<S> {
     service: Rc<S>,
     max_requests: u32,
+    request_tracker: Arc<Mutex<HashMap<String, (u64, u32)>>>,
 }
 
 impl<S, B> Service<ServiceRequest> for RateLimitingMiddleware<S>
@@ -157,18 +175,48 @@ where
 
     fn call(&self, req: ServiceRequest) -> Self::Future {
         let svc = self.service.clone();
+        let max_requests = self.max_requests;
+        let request_tracker = self.request_tracker.clone();
 
         Box::pin(async move {
-            // Basic rate limiting check would go here
-            // In a production environment, you'd integrate with Redis or similar
-
             let client_ip = req.connection_info().peer_addr().unwrap_or("unknown").to_string();
+            let current_minute = RateLimiting::get_current_minute();
 
-            // For now, just log the request
+            // CRITICAL: Enforce rate limiting to protect government systems from abuse
+            // Check if this IP has exceeded the rate limit
+            let rate_limit_exceeded = {
+                let mut tracker = request_tracker.lock().unwrap();
+
+                // Get or create entry for this IP
+                let entry = tracker.entry(client_ip.clone()).or_insert((current_minute, 0));
+
+                // If we're in a new minute, reset the counter
+                if entry.0 != current_minute {
+                    *entry = (current_minute, 1);
+                    false
+                } else {
+                    entry.1 += 1;
+
+                    if entry.1 > max_requests {
+                        log::warn!(
+                            "SECURITY: Rate limit exceeded for IP {}. Requests in current minute: {}. Max allowed: {}",
+                            client_ip, entry.1, max_requests
+                        );
+                        true
+                    } else {
+                        false
+                    }
+                }
+            };
+
+            if rate_limit_exceeded {
+                // Return 429 Too Many Requests
+                return Err(actix_web::error::ErrorTooManyRequests(
+                    format!("Rate limit exceeded. Maximum {} requests per minute allowed.", max_requests)
+                ));
+            }
+
             log::debug!("Request from IP: {} to path: {}", client_ip, req.path());
-
-            // TODO: Implement actual rate limiting logic
-            // For production, consider using governor crate with Redis backend
 
             svc.call(req).await
         })
@@ -335,10 +383,22 @@ pub fn extract_user_from_token(req: &actix_web::HttpRequest) -> Result<Authentic
     // In a real system, this would be stored in the JWT claims
     let government_id = format!("demo_gov_{}", claims.username);
 
-    Ok(AuthenticatedUser {
-        user_id: claims.sub,
-        username: claims.username,
-        government_id,
-        role: claims.role,
-    })
+    let authenticated_user = AuthenticatedUser {
+        user_id: claims.sub.clone(),
+        username: claims.username.clone(),
+        government_id: government_id.clone(),
+        role: claims.role.clone(),
+    };
+
+    // CRITICAL SECURITY: Log successful authentication for audit trail
+    // This helps track who accessed what resources and when
+    log::info!(
+        "User authenticated: user_id={}, username={}, role={}, government_id={}",
+        authenticated_user.user_id,
+        authenticated_user.username,
+        authenticated_user.role,
+        authenticated_user.government_id
+    );
+
+    Ok(authenticated_user)
 }

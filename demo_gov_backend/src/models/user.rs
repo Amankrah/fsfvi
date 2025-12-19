@@ -146,6 +146,23 @@ pub struct ChangePasswordRequest {
     pub confirm_password: String,
 }
 
+/// Password strength check request
+#[derive(Debug, Deserialize)]
+pub struct PasswordStrengthRequest {
+    pub password: String,
+}
+
+/// Password strength check response
+#[derive(Debug, Serialize)]
+pub struct PasswordStrengthResponse {
+    pub is_valid: bool,
+    pub strength: String,
+    pub entropy_bits: f64,
+    pub is_common: bool,
+    pub errors: Vec<String>,
+    pub suggestions: Vec<String>,
+}
+
 /// Password strength validation
 fn validate_password_strength(password: &str) -> Result<(), validator::ValidationError> {
     let mut errors = Vec::new();
@@ -197,7 +214,7 @@ fn validate_password_strength(password: &str) -> Result<(), validator::Validatio
 }
 
 /// Security event for logging
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, FromRow)]
 pub struct SecurityEvent {
     pub id: Uuid,
     pub user_id: Option<Uuid>,
@@ -208,6 +225,32 @@ pub struct SecurityEvent {
     pub success: bool,
     pub timestamp: DateTime<Utc>,
     pub metadata: Option<serde_json::Value>,
+}
+
+impl SecurityEvent {
+    /// Create a new security event for logging
+    /// CRITICAL: Government audit trail requires explicit event creation
+    pub fn new(
+        user_id: Option<Uuid>,
+        event_type: String,
+        description: String,
+        ip_address: Option<String>,
+        user_agent: Option<String>,
+        success: bool,
+        metadata: Option<serde_json::Value>,
+    ) -> Self {
+        Self {
+            id: Uuid::new_v4(),
+            user_id,
+            event_type,
+            description,
+            ip_address,
+            user_agent,
+            success,
+            timestamp: Utc::now(),
+            metadata,
+        }
+    }
 }
 
 /// Session information

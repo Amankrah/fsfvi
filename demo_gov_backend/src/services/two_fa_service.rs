@@ -25,6 +25,15 @@ impl TwoFAService {
     }
 
     /// Generate TOTP code for given secret
+    /// CRITICAL: Used for 2FA testing, debugging, and emergency access scenarios
+    /// Government systems may need to generate codes for:
+    /// - Testing 2FA setup without authenticator apps
+    /// - Administrative emergency access (with proper audit logging)
+    /// - Debugging 2FA issues for government officials
+    ///
+    /// PUBLIC API: Kept for administrative and testing flexibility
+    /// Currently used in test suite (test_totp_generation_and_verification)
+    #[allow(dead_code)]
     pub fn generate_totp(&self, secret: &str, time_offset: Option<i64>) -> AuthResult<String> {
         let decoded_secret = general_purpose::STANDARD
             .decode(secret)

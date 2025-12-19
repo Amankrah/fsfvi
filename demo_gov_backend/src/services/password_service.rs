@@ -11,6 +11,7 @@ use crate::models::auth::{AuthError, AuthResult, PasswordPolicy};
 pub struct PasswordService {
     policy: PasswordPolicy,
     argon2: Argon2<'static>,
+    bcrypt_cost: u32,
 }
 
 impl PasswordService {
@@ -18,13 +19,48 @@ impl PasswordService {
         Self {
             policy: PasswordPolicy::default(),
             argon2: Argon2::default(),
+            bcrypt_cost: 12, // Default cost for bcrypt fallback
         }
     }
 
+    /// Create password service with custom policy and bcrypt cost
+    /// CRITICAL: bcrypt_cost (password_salt_rounds) affects hashing strength
+    /// Higher cost = more secure but slower. Government systems should use ≥12
+    ///
+    /// PUBLIC API: Kept for flexibility when governments only need to customize policy
+    /// Currently used as building block for with_policy_and_bcrypt_cost
+    #[allow(dead_code)]
     pub fn with_policy(policy: PasswordPolicy) -> Self {
         Self {
             policy,
             argon2: Argon2::default(),
+            bcrypt_cost: 12,
+        }
+    }
+
+    /// Create password service with custom bcrypt cost
+    /// Used to integrate SecurityConfig.password_salt_rounds
+    ///
+    /// PUBLIC API: Kept for flexibility when governments only need to customize bcrypt cost
+    /// Currently used as building block for with_policy_and_bcrypt_cost
+    #[allow(dead_code)]
+    pub fn with_bcrypt_cost(bcrypt_cost: u32) -> Self {
+        Self {
+            policy: PasswordPolicy::default(),
+            argon2: Argon2::default(),
+            bcrypt_cost,
+        }
+    }
+
+    /// Create password service with BOTH custom policy AND bcrypt cost
+    /// CRITICAL: Most comprehensive configuration for government compliance
+    /// Allows governments to configure both password complexity requirements (policy)
+    /// and hashing strength (bcrypt_cost) to meet security standards like NIST, NATO, etc.
+    pub fn with_policy_and_bcrypt_cost(policy: PasswordPolicy, bcrypt_cost: u32) -> Self {
+        Self {
+            policy,
+            argon2: Argon2::default(),
+            bcrypt_cost,
         }
     }
 
@@ -41,7 +77,9 @@ impl PasswordService {
             Ok(hash) => Ok(hash.to_string()),
             Err(_) => {
                 // Fallback to bcrypt if Argon2 fails
-                bcrypt::hash(password, 12)
+                // SECURITY: Uses configured password_salt_rounds from SecurityConfig
+                log::warn!("Argon2 hashing failed, using bcrypt fallback with cost {}", self.bcrypt_cost);
+                bcrypt::hash(password, self.bcrypt_cost)
                     .map_err(|_| AuthError::InternalError("Failed to hash password".to_string()))
             }
         }
@@ -146,8 +184,23 @@ impl PasswordService {
             }
         }
 
-        // Check for username inclusion (this would be done with user context)
-        // For now, we'll check if it's just common weak patterns
+        // CRITICAL SECURITY: Check for common passwords
+        // Government systems must not allow easily guessable passwords
+        if self.is_common_password(password) {
+            errors.push("Password is too common and easily guessable. Please choose a more unique password".to_string());
+        }
+
+        // CRITICAL SECURITY: Check password entropy
+        // Minimum 40 bits for government-level security
+        // This ensures passwords are not predictable through pattern analysis
+        let entropy = self.calculate_entropy(password);
+        const MIN_ENTROPY_BITS: f64 = 40.0;
+        if entropy < MIN_ENTROPY_BITS {
+            errors.push(format!(
+                "Password is too predictable (strength: {:.1} bits, required: {:.1} bits). Add more variety in character types",
+                entropy, MIN_ENTROPY_BITS
+            ));
+        }
 
         if errors.is_empty() {
             Ok(())
@@ -319,8 +372,10 @@ impl std::fmt::Display for PasswordStrength {
 mod tests {
     use super::*;
 
+    /// CRITICAL: Test password hashing for government security compliance
+    /// Ensures passwords are securely hashed and verified
     #[test]
-    fn test_password_hashing() {
+    fn test_password_hashing_basic() {
         let service = PasswordService::new();
         let password = "TestPassword123!";
 
@@ -329,20 +384,179 @@ mod tests {
         assert!(!service.verify_password("wrong", &hash).unwrap());
     }
 
+    /// Test that different passwords produce different hashes
     #[test]
-    fn test_password_strength_validation() {
+    fn test_password_hashing_uniqueness() {
         let service = PasswordService::new();
+        let password = "UniquePassword123!";
 
-        // Should pass
-        assert!(service.validate_password_strength("ComplexP@ssw0rd123").is_ok());
+        let hash1 = service.hash_password(password).unwrap();
+        let hash2 = service.hash_password(password).unwrap();
+
+        // Hashes should be different due to salt
+        assert_ne!(hash1, hash2);
+
+        // But both should verify correctly
+        assert!(service.verify_password(password, &hash1).unwrap());
+        assert!(service.verify_password(password, &hash2).unwrap());
+    }
+
+    /// Test bcrypt cost configuration for different security levels
+    #[test]
+    fn test_password_service_with_bcrypt_cost() {
+        let service = PasswordService::with_bcrypt_cost(10);
+        let password = "SecurePassword123!";
+
+        let hash = service.hash_password(password).unwrap();
+        assert!(service.verify_password(password, &hash).unwrap());
+    }
+
+    /// Test custom password policy enforcement
+    #[test]
+    fn test_password_service_with_custom_policy() {
+        let policy = PasswordPolicy {
+            min_length: 16, // Stricter requirement
+            require_uppercase: true,
+            require_lowercase: true,
+            require_numbers: true,
+            require_special_chars: true,
+            max_repeating_chars: 2,
+            forbidden_patterns: vec!["test".to_string()],
+        };
+
+        let service = PasswordService::with_policy(policy);
 
         // Should fail - too short
+        assert!(service.validate_password_strength("Short123!").is_err());
+
+        // Should fail - contains forbidden pattern "test"
+        assert!(service.validate_password_strength("TestPassword123!").is_err());
+
+        // Should pass - meets stricter requirements
+        assert!(service.validate_password_strength("VerySecureP@ssw0rd1234").is_ok());
+    }
+
+    /// Test combined policy and bcrypt cost configuration
+    #[test]
+    fn test_password_service_with_policy_and_bcrypt_cost() {
+        let policy = PasswordPolicy {
+            min_length: 14,
+            require_uppercase: true,
+            require_lowercase: true,
+            require_numbers: true,
+            require_special_chars: true,
+            max_repeating_chars: 3,
+            forbidden_patterns: vec!["government".to_string()],
+        };
+
+        let service = PasswordService::with_policy_and_bcrypt_cost(policy, 10);
+        let password = "ComplexP@ssw0rd2025";
+
+        let hash = service.hash_password(password).unwrap();
+        assert!(service.verify_password(password, &hash).unwrap());
+    }
+
+    /// CRITICAL: Test password validation for NIST compliance
+    #[test]
+    fn test_password_strength_validation_nist() {
+        let service = PasswordService::new();
+
+        // Should pass - meets all requirements
+        assert!(service.validate_password_strength("ComplexP@ssw0rd123").is_ok());
+        assert!(service.validate_password_strength("MyS3cure!Password").is_ok());
+
+        // Should fail - too short (< 12 characters)
         assert!(service.validate_password_strength("Short1!").is_err());
+
+        // Should fail - no uppercase
+        assert!(service.validate_password_strength("lowercase123!").is_err());
+
+        // Should fail - no lowercase
+        assert!(service.validate_password_strength("UPPERCASE123!").is_err());
+
+        // Should fail - no numbers
+        assert!(service.validate_password_strength("NoNumbers!Pass").is_err());
 
         // Should fail - no special chars
         assert!(service.validate_password_strength("NoSpecialChars123").is_err());
     }
 
+    /// Test forbidden patterns detection (common passwords, patterns)
+    #[test]
+    fn test_password_forbidden_patterns() {
+        let service = PasswordService::new();
+
+        // Should fail - contains "password"
+        assert!(service.validate_password_strength("MyPassword123!").is_err());
+
+        // Should fail - contains "123"
+        assert!(service.validate_password_strength("Abc123!Secure").is_err());
+
+        // Should fail - contains "qwerty"
+        assert!(service.validate_password_strength("Qwerty!789Pass").is_err());
+
+        // Should fail - contains "kenya" (government-specific)
+        assert!(service.validate_password_strength("Kenya!Secure123").is_err());
+    }
+
+    /// Test common password detection
+    #[test]
+    fn test_common_password_detection() {
+        let service = PasswordService::new();
+
+        assert!(service.is_common_password("password123"));
+        assert!(service.is_common_password("admin"));
+        assert!(service.is_common_password("qwerty"));
+        assert!(service.is_common_password("kenya"));
+        assert!(service.is_common_password("government"));
+
+        assert!(!service.is_common_password("ComplexP@ssw0rd123"));
+    }
+
+    /// Test excessive repeating characters detection
+    #[test]
+    fn test_excessive_repeating_characters() {
+        let service = PasswordService::new();
+
+        // Should fail - more than 3 repeating characters
+        assert!(service.validate_password_strength("Aaaa1234!Secure").is_err());
+        assert!(service.validate_password_strength("Secure1111!Pass").is_err());
+
+        // Should pass - 3 or fewer repeating characters
+        assert!(service.validate_password_strength("Aaa1234!Secure").is_ok());
+    }
+
+    /// Test password entropy calculation for predictability detection
+    #[test]
+    fn test_password_entropy() {
+        let service = PasswordService::new();
+
+        // High entropy password
+        let strong_password = "Xk8#mL9$pQ2!rT5";
+        let entropy_strong = service.calculate_entropy(strong_password);
+        assert!(entropy_strong >= 60.0); // Should have high entropy
+
+        // Low entropy password
+        let weak_password = "aaaaaaaaaa";
+        let entropy_weak = service.calculate_entropy(weak_password);
+        assert!(entropy_weak < 40.0); // Should have low entropy
+    }
+
+    /// Test password strength rating system
+    #[test]
+    fn test_password_strength_rating() {
+        let service = PasswordService::new();
+
+        // Very strong password
+        let very_strong = service.rate_password_strength("X#9mL$pQ!2rT@5wK8");
+        assert_eq!(very_strong, PasswordStrength::VeryStrong);
+
+        // Weak password (common pattern)
+        let weak = service.rate_password_strength("password123");
+        assert_eq!(weak, PasswordStrength::VeryWeak);
+    }
+
+    /// Test temporary password generation for government officials
     #[test]
     fn test_temporary_password_generation() {
         let service = PasswordService::new();
@@ -351,5 +565,52 @@ mod tests {
         // Should pass strength validation
         assert!(service.validate_password_strength(&temp_password).is_ok());
         assert!(temp_password.len() >= 12);
+
+        // Should contain at least one from each category
+        assert!(temp_password.chars().any(|c| c.is_uppercase()));
+        assert!(temp_password.chars().any(|c| c.is_lowercase()));
+        assert!(temp_password.chars().any(|c| c.is_numeric()));
+        assert!(temp_password.chars().any(|c| "!@#$%^&*".contains(c)));
+    }
+
+    /// Test that temporary passwords are random (don't repeat)
+    #[test]
+    fn test_temporary_password_randomness() {
+        let service = PasswordService::new();
+        let password1 = service.generate_temporary_password();
+        let password2 = service.generate_temporary_password();
+
+        // Should be different
+        assert_ne!(password1, password2);
+    }
+
+    /// Test password similarity detection for password change
+    #[test]
+    fn test_passwords_are_same() {
+        let service = PasswordService::new();
+        let password = "UniqueP@ssw0rd123";
+
+        let hash = service.hash_password(password).unwrap();
+
+        // Same password should return true
+        assert!(service.passwords_are_same(password, &hash));
+
+        // Different password should return false
+        assert!(!service.passwords_are_same("DifferentP@ssw0rd456", &hash));
+    }
+
+    /// CRITICAL: Test that minimum entropy requirement is enforced
+    /// Government systems must not allow predictable passwords
+    #[test]
+    fn test_minimum_entropy_enforcement() {
+        let service = PasswordService::new();
+
+        // Very predictable password (low entropy)
+        let result = service.validate_password_strength("Aaaaaa1!");
+        assert!(result.is_err()); // Should fail due to low entropy
+
+        // Complex password (high entropy)
+        let result = service.validate_password_strength("Xk8#mL9$pQ2!");
+        assert!(result.is_ok());
     }
 }

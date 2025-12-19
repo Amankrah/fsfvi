@@ -9,8 +9,10 @@
 use std::collections::HashMap;
 
 use super::client::FsfviClient;
+use super::data_fetcher::DataFetcher;
 use super::error::FsfviServiceError;
 use super::models::*;
+use sqlx::SqlitePool;
 
 pub struct StrategicPlanningService {
     client: FsfviClient,
@@ -166,6 +168,25 @@ impl StrategicPlanningService {
         self.client
             .post("/api/v1/fsfvi/strategic-planning/mtef", body)
             .await
+    }
+
+    /// Fetch historical multi-year component data for trend analysis
+    /// CRITICAL: Helps governments understand historical trends when planning future improvements
+    /// Uses DataFetcher::fetch_components_multi_year to retrieve data across multiple fiscal years
+    pub async fn fetch_historical_trends(
+        &self,
+        pool: &SqlitePool,
+        government_id: &str,
+        fiscal_years: Vec<i32>,
+        reporting_period: Option<&str>,
+    ) -> Result<Vec<(i32, Vec<ComponentInput>)>, FsfviServiceError> {
+        log::info!(
+            "Fetching historical trends for government {} across {} fiscal years",
+            government_id,
+            fiscal_years.len()
+        );
+
+        DataFetcher::fetch_components_multi_year(pool, government_id, fiscal_years, reporting_period).await
     }
 
     /// Validate component data

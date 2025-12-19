@@ -14,8 +14,9 @@ use std::sync::Mutex;
 
 use crate::config::AppConfig;
 use crate::handlers::auth_handler::{
-    change_password, health_check, login, logout, verify_token,
-    prepare_two_fa_setup, setup_two_fa, verify_two_fa, disable_two_fa, AppState,
+    change_password, check_password_strength, health_check, login, logout, verify_token,
+    prepare_two_fa_setup, setup_two_fa, verify_two_fa, disable_two_fa, get_session, get_audit_logs,
+    get_security_dashboard, AppState,
 };
 use crate::handlers::fsfvi_handler::{
     // Performance Gap Analysis
@@ -23,9 +24,9 @@ use crate::handlers::fsfvi_handler::{
     // Assessments
     run_assessment, quick_check,
     // Strategic Planning
-    generate_multi_year_plan, generate_mtef,
+    generate_multi_year_plan, generate_mtef, get_historical_trends,
     // Budget Optimization
-    analyze_allocation_efficiency, generate_reallocation_plan, optimize_allocation,
+    analyze_allocation_efficiency, calculate_roi, generate_reallocation_plan, optimize_allocation,
     // Weighting Analysis
     analyze_scenario_sensitivity_hybrid, analyze_scenario_sensitivity_expert,
     analyze_financial_weights, get_available_scenarios,
@@ -43,7 +44,7 @@ use crate::handlers::fsfvi_handler::{
     // State
     FsfviAppState,
 };
-use crate::middleware::security::{RequestLogging, SecurityHeaders};
+use crate::middleware::security::{RateLimiting, RequestLogging, SecurityHeaders};
 use crate::models::auth::SecurityConfig;
 use crate::services::{
     auth_service::AuthService,
@@ -90,9 +91,15 @@ async fn main() -> std::io::Result<()> {
         ..Default::default()
     };
 
-    let password_service = PasswordService::new();
+    // CRITICAL: Initialize password service with government-specific password policy AND bcrypt cost
+    // This allows different governments to meet their specific security compliance requirements
+    // (e.g., NIST 800-63B, NATO security standards, or local government regulations)
+    let password_service = PasswordService::with_policy_and_bcrypt_cost(
+        config.password_policy.clone(),
+        security_config.password_salt_rounds
+    );
     let token_service = TokenService::new(security_config.clone());
-    let auth_service = AuthService::new(db_pool.clone(), password_service, token_service.clone());
+    let auth_service = AuthService::new(db_pool.clone(), password_service, token_service.clone(), security_config.clone());
 
     // Initialize default government user if none exists
     log::info!("Initializing default user if needed...");
@@ -145,6 +152,7 @@ async fn main() -> std::io::Result<()> {
 
     // Start HTTP server
     let cors_origins = config.cors_origins.clone();
+    let rate_limit = config.rate_limit_per_minute;
     HttpServer::new(move || {
         // CORS configuration - restrict to Demo Government frontend only
         let mut cors = Cors::default();
@@ -163,6 +171,9 @@ async fn main() -> std::io::Result<()> {
             .wrap(cors)
             .wrap(SecurityHeaders)
             .wrap(RequestLogging)
+            // CRITICAL: Rate limiting prevents abuse and ensures fair resource allocation
+            // Configured from environment variable RATE_LIMIT_PER_MINUTE (default: 60)
+            .wrap(RateLimiting::new(rate_limit))
             .service(
                 web::scope("/api")
                     // Authentication endpoints
@@ -172,6 +183,10 @@ async fn main() -> std::io::Result<()> {
                             .route("/change-password", web::post().to(change_password))
                             .route("/verify", web::get().to(verify_token))
                             .route("/logout", web::post().to(logout))
+                            .route("/session", web::get().to(get_session))
+                            .route("/audit-logs", web::get().to(get_audit_logs))
+                            .route("/security-dashboard", web::get().to(get_security_dashboard))
+                            .route("/password-strength", web::post().to(check_password_strength))
                             .route("/2fa/prepare", web::get().to(prepare_two_fa_setup))
                             .route("/2fa/setup", web::post().to(setup_two_fa))
                             .route("/2fa/verify", web::post().to(verify_two_fa))
@@ -203,13 +218,15 @@ async fn main() -> std::io::Result<()> {
                             .service(
                                 web::scope("/strategic-planning")
                                     .route("/multi-year-plan", web::post().to(generate_multi_year_plan))
-                                    .route("/mtef", web::post().to(generate_mtef)),
+                                    .route("/mtef", web::post().to(generate_mtef))
+                                    .route("/historical-trends", web::get().to(get_historical_trends)),
                             )
 
                             // Budget Optimization
                             .service(
                                 web::scope("/budget-optimization")
                                     .route("/analyze-efficiency", web::post().to(analyze_allocation_efficiency))
+                                    .route("/calculate-roi", web::post().to(calculate_roi))
                                     .route("/generate-plan", web::post().to(generate_reallocation_plan))
                                     .route("/optimize", web::post().to(optimize_allocation)),
                             )

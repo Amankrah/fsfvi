@@ -9,8 +9,10 @@ use crate::models::user::{
 };
 use crate::services::audit_service::AuditService;
 use crate::services::password_service::PasswordService;
-use crate::services::token_service::TokenService;
+use crate::services::security_event_service::SecurityEventService;
+use crate::services::token_service::{TokenService, TokenBlacklist};
 use crate::services::two_fa_service::TwoFAService;
+use std::sync::{Arc, Mutex};
 
 /// Main authentication service
 pub struct AuthService {
@@ -19,6 +21,10 @@ pub struct AuthService {
     token_service: TokenService,
     audit_service: AuditService,
     two_fa_service: TwoFAService,
+    security_event_service: SecurityEventService,
+    security_config: crate::models::auth::SecurityConfig,
+    /// CRITICAL: Token blacklist for revoked tokens (government security requirement)
+    token_blacklist: Arc<Mutex<TokenBlacklist>>,
 }
 
 impl AuthService {
@@ -26,22 +32,29 @@ impl AuthService {
         db_pool: SqlitePool,
         password_service: PasswordService,
         token_service: TokenService,
+        security_config: crate::models::auth::SecurityConfig,
     ) -> Self {
         let audit_service = AuditService::new(db_pool.clone());
         let two_fa_service = TwoFAService::new("Demo Government FSFVI Platform".to_string());
+        let security_event_service = SecurityEventService::new(db_pool.clone());
+        let token_blacklist = Arc::new(Mutex::new(TokenBlacklist::new()));
+
         Self {
             db_pool,
             password_service,
             token_service,
             audit_service,
             two_fa_service,
+            security_event_service,
+            security_config,
+            token_blacklist,
         }
     }
 
     /// Authenticate user with credentials
     pub async fn authenticate(&mut self, request: LoginRequest, ip_address: &str) -> AuthResult<LoginResponse> {
-        // Check rate limiting first
-        self.check_rate_limit(&request.username, ip_address)?;
+        // Check rate limiting first (CRITICAL: Prevents brute force attacks)
+        self.check_rate_limit(&request.username, ip_address).await?;
 
         // Get user from database
         let mut user = self.get_user_by_username(&request.username).await?;
@@ -70,13 +83,28 @@ impl AuthService {
                 Some("Invalid password"),
             ).await.unwrap_or_else(|e| log::error!("Failed to log failed login: {}", e));
 
+            // CRITICAL SECURITY: Log failed login to security events for monitoring
+            self.security_event_service.log_failed_login(
+                &user.username,
+                ip_address,
+                request.user_agent.as_deref(),
+                "Invalid password",
+            ).await.unwrap_or_else(|e| log::error!("Failed to log security event: {}", e));
+
             // Increment failed attempts
             user.login_attempts += 1;
 
             // Lock account if too many attempts
-            if user.login_attempts >= 5 {
+            // CRITICAL: Use configured lockout duration from SecurityConfig for government compliance
+            // Different governments may have different security policies (e.g., 5 min, 15 min, 30 min)
+            if user.login_attempts >= self.security_config.rate_limit.max_attempts as i32 {
                 user.is_locked = true;
-                user.lockout_expiry = Some(Utc::now() + Duration::minutes(5));
+                let lockout_duration_secs = self.security_config.rate_limit.lockout_duration_seconds as i64;
+                user.lockout_expiry = Some(Utc::now() + Duration::seconds(lockout_duration_secs));
+                log::warn!(
+                    "SECURITY: Account locked for user {} after {} failed attempts. Lockout duration: {} seconds",
+                    user.username, user.login_attempts, lockout_duration_secs
+                );
             }
 
             self.update_user_security_info(&user).await?;
@@ -91,7 +119,9 @@ impl AuthService {
 
         // Generate session ID and token
         let session_id = TokenService::generate_session_id();
-        let session_expires_at = Utc::now() + Duration::minutes(30); // 30-minute sessions
+        // SECURITY: Use configured session timeout from SecurityConfig
+        let session_expires_at = Utc::now() + Duration::minutes(self.security_config.session_timeout_minutes);
+        log::debug!("Session created with {} minute timeout", self.security_config.session_timeout_minutes);
 
         user.session_token = Some(session_id.clone());
         user.session_expires_at = Some(session_expires_at);
@@ -183,8 +213,14 @@ impl AuthService {
             return Err(AuthError::InvalidCredentials);
         }
 
-        // Validate new password strength
+        // Validate new password strength (includes common password & entropy checks)
         self.password_service.validate_password_strength(&request.new_password)?;
+
+        // SECURITY ENHANCEMENT: Rate password strength for audit logging
+        let strength = self.password_service.rate_password_strength(&request.new_password);
+        let entropy = self.password_service.calculate_entropy(&request.new_password);
+        log::info!("Password change for user {}: strength={}, entropy={:.1} bits",
+                   user.username, strength, entropy);
 
         // Check that new password is different from current
         log::info!("Checking if new password is different from current password");
@@ -211,6 +247,13 @@ impl AuthService {
             user.is_temporary_password,
         ).await.unwrap_or_else(|e| log::error!("Failed to log password change: {}", e));
 
+        // CRITICAL SECURITY: Log password change to security events
+        self.security_event_service.log_password_change(
+            user_id,
+            &user.username,
+            user.is_temporary_password,
+        ).await.unwrap_or_else(|e| log::error!("Failed to log security event: {}", e));
+
         log::info!("Password changed successfully for user: {}", user.username);
 
         Ok(())
@@ -218,8 +261,53 @@ impl AuthService {
 
     /// Validate session token
     pub async fn validate_session(&self, token: &str) -> AuthResult<UserResponse> {
+        // CRITICAL SECURITY: Check if token is blacklisted first
+        // This prevents use of tokens from logged-out sessions or compromised accounts
+        let is_blacklisted = match self.token_blacklist.lock() {
+            Ok(blacklist) => blacklist.is_blacklisted(token),
+            Err(e) => {
+                log::error!("Failed to acquire blacklist lock: {}", e);
+                false // Fail open for availability, but log the error
+            }
+        };
+
+        if is_blacklisted {
+            log::warn!("SECURITY ALERT: Attempt to use blacklisted token detected");
+
+            // Try to extract user_id for security logging even from blacklisted token
+            if let Some(user_id) = self.token_service.extract_user_id(token) {
+                log::warn!("Blacklisted token belongs to user_id: {}", user_id);
+
+                // Log this security event
+                if let Err(e) = self.security_event_service.log_event(
+                    Some(user_id),
+                    "blacklisted_token_use_attempt",
+                    "Attempt to use blacklisted token",
+                    None,
+                    None,
+                    false,
+                    None,
+                ).await {
+                    log::error!("Failed to log blacklisted token use attempt: {}", e);
+                }
+            }
+
+            return Err(AuthError::InvalidToken);
+        }
+
         // Validate JWT token
         let token_validation = self.token_service.validate_token(token)?;
+
+        // SECURITY: Log token validation details for audit trail
+        log::debug!(
+            "Token validated: user_id={}, username={}, role={}, session_id={}, is_temp_password={}, expires_at={}",
+            token_validation.user_id,
+            token_validation.username,
+            token_validation.role,
+            token_validation.session_id,
+            token_validation.is_temp_password,
+            token_validation.expires_at.to_rfc3339()
+        );
 
         // Get user from database to check session
         let user = self.get_user_by_id(token_validation.user_id).await?;
@@ -236,10 +324,103 @@ impl AuthService {
         }
     }
 
+    /// Get detailed session information
+    /// CRITICAL: Returns enhanced session details including IP address, user agent, and expiration
+    /// Used for session monitoring, security audits, and user session management
+    pub async fn get_session_info(&self, token: &str, ip_address: Option<String>, user_agent: Option<String>) -> AuthResult<crate::models::user::SessionInfo> {
+        // CRITICAL SECURITY: Check if token is blacklisted first
+        let is_blacklisted = match self.token_blacklist.lock() {
+            Ok(blacklist) => blacklist.is_blacklisted(token),
+            Err(e) => {
+                log::error!("Failed to acquire blacklist lock: {}", e);
+                false
+            }
+        };
+
+        if is_blacklisted {
+            log::warn!("Attempt to get session info for blacklisted token");
+            return Err(AuthError::InvalidToken);
+        }
+
+        // Validate JWT token
+        let token_validation = self.token_service.validate_token(token)?;
+
+        // SECURITY: Log token validation details for audit trail
+        log::debug!(
+            "Session info request - Token validated: user_id={}, username={}, role={}, session_id={}, is_temp_password={}, expires_at={}",
+            token_validation.user_id,
+            token_validation.username,
+            token_validation.role,
+            token_validation.session_id,
+            token_validation.is_temp_password,
+            token_validation.expires_at.to_rfc3339()
+        );
+
+        // Get user from database to check session
+        let user = self.get_user_by_id(token_validation.user_id).await?;
+
+        // Check if session is still valid
+        if let (Some(session_token), Some(session_expires_at)) = (&user.session_token, user.session_expires_at) {
+            if session_token == &token_validation.session_id && session_expires_at > Utc::now() {
+                // Build SessionInfo with all details
+                let session_info = crate::models::user::SessionInfo {
+                    user_id: user.id,
+                    username: user.username.clone(),
+                    role: user.role.clone(),
+                    is_temporary_password: user.is_temporary_password,
+                    expires_at: session_expires_at,
+                    ip_address,
+                    user_agent,
+                };
+
+                log::debug!(
+                    "Session info retrieved for user: {} (expires at: {})",
+                    user.username,
+                    session_expires_at.to_rfc3339()
+                );
+
+                Ok(session_info)
+            } else {
+                Err(AuthError::SessionExpired)
+            }
+        } else {
+            Err(AuthError::SessionExpired)
+        }
+    }
+
     /// Logout user (invalidate session)
-    pub async fn logout(&mut self, user_id: Uuid) -> AuthResult<()> {
+    /// SECURITY: Accepts the JWT token to blacklist it, preventing reuse after logout
+    pub async fn logout(&mut self, user_id: Uuid, token: Option<&str>) -> AuthResult<()> {
         // Get user info for audit logging
         let user = self.get_user_by_id(user_id).await?;
+
+        // CRITICAL SECURITY: Blacklist the token to prevent reuse
+        // Even though we clear the session, the JWT itself remains valid until expiry
+        // Blacklisting ensures a logged-out token cannot be used
+        if let Some(jwt_token) = token {
+            // Add token to blacklist
+            match self.token_blacklist.lock() {
+                Ok(mut blacklist) => {
+                    blacklist.blacklist_token(jwt_token.to_string());
+                    log::info!("Token successfully blacklisted for user: {}", user.username);
+
+                    // Log blacklisting event for audit trail
+                    if let Err(e) = self.security_event_service.log_token_blacklisted(
+                        user_id,
+                        &user.username,
+                        "User logout"
+                    ).await {
+                        log::error!("Failed to log token blacklist event: {}", e);
+                    }
+                }
+                Err(e) => {
+                    log::error!("Failed to acquire blacklist lock during logout: {}", e);
+                    // Continue with logout even if blacklisting fails
+                }
+            }
+        } else {
+            log::warn!("Logout called without token - session cleared but token not blacklisted");
+        }
 
         // Clear session information
         sqlx::query!(
@@ -258,7 +439,41 @@ impl AuthService {
             None,
         ).await.unwrap_or_else(|e| log::error!("Failed to log logout: {}", e));
 
+        // CRITICAL SECURITY: Log logout to security events
+        self.security_event_service.log_logout(
+            user_id,
+            &user.username,
+        ).await.unwrap_or_else(|e| log::error!("Failed to log security event: {}", e));
+
         Ok(())
+    }
+
+    /// Get audit logs for security monitoring
+    /// CRITICAL: Provides access to immutable audit trail for compliance and security analysis
+    /// Only accessible to authenticated users - filters by user_id for privacy
+    pub async fn get_audit_logs(&self, user_id: Uuid, limit: i32) -> AuthResult<Vec<crate::models::auth::AuditLogEntry>> {
+        self.audit_service
+            .get_user_events(user_id, limit)
+            .await
+            .map_err(|e| AuthError::InternalError(format!("Failed to retrieve audit logs: {}", e)))
+    }
+
+    /// Get recent security events (admin only in production)
+    /// CRITICAL: Provides system-wide security monitoring capabilities
+    pub async fn get_recent_audit_logs(&self, limit: i32) -> AuthResult<Vec<crate::models::auth::AuditLogEntry>> {
+        self.audit_service
+            .get_recent_events(limit)
+            .await
+            .map_err(|e| AuthError::InternalError(format!("Failed to retrieve audit logs: {}", e)))
+    }
+
+    /// Get count of recent failed login attempts
+    /// CRITICAL: Security monitoring to detect brute force attacks
+    pub async fn get_failed_login_count(&self) -> AuthResult<i64> {
+        self.audit_service
+            .get_recent_failed_logins()
+            .await
+            .map_err(|e| AuthError::InternalError(format!("Failed to retrieve failed login count: {}", e)))
     }
 
     /// Initialize default government user (run once at startup)
@@ -439,21 +654,75 @@ impl AuthService {
         Ok(())
     }
 
-    fn check_rate_limit(&self, _username: &str, _ip_address: &str) -> AuthResult<()> {
-        // Simple in-memory rate limiting
-        // In production, use Redis or a proper rate limiting service
+    /// Check rate limiting for login attempts
+    /// CRITICAL: Prevents brute force attacks by limiting login attempts per IP
+    /// Uses SecurityConfig.rate_limit to configure max attempts and lockout duration
+    async fn check_rate_limit(&self, username: &str, ip_address: &str) -> AuthResult<()> {
+        // SECURITY: Use configured rate limit parameters from security_config
+        let rate_config = &self.security_config.rate_limit;
 
-        let now = Utc::now();
-        let _window_start = now - Duration::minutes(5);
+        log::debug!(
+            "Rate limit check for username={}, ip={}: max_attempts={}, window_seconds={}",
+            username,
+            ip_address,
+            rate_config.max_attempts,
+            rate_config.window_seconds
+        );
 
-        // This is a simplified implementation
-        // TODO: Implement proper rate limiting with Redis or database
+        // CRITICAL: Calculate time window for rate limiting based on government security policy
+        let window_start = Utc::now() - chrono::Duration::seconds(rate_config.window_seconds as i64);
+
+        // Query login_attempts table for failed attempts in the configured time window
+        let attempt_count = sqlx::query_scalar!(
+            r#"
+            SELECT COUNT(*) as count
+            FROM login_attempts
+            WHERE ip_address = ?
+              AND success = 0
+              AND timestamp > ?
+            "#,
+            ip_address,
+            window_start
+        )
+        .fetch_one(&self.db_pool)
+        .await
+        .map_err(|e| AuthError::InternalError(format!("Rate limit check failed: {}", e)))?;
+
+        // CRITICAL: Block if exceeding max_attempts within the configured window
+        // This protects government systems from brute force attacks
+        if attempt_count >= rate_config.max_attempts as i32 {
+            log::warn!(
+                "SECURITY ALERT: Too many failed login attempts from IP: {} (count: {}, limit: {})",
+                ip_address,
+                attempt_count,
+                rate_config.max_attempts
+            );
+            return Err(AuthError::TooManyAttempts);
+        }
+
+        log::debug!(
+            "Rate limit check passed for IP {}: {}/{} attempts in {}s window",
+            ip_address,
+            attempt_count,
+            rate_config.max_attempts,
+            rate_config.window_seconds
+        );
 
         Ok(())
     }
 
     /// Complete the login process (generate token and log)
     async fn complete_login(&mut self, user: User, session_id: String, ip_address: &str, request: &LoginRequest) -> AuthResult<LoginResponse> {
+        // CRITICAL SECURITY: Check if password change is required for temporary passwords
+        // Government policy enforces password changes for temporary credentials
+        if self.security_config.require_password_change && user.is_temporary_password {
+            log::warn!(
+                "User {} logging in with temporary password - password change required per security policy",
+                user.username
+            );
+            // Frontend should check user.is_temporary_password and enforce password change flow
+        }
+
         // Generate JWT token
         let token = self.token_service.generate_token(&user, &session_id)?;
 
@@ -469,6 +738,14 @@ impl AuthService {
             true,
             None,
         ).await.unwrap_or_else(|e| log::error!("Failed to log successful login: {}", e));
+
+        // CRITICAL SECURITY: Log successful login to security events
+        self.security_event_service.log_successful_login(
+            user.id,
+            &user.username,
+            ip_address,
+            request.user_agent.as_deref(),
+        ).await.unwrap_or_else(|e| log::error!("Failed to log security event: {}", e));
 
         Ok(LoginResponse {
             token,

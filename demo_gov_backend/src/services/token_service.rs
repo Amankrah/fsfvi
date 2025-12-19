@@ -1,6 +1,5 @@
 use chrono::{Duration, Utc};
 use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
-use serde_json::json;
 use std::collections::HashSet;
 use uuid::Uuid;
 
@@ -120,58 +119,9 @@ impl TokenService {
         }
     }
 
-    /// Generate a refresh token (for future use)
-    pub fn generate_refresh_token(&self, user_id: &Uuid) -> AuthResult<String> {
-        let now = Utc::now();
-        let expires_at = now + Duration::days(30); // Refresh tokens last 30 days
-
-        let claims = json!({
-            "sub": user_id.to_string(),
-            "type": "refresh",
-            "exp": expires_at.timestamp(),
-            "iat": now.timestamp(),
-            "iss": "fsfvi-demo-gov-backend",
-            "jti": Uuid::new_v4().to_string(),
-        });
-
-        encode(&Header::default(), &claims, &self.encoding_key)
-            .map_err(|_| AuthError::InternalError("Failed to generate refresh token".to_string()))
-    }
-
-    /// Blacklist a token (would need persistent storage in production)
-    pub fn blacklist_token(&self, token: &str) -> AuthResult<()> {
-        // In a production environment, you would store blacklisted tokens
-        // in Redis or a database with their expiration times
-
-        // For now, we'll just validate that the token is valid before blacklisting
-        self.validate_token(token)?;
-
-        // TODO: Implement token blacklisting storage
-        log::info!("Token blacklisted: {}", &token[..20]);
-
-        Ok(())
-    }
-
-    /// Check if token is blacklisted (would need persistent storage in production)
-    pub fn is_token_blacklisted(&self, _token: &str) -> bool {
-        // TODO: Implement blacklist checking
-        false
-    }
-
     /// Generate session ID
     pub fn generate_session_id() -> String {
         Uuid::new_v4().to_string()
-    }
-
-    /// Create secure token response
-    pub fn create_token_response(&self, token: String, expires_in_seconds: i64) -> serde_json::Value {
-        json!({
-            "access_token": token,
-            "token_type": "Bearer",
-            "expires_in": expires_in_seconds,
-            "issued_at": Utc::now().timestamp(),
-            "scope": "demo_government_access"
-        })
     }
 }
 
@@ -194,14 +144,6 @@ impl TokenBlacklist {
 
     pub fn is_blacklisted(&self, token: &str) -> bool {
         self.blacklisted_tokens.contains(token)
-    }
-
-    pub fn cleanup_expired(&mut self, token_service: &TokenService) {
-        // Remove expired tokens from blacklist
-        self.blacklisted_tokens.retain(|token| {
-            // If we can't validate the token, it's probably expired, so remove it
-            token_service.validate_token(token).is_ok()
-        });
     }
 }
 

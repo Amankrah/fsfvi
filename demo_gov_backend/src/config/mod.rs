@@ -1,4 +1,5 @@
 use std::env;
+use crate::models::auth::PasswordPolicy;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Environment {
@@ -30,6 +31,9 @@ pub struct AppConfig {
     pub fsfvi_api_url: String,
     pub fsfvi_api_key: Option<String>,
     pub rate_limit_per_minute: u32,
+    // CRITICAL: Password policy for government compliance
+    // Different governments may have different security requirements (e.g., NATO, NIST, local regulations)
+    pub password_policy: PasswordPolicy,
 }
 
 impl AppConfig {
@@ -80,6 +84,52 @@ impl AppConfig {
             log::warn!("FSFVI_API_KEY not set in production - API calls will require user's API key");
         }
 
+        // CRITICAL: Configure password policy from environment for government compliance
+        // Allows different governments to meet their specific security regulations
+        let password_policy = PasswordPolicy {
+            min_length: env::var("PASSWORD_MIN_LENGTH")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(12), // Default: 12 characters (NIST recommended minimum)
+            require_uppercase: env::var("PASSWORD_REQUIRE_UPPERCASE")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(true),
+            require_lowercase: env::var("PASSWORD_REQUIRE_LOWERCASE")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(true),
+            require_numbers: env::var("PASSWORD_REQUIRE_NUMBERS")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(true),
+            require_special_chars: env::var("PASSWORD_REQUIRE_SPECIAL")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(true),
+            max_repeating_chars: env::var("PASSWORD_MAX_REPEATING")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(3), // Maximum 3 consecutive repeating characters
+            forbidden_patterns: vec![
+                "123".to_string(),
+                "abc".to_string(),
+                "password".to_string(),
+                "qwerty".to_string(),
+                // Add government-specific forbidden patterns from env if needed
+                "kenya".to_string(),
+                "government".to_string(),
+            ],
+        };
+
+        log::info!("Password policy configured: min_length={}, require_uppercase={}, require_lowercase={}, require_numbers={}, require_special={}",
+            password_policy.min_length,
+            password_policy.require_uppercase,
+            password_policy.require_lowercase,
+            password_policy.require_numbers,
+            password_policy.require_special_chars
+        );
+
         Self {
             environment: environment.clone(),
             database_url: env::var("DATABASE_URL")
@@ -97,6 +147,7 @@ impl AppConfig {
                 .unwrap_or_else(|_| "60".to_string())
                 .parse()
                 .expect("RATE_LIMIT_PER_MINUTE must be a valid number"),
+            password_policy,
         }
     }
 }

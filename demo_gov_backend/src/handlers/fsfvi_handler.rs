@@ -26,7 +26,10 @@ use crate::services::fsfvi_service::{
 
 pub struct FsfviAppState {
     pub db_pool: SqlitePool,
+    // CRITICAL: Store client for health checks and monitoring of backend FSFVI API connectivity
+    // Government systems must monitor external dependencies to ensure service availability
     pub fsfvi_client: Arc<FsfviClient>,
+    // All FSFVI operations go through the specialized service instances below
     pub performance_gap_service: Arc<PerformanceGapService>,
     pub assessment_service: Arc<AssessmentService>,
     pub strategic_planning_service: Arc<StrategicPlanningService>,
@@ -51,6 +54,7 @@ impl FsfviAppState {
 
         Self {
             db_pool,
+            fsfvi_client: Arc::new(fsfvi_client.clone()),
             performance_gap_service: Arc::new(PerformanceGapService::new(fsfvi_client.clone())),
             assessment_service: Arc::new(AssessmentService::new(fsfvi_client.clone())),
             strategic_planning_service: Arc::new(StrategicPlanningService::new(fsfvi_client.clone())),
@@ -60,7 +64,6 @@ impl FsfviAppState {
             scenario_simulation_service: Arc::new(ScenarioSimulationService::new(fsfvi_client.clone())),
             decision_support_service: Arc::new(DecisionSupportService::new(fsfvi_client.clone())),
             matrix_generation_service: Arc::new(MatrixGenerationService::new(fsfvi_client.clone())),
-            fsfvi_client: Arc::new(fsfvi_client),
         }
     }
 }
@@ -73,6 +76,53 @@ impl FsfviAppState {
 pub struct FiscalYearQuery {
     pub fiscal_year: Option<i32>,
     pub reporting_period: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct HistoricalTrendsQuery {
+    #[serde(deserialize_with = "deserialize_fiscal_years")]
+    pub fiscal_years: Vec<i32>,
+    pub reporting_period: Option<String>,
+}
+
+fn deserialize_fiscal_years<'de, D>(deserializer: D) -> Result<Vec<i32>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let s: String = serde::Deserialize::deserialize(deserializer)?;
+    s.split(',')
+        .map(|year_str| year_str.trim().parse::<i32>().map_err(serde::de::Error::custom))
+        .collect()
+}
+
+/// CRITICAL: Convert FSFVI service errors to HTTP responses with proper logging
+/// Government systems must log all errors for accountability and debugging
+fn handle_fsfvi_error(error: FsfviServiceError, context: &str) -> actix_web::Error {
+    match &error {
+        FsfviServiceError::ValidationError(msg) => {
+            log::warn!("FSFVI Validation Error in {}: {}", context, msg);
+            actix_web::error::ErrorBadRequest(format!("Validation error: {}", msg))
+        }
+        FsfviServiceError::ApiError { status, message } => {
+            log::error!("FSFVI API Error in {} (HTTP {}): {}", context, status, message);
+            actix_web::error::ErrorInternalServerError(format!(
+                "Backend API error (status {}): {}",
+                status, message
+            ))
+        }
+        FsfviServiceError::NetworkError(msg) => {
+            log::error!("FSFVI Network Error in {}: {}", context, msg);
+            actix_web::error::ErrorServiceUnavailable(format!("Network error: {}", msg))
+        }
+        FsfviServiceError::ResponseParseError(msg) => {
+            log::error!("FSFVI Response Parse Error in {}: {}", context, msg);
+            actix_web::error::ErrorInternalServerError(format!("Response parse error: {}", msg))
+        }
+        FsfviServiceError::DatabaseError(msg) => {
+            log::error!("FSFVI Database Error in {}: {}", context, msg);
+            actix_web::error::ErrorInternalServerError(format!("Database error: {}", msg))
+        }
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -119,6 +169,20 @@ pub struct OptimizationRequest {
     pub total_budget_ceiling: Option<f64>,
     pub min_allocation_per_component: Option<f64>,
     pub max_change_percent: Option<f64>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct RoiAnalysisRequest {
+    pub fiscal_year: Option<i32>,
+    pub reporting_period: Option<String>,
+    pub scenarios: Vec<BudgetScenarioRequest>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct BudgetScenarioRequest {
+    pub scenario_name: String,
+    pub total_budget_usd: f64,
+    pub allocations: std::collections::HashMap<String, f64>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -266,15 +330,12 @@ pub async fn analyze_performance_gaps(
         })));
     }
 
-    // Call FSFVI service
+    // Call FSFVI service with proper error handling for government accountability
     let result = state
         .performance_gap_service
         .analyze_performance_gaps(components)
         .await
-        .map_err(|e| {
-            log::error!("FSFVI service error: {}", e);
-            actix_web::error::ErrorInternalServerError(format!("Analysis failed: {}", e))
-        })?;
+        .map_err(|e| handle_fsfvi_error(e, "analyze_performance_gaps"))?;
 
     Ok(HttpResponse::Ok().json(json!({
         "success": true,
@@ -626,6 +687,49 @@ pub async fn generate_mtef(
     })))
 }
 
+/// GET /api/government/fsfvi/strategic-planning/historical-trends?fiscal_years=2020,2021,2022
+/// Fetch historical multi-year component data for trend analysis
+/// CRITICAL: Helps government understand past performance trends when planning future strategies
+pub async fn get_historical_trends(
+    req: HttpRequest,
+    query: web::Query<HistoricalTrendsQuery>,
+    state: web::Data<FsfviAppState>,
+) -> Result<HttpResponse> {
+    let user = extract_user_from_token(&req)?;
+    log::info!(
+        "User {} fetching historical trends for {} fiscal years",
+        user.username,
+        query.fiscal_years.len()
+    );
+
+    if query.fiscal_years.is_empty() {
+        return Ok(HttpResponse::BadRequest().json(json!({
+            "success": false,
+            "message": "At least one fiscal year is required"
+        })));
+    }
+
+    let trends = state
+        .strategic_planning_service
+        .fetch_historical_trends(
+            &state.db_pool,
+            &user.government_id,
+            query.fiscal_years.clone(),
+            query.reporting_period.as_deref(),
+        )
+        .await
+        .map_err(|e| actix_web::error::ErrorInternalServerError(format!("Failed to fetch historical trends: {}", e)))?;
+
+    Ok(HttpResponse::Ok().json(json!({
+        "success": true,
+        "data": {
+            "fiscal_years": query.fiscal_years,
+            "trends": trends,
+            "count": trends.len()
+        }
+    })))
+}
+
 // ============================================================================
 // BUDGET OPTIMIZATION ENDPOINTS
 // ============================================================================
@@ -714,6 +818,63 @@ pub async fn generate_reallocation_plan(
         .generate_reallocation_plan(components, constraints)
         .await
         .map_err(|e| actix_web::error::ErrorInternalServerError(format!("Planning failed: {}", e)))?;
+
+    Ok(HttpResponse::Ok().json(json!({
+        "success": true,
+        "data": result.data
+    })))
+}
+
+/// POST /api/government/fsfvi/budget-optimization/calculate-roi
+/// Calculate return on investment for budget scenarios
+pub async fn calculate_roi(
+    req: HttpRequest,
+    request: web::Json<RoiAnalysisRequest>,
+    state: web::Data<FsfviAppState>,
+) -> Result<HttpResponse> {
+    let user = extract_user_from_token(&req)?;
+    log::info!("User {} calculating ROI for {} scenarios", user.username, request.scenarios.len());
+
+    // Fetch baseline components from database
+    let components = DataFetcher::fetch_components(
+        &state.db_pool,
+        &user.government_id,
+        request.fiscal_year,
+        request.reporting_period.as_deref(),
+    )
+    .await
+    .map_err(|e| actix_web::error::ErrorInternalServerError(format!("Failed to fetch data: {}", e)))?;
+
+    if components.is_empty() {
+        return Ok(HttpResponse::BadRequest().json(json!({
+            "success": false,
+            "message": "No validated data found for baseline"
+        })));
+    }
+
+    if request.scenarios.is_empty() {
+        return Ok(HttpResponse::BadRequest().json(json!({
+            "success": false,
+            "message": "At least one scenario is required for ROI analysis"
+        })));
+    }
+
+    // Convert request scenarios to service BudgetScenario format
+    use crate::services::fsfvi_service::budget_optimization::BudgetScenario;
+    let scenarios: Vec<BudgetScenario> = request
+        .scenarios
+        .iter()
+        .map(|s| BudgetScenario {
+            scenario_name: s.scenario_name.clone(),
+            component_allocations: s.allocations.clone(),
+        })
+        .collect();
+
+    let result = state
+        .budget_optimization_service
+        .calculate_roi(components, scenarios)
+        .await
+        .map_err(|e| actix_web::error::ErrorInternalServerError(format!("ROI calculation failed: {}", e)))?;
 
     Ok(HttpResponse::Ok().json(json!({
         "success": true,
@@ -1503,10 +1664,27 @@ pub async fn export_matrices_csv(
 
 /// GET /api/government/fsfvi/health
 /// Health check endpoint
-pub async fn health_check() -> Result<HttpResponse> {
-    Ok(HttpResponse::Ok().json(json!({
-        "success": true,
-        "message": "FSFVI Government API is healthy",
-        "version": "1.0.0"
-    })))
+/// CRITICAL: Monitors connectivity to backend FSFVI API to ensure government
+/// officials can access food security vulnerability data when making decisions
+pub async fn health_check(state: web::Data<FsfviAppState>) -> Result<HttpResponse> {
+    // Check backend FSFVI API connectivity
+    let backend_api_healthy = state.fsfvi_client.health_check().await;
+
+    if backend_api_healthy {
+        Ok(HttpResponse::Ok().json(json!({
+            "success": true,
+            "message": "FSFVI Government API is healthy",
+            "version": "1.0.0",
+            "backend_api_status": "connected"
+        })))
+    } else {
+        log::error!("CRITICAL: Backend FSFVI API is not responding - government officials may not be able to access vulnerability data");
+        Ok(HttpResponse::ServiceUnavailable().json(json!({
+            "success": false,
+            "message": "FSFVI Government API frontend is running, but backend API is unreachable",
+            "version": "1.0.0",
+            "backend_api_status": "disconnected",
+            "error": "Cannot connect to backend FSFVI calculation engine"
+        })))
+    }
 }
