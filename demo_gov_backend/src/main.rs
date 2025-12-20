@@ -16,7 +16,7 @@ use crate::config::AppConfig;
 use crate::handlers::auth_handler::{
     change_password, check_password_strength, health_check, login, logout, verify_token,
     prepare_two_fa_setup, setup_two_fa, verify_two_fa, disable_two_fa, get_session, get_audit_logs,
-    get_security_dashboard, AppState,
+    get_security_dashboard, root_handler, AppState,
 };
 use crate::handlers::fsfvi_handler::{
     // Performance Gap Analysis
@@ -276,6 +276,9 @@ async fn main() -> std::io::Result<()> {
                     // General health check
                     .route("/health", web::get().to(health_check)),
             )
+            // Root endpoint to prevent 404 flooding from browser extensions
+            .route("/", web::get().to(root_handler))
+            .route("/", web::head().to(root_handler))
     })
     .bind((host, port))?
     .run()

@@ -67,7 +67,7 @@ impl AuthService {
         // Verify password
         log::debug!("Login: Verifying password for user: {}", user.username);
         log::debug!("Login: Password length: {}", request.password.len());
-        let password_valid = self.password_service.verify_password(&request.password, &user.password_hash)?;
+        let password_valid = self.password_service.verify_password(&request.password, &user.password_hash).unwrap_or(false);
 
         if !password_valid {
             // Record failed attempt
@@ -166,11 +166,11 @@ impl AuthService {
                 self.complete_login(user, session_id, ip_address, &request).await
             } else {
                 // First step: Password verified, 2FA required
-                let temp_token = self.two_fa_service.generate_temp_token();
-                
+                let temp_token = self.two_fa_service.generate_temp_token_with_username(&user.username);
+
                 // Store temp token temporarily (you might want to store this in Redis or database)
                 // For now, we'll return it and validate it on the next request
-                
+
                 Ok(LoginResponse {
                     token: String::new(), // No full token yet
                     user: UserResponse::from(user),
@@ -205,7 +205,7 @@ impl AuthService {
         // Verify current password
         log::debug!("Password change: Attempting to verify current password for user: {}", user.username);
         log::debug!("Password change: Current password length: {}", request.current_password.len());
-        let current_password_valid = self.password_service.verify_password(&request.current_password, &user.password_hash)?;
+        let current_password_valid = self.password_service.verify_password(&request.current_password, &user.password_hash).unwrap_or(false);
         log::debug!("Password change: Password verification result: {}", current_password_valid);
 
         if !current_password_valid {
@@ -712,7 +712,7 @@ impl AuthService {
     }
 
     /// Complete the login process (generate token and log)
-    async fn complete_login(&mut self, user: User, session_id: String, ip_address: &str, request: &LoginRequest) -> AuthResult<LoginResponse> {
+    async fn complete_login(&mut self, mut user: User, session_id: String, ip_address: &str, request: &LoginRequest) -> AuthResult<LoginResponse> {
         // CRITICAL SECURITY: Check if password change is required for temporary passwords
         // Government policy enforces password changes for temporary credentials
         if self.security_config.require_password_change && user.is_temporary_password {
@@ -722,6 +722,14 @@ impl AuthService {
             );
             // Frontend should check user.is_temporary_password and enforce password change flow
         }
+
+        // CRITICAL: Set session information before generating token
+        let session_expires_at = Utc::now() + Duration::minutes(self.security_config.session_timeout_minutes);
+        user.session_token = Some(session_id.clone());
+        user.session_expires_at = Some(session_expires_at);
+
+        // Update session in database
+        self.update_user_security_info(&user).await?;
 
         // Generate JWT token
         let token = self.token_service.generate_token(&user, &session_id)?;
@@ -775,17 +783,19 @@ impl AuthService {
     /// Prepare 2FA setup - generates secret and QR code
     pub async fn prepare_two_fa_setup(&mut self, user_id: Uuid) -> AuthResult<TwoFASetupResponse> {
         let user = self.get_user_by_id(user_id).await?;
-        
+
         // Generate secret and backup codes
         let secret = self.two_fa_service.generate_secret();
         let backup_codes = self.two_fa_service.generate_backup_codes(10);
-        
-        // Generate QR code
+
+        // Generate QR code and otpauth URL
         let qr_code = self.two_fa_service.generate_qr_code(&user.username, &secret)?;
-        
+        let otpauth_url = self.two_fa_service.generate_otpauth_url(&user.username, &secret);
+
         Ok(TwoFASetupResponse {
             secret,
             qr_code,
+            otpauth_url,
             backup_codes,
             enabled: false, // Not enabled yet, just prepared
         })
@@ -794,29 +804,30 @@ impl AuthService {
     /// Set up 2FA for user - verifies TOTP and enables 2FA
     pub async fn setup_two_fa(&mut self, user_id: Uuid, request: TwoFASetupRequest) -> AuthResult<TwoFASetupResponse> {
         let user = self.get_user_by_id(user_id).await?;
-        
-        // Generate secret and backup codes (same as prepare, but we'll verify the code)
-        let secret = self.two_fa_service.generate_secret();
-        let backup_codes = self.two_fa_service.generate_backup_codes(10);
-        
-        // Verify the provided TOTP code against the generated secret
+
+        // Use the secret and backup codes provided from the prepare phase
+        let secret = request.secret.clone();
+        let backup_codes = request.backup_codes.clone();
+
+        // Verify the provided TOTP code against the secret from prepare phase
         let is_valid = self.two_fa_service.verify_totp(&secret, &request.totp_code)?;
         if !is_valid {
             return Err(AuthError::InvalidCredentials);
         }
 
-        // Generate QR code
+        // Generate QR code and otpauth URL (for response consistency)
         let qr_code = self.two_fa_service.generate_qr_code(&user.username, &secret)?;
-        
+        let otpauth_url = self.two_fa_service.generate_otpauth_url(&user.username, &secret);
+
         // Hash backup codes for storage
         let backup_codes_json = self.two_fa_service.hash_backup_codes(&backup_codes)?;
-        
+
         // Update user in database
         let now = Utc::now();
         sqlx::query!(
             r#"
-            UPDATE users 
-            SET two_fa_enabled = ?, two_fa_secret = ?, two_fa_backup_codes = ?, 
+            UPDATE users
+            SET two_fa_enabled = ?, two_fa_secret = ?, two_fa_backup_codes = ?,
                 two_fa_enabled_at = ?, updated_at = ?
             WHERE id = ?
             "#,
@@ -834,6 +845,7 @@ impl AuthService {
         Ok(TwoFASetupResponse {
             secret,
             qr_code,
+            otpauth_url,
             backup_codes,
             enabled: true,
         })
@@ -841,20 +853,101 @@ impl AuthService {
 
     /// Verify 2FA code during login
     pub async fn verify_two_fa(&mut self, request: TwoFAVerifyRequest) -> AuthResult<LoginResponse> {
-        // Validate temp token format
-        if !self.two_fa_service.validate_temp_token(&request.temp_token) {
+        log::info!("=== 2FA Verification Debug ===");
+        log::info!("Temp token: {}", request.temp_token);
+        log::info!("TOTP code length: {}", request.totp_code.len());
+
+        // Validate temp token format (should be "2FA_<username>_<uuid>")
+        if !self.two_fa_service.validate_temp_token_with_username(&request.temp_token) {
+            log::error!("Temp token validation failed");
             return Err(AuthError::InvalidToken);
         }
 
-        // In a real implementation, you would validate the temp token against a store (Redis/database)
-        // For this example, we'll assume it's valid if it has the right format
-        
-        // This is a simplified implementation - in production, you'd need to:
-        // 1. Store temp tokens with user association and expiry
-        // 2. Validate the temp token and get associated user
-        // 3. Complete the login process
-        
-        Err(AuthError::InternalError("2FA verification not fully implemented for temp tokens".to_string()))
+        // Extract username from temp token (format: "2FA||username||uuid")
+        let parts: Vec<&str> = request.temp_token.split("||").collect();
+        if parts.len() != 3 || parts[0] != "2FA" {
+            log::error!("Temp token format invalid: parts count = {}", parts.len());
+            return Err(AuthError::InvalidToken);
+        }
+        let username = parts[1];
+        log::info!("Extracted username: {}", username);
+
+        // Get user from database
+        let user = self.get_user_by_username(username).await?;
+        log::info!("User found: {}, 2FA enabled: {}", user.username, user.two_fa_enabled);
+
+        // Verify user has 2FA enabled
+        if !user.two_fa_enabled {
+            log::error!("2FA not enabled for user: {}", user.username);
+            return Err(AuthError::InternalError("2FA not enabled for this user".to_string()));
+        }
+
+        // Check if user has a secret
+        if user.two_fa_secret.is_none() {
+            log::error!("User {} has 2FA enabled but no secret stored", user.username);
+            return Err(AuthError::InternalError("2FA secret missing".to_string()));
+        }
+
+        let secret = user.two_fa_secret.as_ref().unwrap();
+        log::info!("Secret length: {}, starts with: {}...", secret.len(), &secret[..secret.len().min(4)]);
+
+        // Verify the TOTP code
+        let is_valid = if request.totp_code.len() == 6 && request.totp_code.chars().all(|c| c.is_ascii_digit()) {
+            log::info!("Attempting TOTP verification with 6-digit code");
+            // Verify TOTP code
+            match self.two_fa_service.verify_totp(secret, &request.totp_code) {
+                Ok(valid) => {
+                    log::info!("TOTP verification result: {}", valid);
+                    valid
+                }
+                Err(e) => {
+                    log::error!("TOTP verification error: {:?}", e);
+                    return Err(e);
+                }
+            }
+        } else if request.totp_code.len() == 8 && request.totp_code.chars().all(|c| c.is_ascii_alphanumeric()) {
+            log::info!("Attempting backup code verification");
+            // Verify backup code
+            if let Some(ref backup_codes) = user.two_fa_backup_codes {
+                let (is_valid, updated_codes) = self.two_fa_service.verify_backup_code(backup_codes, &request.totp_code)?;
+                if is_valid {
+                    log::info!("Backup code valid, updating codes in database");
+                    // Update backup codes in database (remove used code)
+                    self.update_user_backup_codes(user.id, &updated_codes).await?;
+                }
+                is_valid
+            } else {
+                log::warn!("User has no backup codes");
+                false
+            }
+        } else {
+            log::warn!("Invalid code format - length: {}, is_digit: {}",
+                request.totp_code.len(),
+                request.totp_code.chars().all(|c| c.is_ascii_digit())
+            );
+            false
+        };
+
+        if !is_valid {
+            log::warn!("2FA verification failed - invalid code");
+            return Err(AuthError::InvalidCredentials);
+        }
+
+        log::info!("2FA verification successful, proceeding with login");
+
+        // 2FA verified, complete login
+        let session_id = TokenService::generate_session_id();
+
+        // Create a dummy login request for complete_login
+        let dummy_request = LoginRequest {
+            username: user.username.clone(),
+            password: String::new(), // Not used in complete_login
+            user_agent: None,
+            ip_address: None,
+            two_fa_code: Some(request.totp_code),
+        };
+
+        self.complete_login(user, session_id, "unknown", &dummy_request).await
     }
 
     /// Disable 2FA for user
@@ -862,7 +955,7 @@ impl AuthService {
         let user = self.get_user_by_id(user_id).await?;
         
         // Verify password
-        let password_valid = self.password_service.verify_password(&request.password, &user.password_hash)?;
+        let password_valid = self.password_service.verify_password(&request.password, &user.password_hash).unwrap_or(false);
         if !password_valid {
             return Err(AuthError::InvalidCredentials);
         }
@@ -904,5 +997,676 @@ impl AuthService {
         .map_err(|e| AuthError::InternalError(format!("Database error: {}", e)))?;
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::user::{LoginRequest, UserRole};
+    use sqlx::SqlitePool;
+
+    /// Helper: Create in-memory test database with migrations
+    async fn setup_test_db() -> SqlitePool {
+        let pool = SqlitePool::connect("sqlite::memory:")
+            .await
+            .expect("Failed to create in-memory database");
+
+        // Run migrations
+        sqlx::migrate!("./migrations")
+            .run(&pool)
+            .await
+            .expect("Failed to run migrations");
+
+        pool
+    }
+
+    /// Helper: Create test auth service with default configuration
+    async fn create_test_auth_service(pool: SqlitePool) -> AuthService {
+        let password_service = PasswordService::new();
+        let security_config = crate::models::auth::SecurityConfig::default();
+        let token_service = TokenService::new(security_config.clone());
+
+        AuthService::new(pool, password_service, token_service, security_config)
+    }
+
+    /// Helper: Create test user in database
+    async fn create_test_user(
+        pool: &SqlitePool,
+        username: &str,
+        password_hash: &str,
+        is_temporary: bool,
+    ) -> Uuid {
+        let user_id = Uuid::new_v4();
+        let now = Utc::now();
+
+        sqlx::query!(
+            r#"
+            INSERT INTO users (id, username, password_hash, role, is_temporary_password,
+                             created_at, updated_at, login_attempts, is_locked,
+                             two_fa_enabled, two_fa_secret, two_fa_backup_codes, two_fa_enabled_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            "#,
+            user_id,
+            username,
+            password_hash,
+            "demo_government",
+            is_temporary,
+            now,
+            now,
+            0,
+            false,
+            false,
+            Option::<String>::None,
+            Option::<String>::None,
+            Option::<chrono::DateTime<chrono::Utc>>::None
+        )
+        .execute(pool)
+        .await
+        .expect("Failed to create test user");
+
+        user_id
+    }
+
+    #[tokio::test]
+    async fn test_login_success_with_correct_credentials() {
+        let pool = setup_test_db().await;
+        let mut service = create_test_auth_service(pool.clone()).await;
+
+        // Create test user with known password
+        let password = "SecurePhrase@2025!Valid";
+        let password_hash = service.password_service.hash_password(password).unwrap();
+        create_test_user(&pool, "test_user", &password_hash, false).await;
+
+        // Attempt login
+        let request = LoginRequest {
+            username: "test_user".to_string(),
+            password: password.to_string(),
+            two_fa_code: None,
+            user_agent: Some("Test Agent".to_string()),
+            ip_address: None,
+        };
+
+        let result = service.authenticate(request, "127.0.0.1").await;
+        assert!(result.is_ok());
+
+        let response = result.unwrap();
+        assert!(!response.token.is_empty());
+        assert_eq!(response.user.username, "test_user");
+        assert!(!response.requires_two_fa);
+    }
+
+    #[tokio::test]
+    async fn test_login_invalid_credentials_wrong_password() {
+        let pool = setup_test_db().await;
+        let mut service = create_test_auth_service(pool.clone()).await;
+
+        // Create test user with known password
+        let password = "SecurePhrase@2025!Valid";
+        let password_hash = service.password_service.hash_password(password).unwrap();
+        create_test_user(&pool, "test_user", &password_hash, false).await;
+
+        // Attempt login with wrong password
+        let request = LoginRequest {
+            username: "test_user".to_string(),
+            password: "WrongPhrase@2025!Wrong".to_string(),
+            two_fa_code: None,
+            user_agent: Some("Test Agent".to_string()),
+            ip_address: None,
+        };
+
+        let result = service.authenticate(request, "127.0.0.1").await;
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), AuthError::InvalidCredentials));
+    }
+
+    #[tokio::test]
+    async fn test_login_invalid_credentials_nonexistent_user() {
+        let pool = setup_test_db().await;
+        let mut service = create_test_auth_service(pool.clone()).await;
+
+        // Attempt login with non-existent user
+        let request = LoginRequest {
+            username: "nonexistent_user".to_string(),
+            password: "AnyPhrase@2025!Any".to_string(),
+            two_fa_code: None,
+            user_agent: Some("Test Agent".to_string()),
+            ip_address: None,
+        };
+
+        let result = service.authenticate(request, "127.0.0.1").await;
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), AuthError::InvalidCredentials));
+    }
+
+    #[tokio::test]
+    async fn test_account_lockout_after_failed_attempts() {
+        let pool = setup_test_db().await;
+        let mut service = create_test_auth_service(pool.clone()).await;
+
+        // Get max attempts from config (default is 5)
+        let max_attempts = service.security_config.rate_limit.max_attempts;
+
+        // Create test user
+        let password = "SecurePhrase@2025!Valid";
+        let password_hash = service.password_service.hash_password(password).unwrap();
+        let user_id = create_test_user(&pool, "test_user", &password_hash, false).await;
+
+        // Attempt login with wrong password max_attempts times
+        for _i in 0..max_attempts {
+            let request = LoginRequest {
+                username: "test_user".to_string(),
+                password: "WrongPhrase@2025!Wrong".to_string(),
+                two_fa_code: None,
+                user_agent: Some("Test Agent".to_string()),
+                ip_address: None,
+            };
+
+            let result = service.authenticate(request, "127.0.0.1").await;
+            assert!(result.is_err());
+
+            // After max_attempts, the error should be InvalidCredentials
+            // (Account is locked, but still returns InvalidCredentials for security)
+            assert!(matches!(result.unwrap_err(), AuthError::InvalidCredentials));
+        }
+
+        // Verify user is now locked
+        let user = service.get_user_by_id(user_id).await.unwrap();
+        assert!(user.is_locked);
+        assert!(user.lockout_expiry.is_some());
+        assert!(user.login_attempts >= max_attempts as i32);
+
+        // Attempt login with correct password should still fail
+        // Note: This will fail with TooManyAttempts (rate limiting) before checking account lockout
+        // since both are triggered after max_attempts (5) and rate limiting is checked first
+        let request = LoginRequest {
+            username: "test_user".to_string(),
+            password: password.to_string(),
+            two_fa_code: None,
+            user_agent: Some("Test Agent".to_string()),
+            ip_address: None,
+        };
+
+        let result = service.authenticate(request, "127.0.0.1").await;
+        assert!(result.is_err());
+        // Rate limiting check happens before account lockout check, so we get TooManyAttempts
+        match result.unwrap_err() {
+            AuthError::TooManyAttempts | AuthError::AccountLocked => {}, // Both are acceptable
+            other => panic!("Expected TooManyAttempts or AccountLocked, got: {:?}", other),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_failed_login_increments_attempt_counter() {
+        let pool = setup_test_db().await;
+        let mut service = create_test_auth_service(pool.clone()).await;
+
+        // Create test user
+        let password = "SecurePhrase@2025!Valid";
+        let password_hash = service.password_service.hash_password(password).unwrap();
+        let user_id = create_test_user(&pool, "test_user", &password_hash, false).await;
+
+        // Verify initial login_attempts is 0
+        let user = service.get_user_by_id(user_id).await.unwrap();
+        assert_eq!(user.login_attempts, 0);
+
+        // Attempt login with wrong password
+        let request = LoginRequest {
+            username: "test_user".to_string(),
+            password: "WrongPhrase@2025!Wrong".to_string(),
+            two_fa_code: None,
+            user_agent: Some("Test Agent".to_string()),
+            ip_address: None,
+        };
+
+        let _ = service.authenticate(request, "127.0.0.1").await;
+
+        // Verify login_attempts incremented
+        let user = service.get_user_by_id(user_id).await.unwrap();
+        assert_eq!(user.login_attempts, 1);
+    }
+
+    #[tokio::test]
+    async fn test_successful_login_resets_attempt_counter() {
+        let pool = setup_test_db().await;
+        let mut service = create_test_auth_service(pool.clone()).await;
+
+        // Create test user
+        let password = "SecurePhrase@2025!Valid";
+        let password_hash = service.password_service.hash_password(password).unwrap();
+        let user_id = create_test_user(&pool, "test_user", &password_hash, false).await;
+
+        // Simulate 2 failed login attempts
+        for _ in 0..2 {
+            let request = LoginRequest {
+                username: "test_user".to_string(),
+                password: "WrongPhrase@2025!Wrong".to_string(),
+                two_fa_code: None,
+                user_agent: Some("Test Agent".to_string()),
+                ip_address: None,
+            };
+            let _ = service.authenticate(request, "127.0.0.1").await;
+        }
+
+        // Verify login_attempts is 2
+        let user = service.get_user_by_id(user_id).await.unwrap();
+        assert_eq!(user.login_attempts, 2);
+
+        // Successful login
+        let request = LoginRequest {
+            username: "test_user".to_string(),
+            password: password.to_string(),
+            two_fa_code: None,
+            user_agent: Some("Test Agent".to_string()),
+            ip_address: None,
+        };
+
+        let result = service.authenticate(request, "127.0.0.1").await;
+        assert!(result.is_ok());
+
+        // Verify login_attempts reset to 0
+        let user = service.get_user_by_id(user_id).await.unwrap();
+        assert_eq!(user.login_attempts, 0);
+        assert!(!user.is_locked);
+        assert!(user.lockout_expiry.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_password_change_success() {
+        let pool = setup_test_db().await;
+        let mut service = create_test_auth_service(pool.clone()).await;
+
+        // Create test user with known password
+        let current_password = "CurrentPhrase@2025!Old";
+        let password_hash = service.password_service.hash_password(current_password).unwrap();
+        let user_id = create_test_user(&pool, "test_user", &password_hash, false).await;
+
+        // Change password
+        let request = ChangePasswordRequest {
+            current_password: current_password.to_string(),
+            new_password: "NewPhrase@2025!Changed".to_string(),
+            confirm_password: "NewPhrase@2025!Changed".to_string(),
+        };
+
+        let result = service.change_password(user_id, request).await;
+        assert!(result.is_ok());
+
+        // Verify new password works
+        let user = service.get_user_by_id(user_id).await.unwrap();
+        assert!(service.password_service.verify_password("NewPhrase@2025!Changed", &user.password_hash).unwrap());
+        assert!(!user.is_temporary_password); // Should be set to false after password change
+    }
+
+    #[tokio::test]
+    async fn test_password_change_wrong_current_password() {
+        let pool = setup_test_db().await;
+        let mut service = create_test_auth_service(pool.clone()).await;
+
+        // Create test user
+        let current_password = "CurrentPhrase@2025!Old";
+        let password_hash = service.password_service.hash_password(current_password).unwrap();
+        let user_id = create_test_user(&pool, "test_user", &password_hash, false).await;
+
+        // Attempt password change with wrong current password
+        let request = ChangePasswordRequest {
+            current_password: "WrongPhrase@2025!Wrong".to_string(),
+            new_password: "NewPhrase@2025!Changed".to_string(),
+            confirm_password: "NewPhrase@2025!Changed".to_string(),
+        };
+
+        let result = service.change_password(user_id, request).await;
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), AuthError::InvalidCredentials));
+    }
+
+    #[tokio::test]
+    async fn test_password_change_mismatch_confirmation() {
+        let pool = setup_test_db().await;
+        let mut service = create_test_auth_service(pool.clone()).await;
+
+        // Create test user
+        let current_password = "CurrentPhrase@2025!Old";
+        let password_hash = service.password_service.hash_password(current_password).unwrap();
+        let user_id = create_test_user(&pool, "test_user", &password_hash, false).await;
+
+        // Attempt password change with mismatched confirmation
+        let request = ChangePasswordRequest {
+            current_password: current_password.to_string(),
+            new_password: "NewPhrase@2025!Changed".to_string(),
+            confirm_password: "DifferentPhrase@2025!Wrong".to_string(),
+        };
+
+        let result = service.change_password(user_id, request).await;
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), AuthError::PasswordMismatch));
+    }
+
+    #[tokio::test]
+    async fn test_password_change_weak_password() {
+        let pool = setup_test_db().await;
+        let mut service = create_test_auth_service(pool.clone()).await;
+
+        // Create test user
+        let current_password = "CurrentPhrase@2025!Old";
+        let password_hash = service.password_service.hash_password(current_password).unwrap();
+        let user_id = create_test_user(&pool, "test_user", &password_hash, false).await;
+
+        // Attempt password change with weak password (too short, no special chars)
+        let request = ChangePasswordRequest {
+            current_password: current_password.to_string(),
+            new_password: "weak".to_string(),
+            confirm_password: "weak".to_string(),
+        };
+
+        let result = service.change_password(user_id, request).await;
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), AuthError::PasswordTooWeak));
+    }
+
+    #[tokio::test]
+    async fn test_password_change_same_as_current() {
+        let pool = setup_test_db().await;
+        let mut service = create_test_auth_service(pool.clone()).await;
+
+        // Create test user
+        let current_password = "CurrentPhrase@2025!Old";
+        let password_hash = service.password_service.hash_password(current_password).unwrap();
+        let user_id = create_test_user(&pool, "test_user", &password_hash, false).await;
+
+        // Attempt password change with same password as current
+        let request = ChangePasswordRequest {
+            current_password: current_password.to_string(),
+            new_password: current_password.to_string(),
+            confirm_password: current_password.to_string(),
+        };
+
+        let result = service.change_password(user_id, request).await;
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            AuthError::InternalError(msg) => {
+                assert!(msg.contains("must be different from current password"));
+            }
+            _ => panic!("Expected InternalError"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_temporary_password_flag() {
+        let pool = setup_test_db().await;
+        let mut service = create_test_auth_service(pool.clone()).await;
+
+        // Create test user with temporary password
+        let password = "TempPhrase@2025!Temp";
+        let password_hash = service.password_service.hash_password(password).unwrap();
+        let user_id = create_test_user(&pool, "test_user", &password_hash, true).await;
+
+        // Login with temporary password
+        let request = LoginRequest {
+            username: "test_user".to_string(),
+            password: password.to_string(),
+            two_fa_code: None,
+            user_agent: Some("Test Agent".to_string()),
+            ip_address: None,
+        };
+
+        let result = service.authenticate(request, "127.0.0.1").await;
+        assert!(result.is_ok());
+
+        // Verify user has is_temporary_password flag
+        let user = service.get_user_by_id(user_id).await.unwrap();
+        assert!(user.is_temporary_password);
+
+        // Change password
+        let request = ChangePasswordRequest {
+            current_password: password.to_string(),
+            new_password: "NewPhrase@2025!Changed".to_string(),
+            confirm_password: "NewPhrase@2025!Changed".to_string(),
+        };
+
+        let result = service.change_password(user_id, request).await;
+        assert!(result.is_ok());
+
+        // Verify is_temporary_password is now false
+        let user = service.get_user_by_id(user_id).await.unwrap();
+        assert!(!user.is_temporary_password);
+    }
+
+    #[tokio::test]
+    async fn test_session_validation_success() {
+        let pool = setup_test_db().await;
+        let mut service = create_test_auth_service(pool.clone()).await;
+
+        // Create test user
+        let password = "SecurePhrase@2025!Valid";
+        let password_hash = service.password_service.hash_password(password).unwrap();
+        create_test_user(&pool, "test_user", &password_hash, false).await;
+
+        // Login to get token
+        let request = LoginRequest {
+            username: "test_user".to_string(),
+            password: password.to_string(),
+            two_fa_code: None,
+            user_agent: Some("Test Agent".to_string()),
+            ip_address: None,
+        };
+
+        let login_response = service.authenticate(request, "127.0.0.1").await.unwrap();
+        let token = login_response.token;
+
+        // Validate session
+        let result = service.validate_session(&token).await;
+        assert!(result.is_ok());
+
+        let user_response = result.unwrap();
+        assert_eq!(user_response.username, "test_user");
+    }
+
+    #[tokio::test]
+    async fn test_session_validation_invalid_token() {
+        let pool = setup_test_db().await;
+        let service = create_test_auth_service(pool.clone()).await;
+
+        // Attempt to validate invalid token
+        let result = service.validate_session("invalid_token").await;
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), AuthError::InvalidToken));
+    }
+
+    #[tokio::test]
+    async fn test_logout_clears_session() {
+        let pool = setup_test_db().await;
+        let mut service = create_test_auth_service(pool.clone()).await;
+
+        // Create test user
+        let password = "SecurePhrase@2025!Valid";
+        let password_hash = service.password_service.hash_password(password).unwrap();
+        create_test_user(&pool, "test_user", &password_hash, false).await;
+
+        // Login to create session
+        let request = LoginRequest {
+            username: "test_user".to_string(),
+            password: password.to_string(),
+            two_fa_code: None,
+            user_agent: Some("Test Agent".to_string()),
+            ip_address: None,
+        };
+
+        let login_response = service.authenticate(request, "127.0.0.1").await.unwrap();
+        let user_id = Uuid::parse_str(&login_response.user.id).unwrap();
+        let token = login_response.token.clone();
+
+        // Verify session exists
+        let user = service.get_user_by_id(user_id).await.unwrap();
+        assert!(user.session_token.is_some());
+
+        // Logout
+        let result = service.logout(user_id, Some(&token)).await;
+        assert!(result.is_ok());
+
+        // Verify session cleared
+        let user = service.get_user_by_id(user_id).await.unwrap();
+        assert!(user.session_token.is_none());
+        assert!(user.session_expires_at.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_logout_blacklists_token() {
+        let pool = setup_test_db().await;
+        let mut service = create_test_auth_service(pool.clone()).await;
+
+        // Create test user
+        let password = "SecurePhrase@2025!Valid";
+        let password_hash = service.password_service.hash_password(password).unwrap();
+        create_test_user(&pool, "test_user", &password_hash, false).await;
+
+        // Login
+        let request = LoginRequest {
+            username: "test_user".to_string(),
+            password: password.to_string(),
+            two_fa_code: None,
+            user_agent: Some("Test Agent".to_string()),
+            ip_address: None,
+        };
+
+        let login_response = service.authenticate(request, "127.0.0.1").await.unwrap();
+        let user_id = Uuid::parse_str(&login_response.user.id).unwrap();
+        let token = login_response.token.clone();
+
+        // Token should work before logout
+        let result = service.validate_session(&token).await;
+        assert!(result.is_ok());
+
+        // Logout with token
+        let result = service.logout(user_id, Some(&token)).await;
+        assert!(result.is_ok());
+
+        // Token should be blacklisted and fail validation
+        let result = service.validate_session(&token).await;
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), AuthError::InvalidToken));
+    }
+
+    #[tokio::test]
+    async fn test_rate_limiting_ip_based() {
+        let pool = setup_test_db().await;
+        let mut service = create_test_auth_service(pool.clone()).await;
+
+        // Get max attempts from config (default is 5)
+        let max_attempts = service.security_config.rate_limit.max_attempts;
+
+        // Create test user (but we won't use correct password)
+        let password_hash = service.password_service.hash_password("DummyPhrase@2025!Dummy").unwrap();
+        create_test_user(&pool, "test_user", &password_hash, false).await;
+
+        // Make (max_attempts - 2) failed login attempts from the first IP
+        // This will trigger IP-based rate limiting without triggering account lockout
+        for _i in 0..(max_attempts - 2) {
+            let request = LoginRequest {
+                username: "test_user".to_string(),
+                password: "WrongPhrase@2025!Wrong".to_string(),
+                two_fa_code: None,
+                user_agent: Some("Test Agent".to_string()),
+                ip_address: None,
+            };
+
+            let _ = service.authenticate(request, "192.168.1.100").await;
+        }
+
+        // Make 2 more attempts from the same IP to exceed rate limit
+        for _i in 0..2 {
+            let request = LoginRequest {
+                username: "test_user".to_string(),
+                password: "WrongPhrase@2025!Wrong".to_string(),
+                two_fa_code: None,
+                user_agent: Some("Test Agent".to_string()),
+                ip_address: None,
+            };
+
+            let _ = service.authenticate(request, "192.168.1.100").await;
+        }
+
+        // Next attempt from same IP should fail with TooManyAttempts (rate limited)
+        let request = LoginRequest {
+            username: "test_user".to_string(),
+            password: "WrongPhrase@2025!Wrong".to_string(),
+            two_fa_code: None,
+            user_agent: Some("Test Agent".to_string()),
+            ip_address: None,
+        };
+
+        let result = service.authenticate(request, "192.168.1.100").await;
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), AuthError::TooManyAttempts));
+
+        // Attempt from different IP should still work (rate limit is per IP, not per user)
+        // But user account may also be locked if we hit max_attempts
+        let request = LoginRequest {
+            username: "test_user".to_string(),
+            password: "WrongPhrase@2025!Wrong".to_string(),
+            two_fa_code: None,
+            user_agent: Some("Test Agent".to_string()),
+            ip_address: None,
+        };
+
+        let result = service.authenticate(request, "192.168.1.200").await;
+        assert!(result.is_err());
+        // Could be InvalidCredentials (password wrong) or AccountLocked (user locked after max attempts)
+        match result.unwrap_err() {
+            AuthError::InvalidCredentials | AuthError::AccountLocked => {}, // Both acceptable
+            AuthError::TooManyAttempts => panic!("Should not be rate-limited for different IP"),
+            other => panic!("Unexpected error: {:?}", other),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_initialize_default_user() {
+        let pool = setup_test_db().await;
+        let service = create_test_auth_service(pool.clone()).await;
+
+        // Verify no users exist initially
+        let user_count: i32 = sqlx::query_scalar!("SELECT COUNT(*) as count FROM users")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(user_count, 0);
+
+        // Initialize default user
+        let result = service.initialize_default_user().await;
+        assert!(result.is_ok());
+
+        // Verify user was created
+        let user_count: i32 = sqlx::query_scalar!("SELECT COUNT(*) as count FROM users")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(user_count, 1);
+
+        // Verify user has correct properties
+        let user: User = sqlx::query_as("SELECT * FROM users WHERE username = ?")
+            .bind("demo_government")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+
+        assert_eq!(user.username, "demo_government");
+        assert_eq!(user.role, UserRole::DemoGovernment);
+        assert!(user.is_temporary_password);
+    }
+
+    #[tokio::test]
+    async fn test_initialize_default_user_idempotent() {
+        let pool = setup_test_db().await;
+        let service = create_test_auth_service(pool.clone()).await;
+
+        // Initialize default user twice
+        service.initialize_default_user().await.unwrap();
+        service.initialize_default_user().await.unwrap();
+
+        // Verify only one user exists
+        let user_count: i32 = sqlx::query_scalar!("SELECT COUNT(*) as count FROM users")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(user_count, 1);
     }
 }

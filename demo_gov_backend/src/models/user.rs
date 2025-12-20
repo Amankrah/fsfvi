@@ -5,7 +5,7 @@ use uuid::Uuid;
 use validator::Validate;
 
 /// User role enum - only Demo Government allowed
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, sqlx::Type)]
 #[sqlx(type_name = "user_role", rename_all = "snake_case")]
 pub enum UserRole {
     DemoGovernment,
@@ -75,7 +75,7 @@ impl From<User> for UserResponse {
 }
 
 /// Login request model
-#[derive(Debug, Deserialize, Validate)]
+#[derive(Debug, Serialize, Deserialize, Validate)]
 pub struct LoginRequest {
     #[validate(length(min = 3, max = 50, message = "Username must be between 3 and 50 characters"))]
     pub username: String,
@@ -105,13 +105,16 @@ pub struct LoginResponse {
 pub struct TwoFASetupRequest {
     #[validate(length(min = 6, max = 6, message = "TOTP code must be 6 digits"))]
     pub totp_code: String,
+    pub secret: String,
+    pub backup_codes: Vec<String>,
 }
 
 /// 2FA Setup Response
 #[derive(Debug, Serialize)]
 pub struct TwoFASetupResponse {
     pub secret: String,
-    pub qr_code: String, // Base64 encoded QR code image
+    pub qr_code: String, // Base64 encoded QR code image (for compatibility)
+    pub otpauth_url: String, // TOTP URL for QR code generation
     pub backup_codes: Vec<String>,
     pub enabled: bool,
 }
@@ -134,7 +137,7 @@ pub struct TwoFADisableRequest {
 }
 
 /// Change password request model
-#[derive(Debug, Deserialize, Validate)]
+#[derive(Debug, Serialize, Deserialize, Validate)]
 pub struct ChangePasswordRequest {
     #[validate(length(min = 8, message = "Current password must be at least 8 characters"))]
     pub current_password: String,
@@ -147,7 +150,7 @@ pub struct ChangePasswordRequest {
 }
 
 /// Password strength check request
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct PasswordStrengthRequest {
     pub password: String,
 }

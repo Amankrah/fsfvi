@@ -208,10 +208,13 @@ pub async fn change_password(
                 Err(auth_error) => {
                     log::warn!("Failed password change for user ID: {} - Error: {}", user_id, auth_error);
 
-                    let (status_code, message) = match auth_error {
+                    let (status_code, message) = match &auth_error {
                         AuthError::InvalidCredentials => (400, "Current password is incorrect"),
                         AuthError::PasswordMismatch => (400, "New passwords do not match"),
                         AuthError::PasswordTooWeak => (400, "Password does not meet security requirements"),
+                        AuthError::InternalError(msg) if msg.contains("same password") => {
+                            (400, "New password must be different from your current password")
+                        }
                         _ => (500, "Internal server error"),
                     };
 
@@ -1020,11 +1023,697 @@ pub async fn get_security_dashboard(
 }
 
 /// Health check endpoint
+/// Root endpoint handler - prevents 404 flooding from browser extensions
+pub async fn root_handler() -> Result<HttpResponse> {
+    Ok(HttpResponse::Ok().json(json!({
+        "service": "Demo Government Authentication API",
+        "version": "1.0.0",
+        "status": "operational",
+        "timestamp": chrono::Utc::now().to_rfc3339(),
+        "endpoints": {
+            "health": "/api/health",
+            "auth": "/api/auth/*",
+            "fsfvi": "/api/government/fsfvi/*"
+        }
+    })))
+}
+
 pub async fn health_check() -> Result<HttpResponse> {
     Ok(HttpResponse::Ok().json(json!({
         "status": "healthy",
-        "service": "kenya-fsfvi-auth",
+        "service": "demo-gov-backend",
         "timestamp": chrono::Utc::now().to_rfc3339(),
         "version": "1.0.0"
     })))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use actix_web::{test, web, App};
+    use crate::models::auth::SecurityConfig;
+    use crate::models::user::{LoginRequest, ChangePasswordRequest, PasswordStrengthRequest};
+    use crate::services::auth_service::AuthService;
+    use crate::services::password_service::PasswordService;
+    use crate::services::token_service::TokenService;
+    use sqlx::SqlitePool;
+    use std::sync::Mutex;
+
+    /// Helper: Create in-memory test database with migrations
+    async fn setup_test_db() -> SqlitePool {
+        let pool = SqlitePool::connect("sqlite::memory:")
+            .await
+            .expect("Failed to create in-memory database");
+
+        sqlx::migrate!("./migrations")
+            .run(&pool)
+            .await
+            .expect("Failed to run migrations");
+
+        pool
+    }
+
+    /// Helper: Create test app state
+    async fn create_test_app_state(pool: SqlitePool) -> web::Data<AppState> {
+        let password_service = PasswordService::new();
+        let security_config = SecurityConfig::default();
+        let token_service = TokenService::new(security_config.clone());
+        let auth_service = AuthService::new(pool, password_service, token_service, security_config);
+
+        web::Data::new(AppState {
+            auth_service: Mutex::new(auth_service),
+        })
+    }
+
+    /// Helper: Create test user in database
+    async fn create_test_user(
+        pool: &SqlitePool,
+        username: &str,
+        password: &str,
+    ) -> (Uuid, String) {
+        let user_id = Uuid::new_v4();
+        let now = chrono::Utc::now();
+
+        // Hash the password
+        let password_service = PasswordService::new();
+        let password_hash = password_service.hash_password(password).unwrap();
+
+        sqlx::query!(
+            r#"
+            INSERT INTO users (id, username, password_hash, role, is_temporary_password,
+                             created_at, updated_at, login_attempts, is_locked,
+                             two_fa_enabled, two_fa_secret, two_fa_backup_codes, two_fa_enabled_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            "#,
+            user_id,
+            username,
+            password_hash,
+            "demo_government",
+            false,
+            now,
+            now,
+            0,
+            false,
+            false,
+            Option::<String>::None,
+            Option::<String>::None,
+            Option::<chrono::DateTime<chrono::Utc>>::None
+        )
+        .execute(pool)
+        .await
+        .expect("Failed to create test user");
+
+        (user_id, password_hash)
+    }
+
+    // ============================================================================
+    // Health Check Tests
+    // ============================================================================
+
+    #[actix_web::test]
+    async fn test_health_check_endpoint() {
+        let app = test::init_service(
+            App::new().route("/health", web::get().to(health_check))
+        ).await;
+
+        let req = test::TestRequest::get().uri("/health").to_request();
+        let resp = test::call_service(&app, req).await;
+
+        assert!(resp.status().is_success());
+
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        assert_eq!(body["status"], "healthy");
+        assert_eq!(body["service"], "demo-gov-backend");
+    }
+
+    // ============================================================================
+    // Login Endpoint Tests
+    // ============================================================================
+
+    #[actix_web::test]
+    async fn test_login_success() {
+        let pool = setup_test_db().await;
+        let app_state = create_test_app_state(pool.clone()).await;
+
+        let password = "SecurePhrase@2025!Valid";
+        create_test_user(&pool, "test_user", password).await;
+
+        let app = test::init_service(
+            App::new()
+                .app_data(app_state.clone())
+                .route("/api/auth/login", web::post().to(login))
+        ).await;
+
+        let login_req = LoginRequest {
+            username: "test_user".to_string(),
+            password: password.to_string(),
+            two_fa_code: None,
+            user_agent: Some("Test Agent".to_string()),
+            ip_address: None,
+        };
+
+        let req = test::TestRequest::post()
+            .uri("/api/auth/login")
+            .set_json(&login_req)
+            .to_request();
+
+        let resp = test::call_service(&app, req).await;
+        assert!(resp.status().is_success());
+
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        assert_eq!(body["success"], true);
+        assert!(body["data"]["token"].as_str().unwrap().len() > 0);
+        assert_eq!(body["data"]["user"]["username"], "test_user");
+    }
+
+    #[actix_web::test]
+    async fn test_login_invalid_credentials() {
+        let pool = setup_test_db().await;
+        let app_state = create_test_app_state(pool.clone()).await;
+
+        create_test_user(&pool, "test_user", "CorrectPhrase@2025!Valid").await;
+
+        let app = test::init_service(
+            App::new()
+                .app_data(app_state.clone())
+                .route("/api/auth/login", web::post().to(login))
+        ).await;
+
+        let login_req = LoginRequest {
+            username: "test_user".to_string(),
+            password: "WrongPhrase@2025!Wrong".to_string(),
+            two_fa_code: None,
+            user_agent: Some("Test Agent".to_string()),
+            ip_address: None,
+        };
+
+        let req = test::TestRequest::post()
+            .uri("/api/auth/login")
+            .set_json(&login_req)
+            .to_request();
+
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status().as_u16(), 401);
+
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        assert_eq!(body["success"], false);
+        assert!(body["message"].as_str().unwrap().contains("Invalid username or password"));
+    }
+
+    #[actix_web::test]
+    async fn test_login_nonexistent_user() {
+        let pool = setup_test_db().await;
+        let app_state = create_test_app_state(pool.clone()).await;
+
+        let app = test::init_service(
+            App::new()
+                .app_data(app_state.clone())
+                .route("/api/auth/login", web::post().to(login))
+        ).await;
+
+        let login_req = LoginRequest {
+            username: "nonexistent_user".to_string(),
+            password: "AnyPhrase@2025!Any".to_string(),
+            two_fa_code: None,
+            user_agent: Some("Test Agent".to_string()),
+            ip_address: None,
+        };
+
+        let req = test::TestRequest::post()
+            .uri("/api/auth/login")
+            .set_json(&login_req)
+            .to_request();
+
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status().as_u16(), 401);
+
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        assert_eq!(body["success"], false);
+    }
+
+    // ============================================================================
+    // Verify Token Endpoint Tests
+    // ============================================================================
+
+    #[actix_web::test]
+    async fn test_verify_token_success() {
+        let pool = setup_test_db().await;
+        let app_state = create_test_app_state(pool.clone()).await;
+
+        let password = "SecurePhrase@2025!Valid";
+        create_test_user(&pool, "test_user", password).await;
+
+        let app = test::init_service(
+            App::new()
+                .app_data(app_state.clone())
+                .route("/api/auth/login", web::post().to(login))
+                .route("/api/auth/verify", web::get().to(verify_token))
+        ).await;
+
+        // Login first to get token
+        let login_req = LoginRequest {
+            username: "test_user".to_string(),
+            password: password.to_string(),
+            two_fa_code: None,
+            user_agent: Some("Test Agent".to_string()),
+            ip_address: None,
+        };
+
+        let req = test::TestRequest::post()
+            .uri("/api/auth/login")
+            .set_json(&login_req)
+            .to_request();
+
+        let resp = test::call_service(&app, req).await;
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        let token = body["data"]["token"].as_str().unwrap();
+
+        // Verify token
+        let req = test::TestRequest::get()
+            .uri("/api/auth/verify")
+            .insert_header(("Authorization", format!("Bearer {}", token)))
+            .to_request();
+
+        let resp = test::call_service(&app, req).await;
+        assert!(resp.status().is_success());
+
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        assert_eq!(body["success"], true);
+        assert_eq!(body["data"]["user"]["username"], "test_user");
+    }
+
+    #[actix_web::test]
+    async fn test_verify_token_missing_authorization() {
+        let pool = setup_test_db().await;
+        let app_state = create_test_app_state(pool.clone()).await;
+
+        let app = test::init_service(
+            App::new()
+                .app_data(app_state.clone())
+                .route("/api/auth/verify", web::get().to(verify_token))
+        ).await;
+
+        let req = test::TestRequest::get()
+            .uri("/api/auth/verify")
+            .to_request();
+
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status().as_u16(), 401);
+
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        assert_eq!(body["success"], false);
+    }
+
+    #[actix_web::test]
+    async fn test_verify_token_invalid_token() {
+        let pool = setup_test_db().await;
+        let app_state = create_test_app_state(pool.clone()).await;
+
+        let app = test::init_service(
+            App::new()
+                .app_data(app_state.clone())
+                .route("/api/auth/verify", web::get().to(verify_token))
+        ).await;
+
+        let req = test::TestRequest::get()
+            .uri("/api/auth/verify")
+            .insert_header(("Authorization", "Bearer invalid_token_123"))
+            .to_request();
+
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status().as_u16(), 401);
+    }
+
+    // ============================================================================
+    // Logout Endpoint Tests
+    // ============================================================================
+
+    #[actix_web::test]
+    async fn test_logout_success() {
+        let pool = setup_test_db().await;
+        let app_state = create_test_app_state(pool.clone()).await;
+
+        let password = "SecurePhrase@2025!Valid";
+        create_test_user(&pool, "test_user", password).await;
+
+        let app = test::init_service(
+            App::new()
+                .app_data(app_state.clone())
+                .route("/api/auth/login", web::post().to(login))
+                .route("/api/auth/logout", web::post().to(logout))
+        ).await;
+
+        // Login first
+        let login_req = LoginRequest {
+            username: "test_user".to_string(),
+            password: password.to_string(),
+            two_fa_code: None,
+            user_agent: Some("Test Agent".to_string()),
+            ip_address: None,
+        };
+
+        let req = test::TestRequest::post()
+            .uri("/api/auth/login")
+            .set_json(&login_req)
+            .to_request();
+
+        let resp = test::call_service(&app, req).await;
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        let token = body["data"]["token"].as_str().unwrap();
+
+        // Logout
+        let req = test::TestRequest::post()
+            .uri("/api/auth/logout")
+            .insert_header(("Authorization", format!("Bearer {}", token)))
+            .to_request();
+
+        let resp = test::call_service(&app, req).await;
+        assert!(resp.status().is_success());
+
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        assert_eq!(body["success"], true);
+    }
+
+    // ============================================================================
+    // Change Password Endpoint Tests
+    // ============================================================================
+
+    #[actix_web::test]
+    async fn test_change_password_success() {
+        let pool = setup_test_db().await;
+        let app_state = create_test_app_state(pool.clone()).await;
+
+        let current_password = "CurrentPhrase@2025!Old";
+        create_test_user(&pool, "test_user", current_password).await;
+
+        let app = test::init_service(
+            App::new()
+                .app_data(app_state.clone())
+                .route("/api/auth/login", web::post().to(login))
+                .route("/api/auth/change-password", web::post().to(change_password))
+        ).await;
+
+        // Login first
+        let login_req = LoginRequest {
+            username: "test_user".to_string(),
+            password: current_password.to_string(),
+            two_fa_code: None,
+            user_agent: Some("Test Agent".to_string()),
+            ip_address: None,
+        };
+
+        let req = test::TestRequest::post()
+            .uri("/api/auth/login")
+            .set_json(&login_req)
+            .to_request();
+
+        let resp = test::call_service(&app, req).await;
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        let token = body["data"]["token"].as_str().unwrap();
+
+        // Change password
+        let change_req = ChangePasswordRequest {
+            current_password: current_password.to_string(),
+            new_password: "NewPhrase@2025!Changed".to_string(),
+            confirm_password: "NewPhrase@2025!Changed".to_string(),
+        };
+
+        let req = test::TestRequest::post()
+            .uri("/api/auth/change-password")
+            .insert_header(("Authorization", format!("Bearer {}", token)))
+            .set_json(&change_req)
+            .to_request();
+
+        let resp = test::call_service(&app, req).await;
+        assert!(resp.status().is_success());
+
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        assert_eq!(body["success"], true);
+    }
+
+    #[actix_web::test]
+    async fn test_change_password_wrong_current_password() {
+        let pool = setup_test_db().await;
+        let app_state = create_test_app_state(pool.clone()).await;
+
+        let current_password = "CurrentPhrase@2025!Old";
+        create_test_user(&pool, "test_user", current_password).await;
+
+        let app = test::init_service(
+            App::new()
+                .app_data(app_state.clone())
+                .route("/api/auth/login", web::post().to(login))
+                .route("/api/auth/change-password", web::post().to(change_password))
+        ).await;
+
+        // Login first
+        let login_req = LoginRequest {
+            username: "test_user".to_string(),
+            password: current_password.to_string(),
+            two_fa_code: None,
+            user_agent: Some("Test Agent".to_string()),
+            ip_address: None,
+        };
+
+        let req = test::TestRequest::post()
+            .uri("/api/auth/login")
+            .set_json(&login_req)
+            .to_request();
+
+        let resp = test::call_service(&app, req).await;
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        let token = body["data"]["token"].as_str().unwrap();
+
+        // Try to change password with wrong current password
+        let change_req = ChangePasswordRequest {
+            current_password: "WrongPhrase@2025!Wrong".to_string(),
+            new_password: "NewPhrase@2025!Changed".to_string(),
+            confirm_password: "NewPhrase@2025!Changed".to_string(),
+        };
+
+        let req = test::TestRequest::post()
+            .uri("/api/auth/change-password")
+            .insert_header(("Authorization", format!("Bearer {}", token)))
+            .set_json(&change_req)
+            .to_request();
+
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status().as_u16(), 400);
+
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        assert_eq!(body["success"], false);
+    }
+
+    #[actix_web::test]
+    async fn test_change_password_mismatched_confirmation() {
+        let pool = setup_test_db().await;
+        let app_state = create_test_app_state(pool.clone()).await;
+
+        let current_password = "CurrentPhrase@2025!Old";
+        create_test_user(&pool, "test_user", current_password).await;
+
+        let app = test::init_service(
+            App::new()
+                .app_data(app_state.clone())
+                .route("/api/auth/login", web::post().to(login))
+                .route("/api/auth/change-password", web::post().to(change_password))
+        ).await;
+
+        // Login first
+        let login_req = LoginRequest {
+            username: "test_user".to_string(),
+            password: current_password.to_string(),
+            two_fa_code: None,
+            user_agent: Some("Test Agent".to_string()),
+            ip_address: None,
+        };
+
+        let req = test::TestRequest::post()
+            .uri("/api/auth/login")
+            .set_json(&login_req)
+            .to_request();
+
+        let resp = test::call_service(&app, req).await;
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        let token = body["data"]["token"].as_str().unwrap();
+
+        // Try to change password with mismatched confirmation
+        let change_req = ChangePasswordRequest {
+            current_password: current_password.to_string(),
+            new_password: "NewPhrase@2025!Changed".to_string(),
+            confirm_password: "DifferentPhrase@2025!Wrong".to_string(),
+        };
+
+        let req = test::TestRequest::post()
+            .uri("/api/auth/change-password")
+            .insert_header(("Authorization", format!("Bearer {}", token)))
+            .set_json(&change_req)
+            .to_request();
+
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status().as_u16(), 400);
+    }
+
+    // ============================================================================
+    // Password Strength Check Endpoint Tests
+    // ============================================================================
+
+    #[actix_web::test]
+    async fn test_password_strength_check_strong() {
+        let app = test::init_service(
+            App::new().route("/api/auth/password-strength", web::post().to(check_password_strength))
+        ).await;
+
+        let strength_req = PasswordStrengthRequest {
+            password: "VerySecureP@ssw0rd2025!".to_string(),
+        };
+
+        let req = test::TestRequest::post()
+            .uri("/api/auth/password-strength")
+            .set_json(&strength_req)
+            .to_request();
+
+        let resp = test::call_service(&app, req).await;
+        assert!(resp.status().is_success());
+
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        assert_eq!(body["success"], true);
+        assert_eq!(body["data"]["is_valid"], true);
+    }
+
+    #[actix_web::test]
+    async fn test_password_strength_check_weak() {
+        let app = test::init_service(
+            App::new().route("/api/auth/password-strength", web::post().to(check_password_strength))
+        ).await;
+
+        let strength_req = PasswordStrengthRequest {
+            password: "weak".to_string(),
+        };
+
+        let req = test::TestRequest::post()
+            .uri("/api/auth/password-strength")
+            .set_json(&strength_req)
+            .to_request();
+
+        let resp = test::call_service(&app, req).await;
+        assert!(resp.status().is_success());
+
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        assert_eq!(body["success"], true);
+        assert_eq!(body["data"]["is_valid"], false);
+        assert!(body["data"]["errors"].as_array().unwrap().len() > 0);
+    }
+
+    #[actix_web::test]
+    async fn test_password_strength_check_provides_suggestions() {
+        let app = test::init_service(
+            App::new().route("/api/auth/password-strength", web::post().to(check_password_strength))
+        ).await;
+
+        let strength_req = PasswordStrengthRequest {
+            password: "ShortPass1!".to_string(),
+        };
+
+        let req = test::TestRequest::post()
+            .uri("/api/auth/password-strength")
+            .set_json(&strength_req)
+            .to_request();
+
+        let resp = test::call_service(&app, req).await;
+        let body: serde_json::Value = test::read_body_json(resp).await;
+
+        assert!(body["data"]["suggestions"].as_array().is_some());
+    }
+
+    // ============================================================================
+    // IP Address Extraction Tests
+    // ============================================================================
+
+    #[actix_web::test]
+    async fn test_get_client_ip_from_connection() {
+        let pool = setup_test_db().await;
+        let app_state = create_test_app_state(pool.clone()).await;
+
+        create_test_user(&pool, "test_user", "SecurePhrase@2025!Valid").await;
+
+        let app = test::init_service(
+            App::new()
+                .app_data(app_state.clone())
+                .route("/api/auth/login", web::post().to(login))
+        ).await;
+
+        let login_req = LoginRequest {
+            username: "test_user".to_string(),
+            password: "SecurePhrase@2025!Valid".to_string(),
+            two_fa_code: None,
+            user_agent: Some("Test Agent".to_string()),
+            ip_address: None,
+        };
+
+        let req = test::TestRequest::post()
+            .uri("/api/auth/login")
+            .set_json(&login_req)
+            .to_request();
+
+        // Just verify request completes (IP extraction happens internally)
+        let resp = test::call_service(&app, req).await;
+        assert!(resp.status().is_success());
+    }
+
+    #[actix_web::test]
+    async fn test_get_client_ip_from_x_forwarded_for() {
+        let pool = setup_test_db().await;
+        let app_state = create_test_app_state(pool.clone()).await;
+
+        create_test_user(&pool, "test_user", "SecurePhrase@2025!Valid").await;
+
+        let app = test::init_service(
+            App::new()
+                .app_data(app_state.clone())
+                .route("/api/auth/login", web::post().to(login))
+        ).await;
+
+        let login_req = LoginRequest {
+            username: "test_user".to_string(),
+            password: "SecurePhrase@2025!Valid".to_string(),
+            two_fa_code: None,
+            user_agent: Some("Test Agent".to_string()),
+            ip_address: None,
+        };
+
+        let req = test::TestRequest::post()
+            .uri("/api/auth/login")
+            .insert_header(("X-Forwarded-For", "192.168.1.100, 10.0.0.1"))
+            .set_json(&login_req)
+            .to_request();
+
+        // Verify request completes (IP extraction from X-Forwarded-For happens internally)
+        let resp = test::call_service(&app, req).await;
+        assert!(resp.status().is_success());
+    }
+
+    // ============================================================================
+    // Authorization Header Tests
+    // ============================================================================
+
+    #[actix_web::test]
+    async fn test_extract_token_missing_bearer_prefix() {
+        let pool = setup_test_db().await;
+        let app_state = create_test_app_state(pool.clone()).await;
+
+        let app = test::init_service(
+            App::new()
+                .app_data(app_state.clone())
+                .route("/api/auth/verify", web::get().to(verify_token))
+        ).await;
+
+        let req = test::TestRequest::get()
+            .uri("/api/auth/verify")
+            .insert_header(("Authorization", "invalid_token_without_bearer"))
+            .to_request();
+
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status().as_u16(), 401);
+    }
 }
