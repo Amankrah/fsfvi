@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            SELECT\n                id,\n                government_id,\n                email,\n                password_hash,\n                full_name,\n                title,\n                role as \"role: crate::models::user::UserRole\",\n                status as \"status: UserStatus\",\n                mfa_enabled,\n                mfa_secret,\n                last_login,\n                failed_login_attempts,\n                locked_until,\n                created_at,\n                updated_at\n            FROM users\n            WHERE id = $1\n            ",
+  "query": "\n            SELECT\n                id,\n                government_id,\n                email,\n                password_hash,\n                full_name,\n                title,\n                role as \"role: crate::models::user::UserRole\",\n                status as \"status: UserStatus\",\n                mfa_enabled,\n                mfa_secret,\n                last_login,\n                failed_login_attempts,\n                locked_until,\n                api_key_expiry_days,\n                created_at,\n                updated_at\n            FROM users\n            WHERE id = $1\n            ",
   "describe": {
     "columns": [
       {
@@ -93,11 +93,16 @@
       },
       {
         "ordinal": 13,
+        "name": "api_key_expiry_days",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 14,
         "name": "created_at",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 14,
+        "ordinal": 15,
         "name": "updated_at",
         "type_info": "Timestamptz"
       }
@@ -121,9 +126,10 @@
       true,
       false,
       true,
+      true,
       false,
       false
     ]
   },
-  "hash": "a59d2f0bdfc4b003d4d5fadd5cb3a3eea4c4e0fea27765489d45aeaf72eeaa4f"
+  "hash": "14a9e16e666c00aa03f194016dd6db1296a9d65043912a17a744259307ca6b42"
 }

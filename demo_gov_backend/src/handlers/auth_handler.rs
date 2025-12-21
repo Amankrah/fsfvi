@@ -1,7 +1,6 @@
 use actix_web::{web, HttpRequest, HttpResponse, Result};
 use serde_json::json;
 use std::sync::Mutex;
-use uuid::Uuid;
 
 use crate::models::auth::AuthError;
 use crate::models::user::{ChangePasswordRequest, LoginRequest, TwoFASetupRequest, TwoFAVerifyRequest, TwoFADisableRequest, PasswordStrengthRequest, PasswordStrengthResponse};
@@ -156,17 +155,7 @@ pub async fn change_password(
     let user_id = match data.auth_service.lock() {
         Ok(auth_service) => {
             match auth_service.validate_session(&token).await {
-                Ok(user_response) => {
-                    match Uuid::parse_str(&user_response.id) {
-                        Ok(id) => id,
-                        Err(_) => {
-                            return Ok(HttpResponse::InternalServerError().json(json!({
-                                "success": false,
-                                "message": "Invalid user ID format"
-                            })));
-                        }
-                    }
-                }
+                Ok(user_response) => user_response.id,
                 Err(auth_error) => {
                     let (status_code, message) = match auth_error {
                         AuthError::TokenExpired => (401, "Token has expired"),
@@ -196,7 +185,7 @@ pub async fn change_password(
     // Change password
     match data.auth_service.lock() {
         Ok(mut auth_service) => {
-            match auth_service.change_password(user_id, password_request.into_inner()).await {
+            match auth_service.change_password(&user_id, password_request.into_inner()).await {
                 Ok(_) => {
                     log::info!("Password changed successfully for user ID: {}", user_id);
 
@@ -313,29 +302,22 @@ pub async fn logout(
         Ok(mut auth_service) => {
             match auth_service.validate_session(&token).await {
                 Ok(user_response) => {
-                    if let Ok(user_id) = Uuid::parse_str(&user_response.id) {
-                        // Pass the token to blacklist it during logout
-                        match auth_service.logout(user_id, Some(&token)).await {
-                            Ok(_) => {
-                                log::info!("User {} logged out from IP: {}", user_response.username, ip_address);
+                    // Pass the token to blacklist it during logout
+                    match auth_service.logout(&user_response.id, Some(&token)).await {
+                        Ok(_) => {
+                            log::info!("User {} logged out from IP: {}", user_response.username, ip_address);
 
-                                Ok(HttpResponse::Ok().json(json!({
-                                    "success": true,
-                                    "message": "Logged out successfully"
-                                })))
-                            }
-                            Err(_) => {
-                                Ok(HttpResponse::InternalServerError().json(json!({
-                                    "success": false,
-                                    "message": "Failed to logout"
-                                })))
-                            }
+                            Ok(HttpResponse::Ok().json(json!({
+                                "success": true,
+                                "message": "Logged out successfully"
+                            })))
                         }
-                    } else {
-                        Ok(HttpResponse::BadRequest().json(json!({
-                            "success": false,
-                            "message": "Invalid user ID"
-                        })))
+                        Err(_) => {
+                            Ok(HttpResponse::InternalServerError().json(json!({
+                                "success": false,
+                                "message": "Failed to logout"
+                            })))
+                        }
                     }
                 }
                 Err(_) => {
@@ -378,17 +360,7 @@ pub async fn prepare_two_fa_setup(
     let user_id = match data.auth_service.lock() {
         Ok(auth_service) => {
             match auth_service.validate_session(&token).await {
-                Ok(user_response) => {
-                    match Uuid::parse_str(&user_response.id) {
-                        Ok(id) => id,
-                        Err(_) => {
-                            return Ok(HttpResponse::InternalServerError().json(json!({
-                                "success": false,
-                                "message": "Invalid user ID format"
-                            })));
-                        }
-                    }
-                }
+                Ok(user_response) => user_response.id,
                 Err(auth_error) => {
                     let (status_code, message) = match auth_error {
                         AuthError::TokenExpired => (401, "Token has expired"),
@@ -416,7 +388,7 @@ pub async fn prepare_two_fa_setup(
     // Prepare 2FA setup
     match data.auth_service.lock() {
         Ok(mut auth_service) => {
-            match auth_service.prepare_two_fa_setup(user_id).await {
+            match auth_service.prepare_two_fa_setup(&user_id).await {
                 Ok(setup_response) => {
                     log::info!("2FA preparation successful for user ID: {}", user_id);
 
@@ -468,17 +440,7 @@ pub async fn setup_two_fa(
     let user_id = match data.auth_service.lock() {
         Ok(auth_service) => {
             match auth_service.validate_session(&token).await {
-                Ok(user_response) => {
-                    match Uuid::parse_str(&user_response.id) {
-                        Ok(id) => id,
-                        Err(_) => {
-                            return Ok(HttpResponse::InternalServerError().json(json!({
-                                "success": false,
-                                "message": "Invalid user ID format"
-                            })));
-                        }
-                    }
-                }
+                Ok(user_response) => user_response.id,
                 Err(auth_error) => {
                     let (status_code, message) = match auth_error {
                         AuthError::TokenExpired => (401, "Token has expired"),
@@ -508,7 +470,7 @@ pub async fn setup_two_fa(
     // Setup 2FA
     match data.auth_service.lock() {
         Ok(mut auth_service) => {
-            match auth_service.setup_two_fa(user_id, setup_request.into_inner()).await {
+            match auth_service.setup_two_fa(&user_id, setup_request.into_inner()).await {
                 Ok(setup_response) => {
                     log::info!("2FA setup successful for user ID: {}", user_id);
 
@@ -615,17 +577,7 @@ pub async fn disable_two_fa(
     let user_id = match data.auth_service.lock() {
         Ok(auth_service) => {
             match auth_service.validate_session(&token).await {
-                Ok(user_response) => {
-                    match Uuid::parse_str(&user_response.id) {
-                        Ok(id) => id,
-                        Err(_) => {
-                            return Ok(HttpResponse::InternalServerError().json(json!({
-                                "success": false,
-                                "message": "Invalid user ID format"
-                            })));
-                        }
-                    }
-                }
+                Ok(user_response) => user_response.id,
                 Err(auth_error) => {
                     let (status_code, message) = match auth_error {
                         AuthError::TokenExpired => (401, "Token has expired"),
@@ -655,7 +607,7 @@ pub async fn disable_two_fa(
     // Disable 2FA
     match data.auth_service.lock() {
         Ok(mut auth_service) => {
-            match auth_service.disable_two_fa(user_id, disable_request.into_inner()).await {
+            match auth_service.disable_two_fa(&user_id, disable_request.into_inner()).await {
                 Ok(_) => {
                     log::info!("2FA disabled successfully for user ID: {}", user_id);
 
@@ -864,17 +816,7 @@ pub async fn get_audit_logs(
     let (user_id, username) = match data.auth_service.lock() {
         Ok(auth_service) => {
             match auth_service.validate_session(&token).await {
-                Ok(user_response) => {
-                    match uuid::Uuid::parse_str(&user_response.id) {
-                        Ok(id) => (id, user_response.username),
-                        Err(_) => {
-                            return Ok(HttpResponse::InternalServerError().json(json!({
-                                "success": false,
-                                "message": "Invalid user ID format"
-                            })));
-                        }
-                    }
-                }
+                Ok(user_response) => (user_response.id, user_response.username),
                 Err(auth_error) => {
                     let (status_code, message) = match auth_error {
                         AuthError::TokenExpired => (401, "Token has expired"),
@@ -912,7 +854,7 @@ pub async fn get_audit_logs(
     // Retrieve audit logs
     match data.auth_service.lock() {
         Ok(auth_service) => {
-            match auth_service.get_audit_logs(user_id, limit).await {
+            match auth_service.get_audit_logs(&user_id, limit).await {
                 Ok(logs) => {
                     log::info!(
                         "Audit logs retrieved for user: {} from IP: {} (count: {})",
@@ -1058,6 +1000,7 @@ mod tests {
     use crate::services::token_service::TokenService;
     use sqlx::SqlitePool;
     use std::sync::Mutex;
+    use uuid::Uuid;
 
     /// Helper: Create in-memory test database with migrations
     async fn setup_test_db() -> SqlitePool {

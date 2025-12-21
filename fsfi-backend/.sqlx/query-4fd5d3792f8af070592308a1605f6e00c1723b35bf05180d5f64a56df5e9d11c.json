@@ -1,0 +1,139 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            id, timestamp, government_id, user_id, api_key_id,\n            action as \"action: AuditAction\",\n            resource_type, resource_id, ip_address, user_agent,\n            request_method, request_path, request_body, response_status,\n            response_time_ms, error_message, metadata\n        FROM audit_logs\n        ORDER BY timestamp DESC\n        LIMIT 100\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "timestamp",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 2,
+        "name": "government_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "user_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 4,
+        "name": "api_key_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 5,
+        "name": "action: AuditAction",
+        "type_info": {
+          "Custom": {
+            "name": "audit_action",
+            "kind": {
+              "Enum": [
+                "login",
+                "logout",
+                "login_failed",
+                "api_key_created",
+                "api_key_revoked",
+                "api_request",
+                "data_access",
+                "data_export",
+                "config_change",
+                "user_created",
+                "user_updated",
+                "user_deleted",
+                "permission_changed",
+                "rate_limit_exceeded",
+                "unauthorized_access"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "resource_type",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 7,
+        "name": "resource_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 8,
+        "name": "ip_address",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 9,
+        "name": "user_agent",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 10,
+        "name": "request_method",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 11,
+        "name": "request_path",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 12,
+        "name": "request_body",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 13,
+        "name": "response_status",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 14,
+        "name": "response_time_ms",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 15,
+        "name": "error_message",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 16,
+        "name": "metadata",
+        "type_info": "Jsonb"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      true,
+      true,
+      false,
+      false,
+      true,
+      false,
+      true,
+      false,
+      false,
+      true,
+      false,
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "4fd5d3792f8af070592308a1605f6e00c1723b35bf05180d5f64a56df5e9d11c"
+}

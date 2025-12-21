@@ -1,0 +1,40 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT max_active_api_keys, mandatory_rotation_days, api_key_expiry_days, allowed_endpoints\n        FROM governments\n        WHERE id = $1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "max_active_api_keys",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 1,
+        "name": "mandatory_rotation_days",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 2,
+        "name": "api_key_expiry_days",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 3,
+        "name": "allowed_endpoints",
+        "type_info": "Jsonb"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      true,
+      false
+    ]
+  },
+  "hash": "3ca6fbcbce202c78a1731681b353091ce773b64c86b95e46644099e87cb85e5a"
+}

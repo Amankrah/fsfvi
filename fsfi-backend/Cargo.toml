@@ -19,6 +19,11 @@ path = "src/main.rs"
 name = "hash_password"
 path = "src/bin/hash_password.rs"
 
+# Utility binary for checking API keys in database
+[[bin]]
+name = "check_api_key_db"
+path = "check_api_key_db.rs"
+
 [dependencies]
 # Web Framework
 actix-web = "4.5"

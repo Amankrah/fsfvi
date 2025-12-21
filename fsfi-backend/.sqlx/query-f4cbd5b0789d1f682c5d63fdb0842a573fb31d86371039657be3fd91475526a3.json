@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT\n            u.id,\n            u.government_id,\n            u.email,\n            u.password_hash,\n            u.full_name,\n            u.role as \"role: crate::models::user::UserRole\",\n            u.status as \"status: UserStatus\",\n            u.failed_login_attempts,\n            u.locked_until,\n            g.status as \"gov_status: GovernmentStatus\"\n        FROM users u\n        JOIN governments g ON u.government_id = g.id\n        WHERE u.email = $1\n        ",
+  "query": "\n        SELECT\n            u.id,\n            u.government_id,\n            u.email,\n            u.password_hash,\n            u.full_name,\n            u.role as \"role: crate::models::user::UserRole\",\n            u.status as \"status: UserStatus\",\n            u.mfa_enabled,\n            u.mfa_secret,\n            u.failed_login_attempts,\n            u.locked_until,\n            g.status as \"gov_status: GovernmentStatus\"\n        FROM users u\n        JOIN governments g ON u.government_id = g.id\n        WHERE u.email = $1\n        ",
   "describe": {
     "columns": [
       {
@@ -63,16 +63,26 @@
       },
       {
         "ordinal": 7,
+        "name": "mfa_enabled",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 8,
+        "name": "mfa_secret",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 9,
         "name": "failed_login_attempts",
         "type_info": "Int4"
       },
       {
-        "ordinal": 8,
+        "ordinal": 10,
         "name": "locked_until",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 9,
+        "ordinal": 11,
         "name": "gov_status: GovernmentStatus",
         "type_info": {
           "Custom": {
@@ -104,8 +114,10 @@
       false,
       false,
       true,
+      false,
+      true,
       false
     ]
   },
-  "hash": "1fc9e86dcd295fed28137d0283d1150403bbfb766f0ccde8c9b6856206a044dd"
+  "hash": "f4cbd5b0789d1f682c5d63fdb0842a573fb31d86371039657be3fd91475526a3"
 }

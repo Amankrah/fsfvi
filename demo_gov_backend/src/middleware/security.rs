@@ -360,13 +360,25 @@ pub fn extract_user_from_token(req: &actix_web::HttpRequest) -> Result<Authentic
         username: String,     // Username
         role: String,         // User role
         exp: usize,           // Expiration
+        iat: usize,           // Issued at
+        iss: String,          // Issuer
+        aud: String,          // Audience
+        jti: String,          // JWT ID
+        session_id: String,   // Session ID
+        is_temp_password: bool, // Is temporary password
     }
 
     // Get JWT secret from environment (fallback for compilation)
     let jwt_secret = std::env::var("JWT_SECRET").unwrap_or_else(|_| "dev_secret_key_change_in_production".to_string());
 
+    // CRITICAL: JWT validation MUST match token generation settings
+    // Token is generated with audience "demo-government" and issuer "fsfvi-demo-gov-backend"
+    // See: demo_gov_backend/src/services/token_service.rs lines 23-24, 48-49
     let mut validation = Validation::new(Algorithm::HS256);
     validation.validate_exp = true;
+    validation.set_audience(&["demo-government"]);
+    validation.set_issuer(&["fsfvi-demo-gov-backend"]);
+    validation.leeway = 60; // 1 minute leeway for clock skew
 
     let token_data = decode::<Claims>(
         token,
@@ -379,9 +391,11 @@ pub fn extract_user_from_token(req: &actix_web::HttpRequest) -> Result<Authentic
 
     let claims = token_data.claims;
 
-    // For Demo Government, the government_id is typically the username or a fixed ID
-    // In a real system, this would be stored in the JWT claims
-    let government_id = format!("demo_gov_{}", claims.username);
+    // CRITICAL: For Demo Government system, government_id MUST match the database
+    // The database fsfvi_data table uses 'demo_government' as the government_id
+    // This MUST be consistent or queries will return no data
+    // In production, this should be stored in JWT claims or user profile
+    let government_id = "demo_government".to_string();
 
     let authenticated_user = AuthenticatedUser {
         user_id: claims.sub.clone(),

@@ -1,0 +1,57 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                    SELECT id, government_id, created_by_user_id, scopes, status as \"status: ApiKeyStatus\"\n                    FROM api_keys\n                    WHERE key_hash = $1 AND status = 'active'\n                    ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "government_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "created_by_user_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "scopes",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 4,
+        "name": "status: ApiKeyStatus",
+        "type_info": {
+          "Custom": {
+            "name": "api_key_status",
+            "kind": {
+              "Enum": [
+                "active",
+                "expired",
+                "revoked"
+              ]
+            }
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "cd91b228449ef05835f4917958701b15ebf13e1319b00f6966da6669335f71a4"
+}

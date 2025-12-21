@@ -6,6 +6,30 @@ description = "High-security authentication backend for Demo Government FSFVI pl
 authors = ["FSFI Team"]
 default-run = "demo_gov_backend"
 
+[lib]
+name = "demo_gov_backend"
+path = "src/lib.rs"
+
+[[bin]]
+name = "demo_gov_backend"
+path = "src/main.rs"
+
+[[bin]]
+name = "fix_database"
+path = "src/bin/fix_database.rs"
+
+[[bin]]
+name = "check_database"
+path = "src/bin/check_database.rs"
+
+[[bin]]
+name = "add_historical_data"
+path = "src/bin/add_historical_data.rs"
+
+[[bin]]
+name = "add_peer_data"
+path = "src/bin/add_peer_data.rs"
+
 [dependencies]
 # Web framework
 actix-web = "4.4"
@@ -65,3 +89,15 @@ base64 = "0.21"
 base32 = "0.4"
 image = "0.24"
 urlencoding = "2.1"
+
+[dev-dependencies]
+# Testing framework
+tokio-test = "0.4"
+
+# Integration test utilities
+serial_test = "3.0"
+
+[[test]]
+name = "performance_gap_integration_tests"
+path = "tests/performance_gap_integration_tests.rs"
+harness = true

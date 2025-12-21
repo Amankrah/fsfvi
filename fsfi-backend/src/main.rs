@@ -156,6 +156,13 @@ async fn main() -> std::io::Result<()> {
                     .wrap(admin_auth.clone())
                     .configure(handlers::admin::configure)
             )
+            // FSFVI API endpoints (JWT OR API Key auth for governments)
+            // IMPORTANT: Must come BEFORE /api/v1 to match more specific routes first
+            .service(
+                web::scope("/api/v1/fsfvi")
+                    .wrap(api_key_auth)
+                    .configure(fsfvi_api::routes::configure_fsfvi_routes)
+            )
             // Government routes (JWT auth, Developer or Admin role)
             .service(
                 web::scope("/api/v1")
@@ -164,12 +171,6 @@ async fn main() -> std::io::Result<()> {
                     .configure(handlers::api_key::configure)
                     .configure(handlers::mfa::configure)
                     .configure(handlers::user::configure)
-            )
-            // FSFVI API endpoints (JWT OR API Key auth for governments)
-            .service(
-                web::scope("/api/v1/fsfvi")
-                    .wrap(api_key_auth)
-                    .configure(fsfvi_api::routes::configure_fsfvi_routes)
             )
     })
     .bind((server_host.as_str(), server_port))?

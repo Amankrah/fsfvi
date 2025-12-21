@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT COUNT(*) as count\n        FROM audit_logs\n        WHERE action = 'unauthorized_access'\n          AND timestamp >= NOW() - INTERVAL '1 hour'\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "count",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "2b695420486d5c681017f3066ebc1fead5f2821b335c6510b286247cea5e5930"
+}

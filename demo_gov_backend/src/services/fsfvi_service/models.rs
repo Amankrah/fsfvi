@@ -46,21 +46,30 @@ pub struct ApiResponse<T> {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PerformanceGapAnalysisReport {
-    pub overall_gap: f64,
+    pub overall_status: String,
+    pub average_gap: f64,
+    pub total_components: usize,
+    pub critical_gaps: usize,
     pub component_gaps: Vec<ComponentGap>,
-    pub priority_areas: Vec<String>,
-    pub estimated_cost_to_close_usd: f64,
-    pub recommendations: Vec<String>,
+    pub top_priorities: Vec<String>,
+    pub quick_wins: Vec<String>,
+    pub key_insights: Vec<String>,
 }
 
+/// Component Performance Gap
+/// Matches: fsfi-backend/src/fsfvi/service/performance_gap_analysis.rs:750-761
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ComponentGap {
     pub component_type: String,
-    pub current_value: f64,
+    pub observed_value: f64,
     pub benchmark_value: f64,
-    pub gap_absolute: f64,
-    pub gap_percentage: f64,
-    pub priority_level: String,
+    pub performance_gap: f64,        // Normalized gap (0-1)
+    pub absolute_gap: f64,            // Absolute difference
+    pub achievement_rate: f64,        // % of benchmark achieved
+    pub severity: String,             // "critical", "high", "medium", "low"
+    pub prefer_higher: bool,
+    pub improvement_needed: f64,
+    pub recommendations: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -75,13 +84,30 @@ pub struct PeerComparisonRequest {
     pub peer_countries: Vec<PeerCountryData>,
 }
 
+/// Component Peer Comparison
+/// Matches: fsfi-backend/src/fsfvi/service/performance_gap_analysis.rs:774-783
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ComponentPeerComparison {
+    pub component_type: String,
+    pub current_value: f64,
+    pub peer_average: f64,
+    pub peer_best: f64,
+    pub peer_worst: f64,
+    pub difference_from_peers_percent: f64,
+    pub performance_level: String, // "above_peers", "at_peer_level", etc.
+    pub quartile: String,          // "top_quartile", "second_quartile", etc.
+}
+
+/// Peer Comparison Report
+/// Matches: fsfi-backend/src/fsfvi/service/performance_gap_analysis.rs:764-771
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PeerComparisonReport {
-    pub subject_country_fsfvi: f64,
-    pub peer_averages: HashMap<String, f64>,
-    pub rankings: HashMap<String, usize>,
-    pub relative_position: String,
-    pub best_practices_identified: Vec<String>,
+    pub peer_countries: Vec<String>,
+    pub component_comparisons: Vec<ComponentPeerComparison>,
+    pub areas_above_peers: usize,
+    pub areas_below_peers: usize,
+    pub competitive_advantages: Vec<String>,
+    pub learning_opportunities: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -91,23 +117,41 @@ pub struct GapClosureRequest {
     pub time_period_months: usize,
 }
 
+/// Gap Closure Report
+/// Matches: fsfi-backend/src/fsfvi/service/performance_gap_analysis.rs:792-800
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GapClosureReport {
-    pub baseline_fsfvi: f64,
-    pub current_fsfvi: f64,
-    pub fsfvi_change: f64,
-    pub component_progress: Vec<ComponentProgress>,
-    pub monthly_improvement_rate: f64,
-    pub on_track_to_targets: bool,
+    pub time_period_months: usize,
+    pub average_gap_closure_percent: f64,
+    pub improving_components: usize,
+    pub declining_components: usize,
+    pub component_progress: Vec<ComponentGapProgress>,
+    pub success_stories: Vec<String>,
+    pub areas_needing_attention: Vec<String>,
 }
 
+/// Component Gap Progress
+/// Matches: fsfi-backend/src/fsfvi/service/performance_gap_analysis.rs:803-809
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ComponentProgress {
+pub struct ComponentGapProgress {
     pub component_type: String,
     pub baseline_gap: f64,
     pub current_gap: f64,
-    pub gap_closed_percentage: f64,
-    pub progress_status: String,
+    pub gap_change: f64,
+    #[serde(alias = "closure_percent")]
+    pub gap_closure_percent: f64,
+    #[serde(alias = "status")]
+    pub progress_status: String, // "good", "moderate", "stagnant", etc.
+    // Government-calculated field: gap closure rate per month
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub monthly_closure_rate: Option<f64>,
+    // Optional additional fields from API
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub baseline_value: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub current_value: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub value_change: Option<f64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -117,21 +161,26 @@ pub struct TargetRecommendationRequest {
     pub peer_countries: Option<Vec<PeerCountryData>>,
 }
 
+/// Target Recommendation Report
+/// Matches: fsfi-backend/src/fsfvi/service/performance_gap_analysis.rs:816-820
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TargetRecommendationReport {
-    pub current_fsfvi: f64,
-    pub recommended_targets: Vec<ComponentTarget>,
-    pub achievability_assessment: String,
-    pub estimated_budget_required_usd: f64,
+    pub target_timeline_months: usize,
+    pub component_targets: Vec<ComponentTargetRecommendation>,
+    pub overall_guidance: Vec<String>,
 }
 
+/// Component Target Recommendation
+/// Matches: fsfi-backend/src/fsfvi/service/performance_gap_analysis.rs:823-831
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ComponentTarget {
+pub struct ComponentTargetRecommendation {
     pub component_type: String,
     pub current_value: f64,
+    pub current_gap: f64,
     pub recommended_target: f64,
-    pub improvement_required: f64,
-    pub achievability: String,
+    pub peer_informed_target: Option<f64>,
+    pub realistic_closure_percent: f64,
+    pub rationale: String,
 }
 
 // ============================================================================

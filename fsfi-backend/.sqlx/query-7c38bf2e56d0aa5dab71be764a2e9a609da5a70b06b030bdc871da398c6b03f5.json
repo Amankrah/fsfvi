@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            COALESCE(SUM(request_count), 0) as total_requests\n        FROM api_usage\n        WHERE government_id = $1\n          AND date = CURRENT_DATE\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "total_requests",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "7c38bf2e56d0aa5dab71be764a2e9a609da5a70b06b030bdc871da398c6b03f5"
+}

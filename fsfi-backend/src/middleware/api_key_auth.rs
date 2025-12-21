@@ -21,6 +21,7 @@ use crate::services::api_key::ApiKeyService;
 pub struct ApiKeyAuthContext {
     pub api_key_id: Uuid,
     pub government_id: Uuid,
+    pub created_by_user_id: Uuid,
     pub scopes: Vec<String>,
 }
 
@@ -125,7 +126,7 @@ where
 
                 let api_key_record = sqlx::query!(
                     r#"
-                    SELECT id, government_id, scopes, status as "status: ApiKeyStatus"
+                    SELECT id, government_id, created_by_user_id, scopes, status as "status: ApiKeyStatus"
                     FROM api_keys
                     WHERE key_hash = $1 AND status = 'active'
                     "#,
@@ -210,6 +211,7 @@ where
                     req.extensions_mut().insert(ApiKeyAuthContext {
                         api_key_id: record.id,
                         government_id: record.government_id,
+                        created_by_user_id: record.created_by_user_id,
                         scopes,
                     });
 

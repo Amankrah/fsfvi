@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT COUNT(*) as count\n        FROM api_keys\n        WHERE government_id = $1\n        AND status = 'active'::api_key_status\n        AND (expires_at IS NULL OR expires_at > NOW())\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "count",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "4ae93744c33fc655d3068ffb3be2f1b9075670d4b5940dc0d396941ff1654783"
+}

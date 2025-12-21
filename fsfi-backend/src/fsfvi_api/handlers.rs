@@ -504,15 +504,16 @@ pub async fn analyze_performance_gaps(
 ) -> Result<HttpResponse, AppError> {
     let start = Instant::now();
 
-    let claims = req.extensions().get::<Claims>().cloned()
-        .ok_or_else(|| AppError::AuthenticationError("Missing authentication".to_string()))?;
+    // Extract auth context (works with both JWT and API key)
+    let auth_ctx = crate::fsfvi_api::auth_extract::extract_auth_context(&req)?;
+    let user_id = auth_ctx.user_id;
 
-
-    // Parse user ID from claims
-    let user_id = Uuid::parse_str(&claims.sub)
-        .map_err(|_| AppError::AuthenticationError("Invalid user ID".to_string()))?;
-
-    require_permission!(claims, FsfviPermission::RunPerformanceGapAnalysis);
+    // TODO: Implement scope-based permission checking for API keys
+    // For now, API keys with "*" scope have full access
+    // JWT users still go through role-based permission checks
+    if let Some(claims) = req.extensions().get::<Claims>() {
+        require_permission!(claims, FsfviPermission::RunPerformanceGapAnalysis);
+    }
 
     let components: Vec<crate::fsfvi::validators::Component> = payload
         .iter()
@@ -557,15 +558,12 @@ pub async fn peer_comparison(
 ) -> Result<HttpResponse, AppError> {
     let start = Instant::now();
 
-    let claims = req.extensions().get::<Claims>().cloned()
-        .ok_or_else(|| AppError::AuthenticationError("Missing authentication".to_string()))?;
+    let auth_ctx = crate::fsfvi_api::auth_extract::extract_auth_context(&req)?;
+    let user_id = auth_ctx.user_id;
 
-
-    // Parse user ID from claims
-    let user_id = Uuid::parse_str(&claims.sub)
-        .map_err(|_| AppError::AuthenticationError("Invalid user ID".to_string()))?;
-
-    require_permission!(claims, FsfviPermission::RunPerformanceGapAnalysis);
+    if let Some(claims) = req.extensions().get::<Claims>() {
+        require_permission!(claims, FsfviPermission::RunPerformanceGapAnalysis);
+    }
 
     payload.validate().map_err(|e| AppError::ValidationError(e.to_string()))?;
 
@@ -624,13 +622,12 @@ pub async fn track_gap_closure(
 ) -> Result<HttpResponse, AppError> {
     let start = Instant::now();
 
-    let claims = req.extensions().get::<Claims>().cloned()
-        .ok_or_else(|| AppError::AuthenticationError("Missing authentication".to_string()))?;
+    let auth_ctx = crate::fsfvi_api::auth_extract::extract_auth_context(&req)?;
+    let user_id = auth_ctx.user_id;
 
-    let user_id = Uuid::parse_str(&claims.sub)
-        .map_err(|_| AppError::AuthenticationError("Invalid user ID".to_string()))?;
-
-    require_permission!(claims, FsfviPermission::RunPerformanceGapAnalysis);
+    if let Some(claims) = req.extensions().get::<Claims>() {
+        require_permission!(claims, FsfviPermission::RunPerformanceGapAnalysis);
+    }
 
     payload.validate().map_err(|e| AppError::ValidationError(e.to_string()))?;
 
@@ -686,13 +683,12 @@ pub async fn recommend_targets(
 ) -> Result<HttpResponse, AppError> {
     let start = Instant::now();
 
-    let claims = req.extensions().get::<Claims>().cloned()
-        .ok_or_else(|| AppError::AuthenticationError("Missing authentication".to_string()))?;
+    let auth_ctx = crate::fsfvi_api::auth_extract::extract_auth_context(&req)?;
+    let user_id = auth_ctx.user_id;
 
-    let user_id = Uuid::parse_str(&claims.sub)
-        .map_err(|_| AppError::AuthenticationError("Invalid user ID".to_string()))?;
-
-    require_permission!(claims, FsfviPermission::RunPerformanceGapAnalysis);
+    if let Some(claims) = req.extensions().get::<Claims>() {
+        require_permission!(claims, FsfviPermission::RunPerformanceGapAnalysis);
+    }
 
     payload.validate().map_err(|e| AppError::ValidationError(e.to_string()))?;
 

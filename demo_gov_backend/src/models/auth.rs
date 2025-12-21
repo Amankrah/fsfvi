@@ -58,7 +58,7 @@ pub type AuthResult<T> = Result<T, AuthError>;
 /// Token validation result
 #[derive(Debug)]
 pub struct TokenValidation {
-    pub user_id: Uuid,
+    pub user_id: String, // UUID stored as string
     pub username: String,
     pub role: String,
     pub session_id: String,

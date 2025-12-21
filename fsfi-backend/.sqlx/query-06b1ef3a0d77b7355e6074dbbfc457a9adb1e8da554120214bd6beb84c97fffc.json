@@ -1,0 +1,35 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            endpoint,\n            SUM(request_count) as total_requests,\n            SUM(error_count) as total_errors\n        FROM api_usage\n        WHERE government_id = $1\n          AND date >= CURRENT_DATE - $2::integer\n        GROUP BY endpoint\n        ORDER BY total_requests DESC\n        LIMIT 10\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "endpoint",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 1,
+        "name": "total_requests",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "total_errors",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Int4"
+      ]
+    },
+    "nullable": [
+      false,
+      null,
+      null
+    ]
+  },
+  "hash": "06b1ef3a0d77b7355e6074dbbfc457a9adb1e8da554120214bd6beb84c97fffc"
+}

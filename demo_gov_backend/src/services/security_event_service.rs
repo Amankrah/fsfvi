@@ -4,7 +4,6 @@
 /// Government systems must maintain comprehensive logs for accountability
 
 use sqlx::SqlitePool;
-use uuid::Uuid;
 
 pub struct SecurityEventService {
     db_pool: SqlitePool,
@@ -19,7 +18,7 @@ impl SecurityEventService {
     /// CRITICAL: This creates an immutable audit trail
     pub async fn log_event(
         &self,
-        user_id: Option<Uuid>,
+        user_id: Option<&str>,
         event_type: &str,
         description: &str,
         ip_address: Option<&str>,
@@ -92,7 +91,7 @@ impl SecurityEventService {
     /// Log successful login
     pub async fn log_successful_login(
         &self,
-        user_id: Uuid,
+        user_id: &str,
         username: &str,
         ip_address: &str,
         user_agent: Option<&str>,
@@ -112,7 +111,7 @@ impl SecurityEventService {
     /// Log password change
     pub async fn log_password_change(
         &self,
-        user_id: Uuid,
+        user_id: &str,
         username: &str,
         was_temporary: bool,
     ) -> Result<(), sqlx::Error> {
@@ -131,7 +130,7 @@ impl SecurityEventService {
     /// Log logout
     pub async fn log_logout(
         &self,
-        user_id: Uuid,
+        user_id: &str,
         username: &str,
     ) -> Result<(), sqlx::Error> {
         self.log_event(
@@ -149,7 +148,7 @@ impl SecurityEventService {
     /// Log token blacklisted (security-critical event)
     pub async fn log_token_blacklisted(
         &self,
-        user_id: Uuid,
+        user_id: &str,
         username: &str,
         reason: &str,
     ) -> Result<(), sqlx::Error> {

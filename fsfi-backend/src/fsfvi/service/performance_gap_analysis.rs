@@ -249,11 +249,17 @@ impl PerformanceGapAnalysisService {
                 }
             };
 
-            let performance_level = if relative_to_peers > 10.0 {
+            // CRITICAL: Government decision-making requires sensitivity to all performance differences
+            // Use 1% threshold instead of 10% - any positive/negative difference matters for policy
+            // +1% or more = above_peers (meaningful advantage)
+            // -1% to +1% = at_peer_level (equivalent performance)
+            // -1% to -20% = below_peers (needs improvement)
+            // < -20% = significantly_below_peers (urgent intervention required)
+            let performance_level = if relative_to_peers > 1.0 {
                 "above_peers"
-            } else if relative_to_peers > -10.0 {
+            } else if relative_to_peers > -1.0 {
                 "at_peer_level"
-            } else if relative_to_peers > -30.0 {
+            } else if relative_to_peers > -20.0 {
                 "below_peers"
             } else {
                 "significantly_below_peers"
@@ -419,9 +425,16 @@ impl PerformanceGapAnalysisService {
             .sum::<f64>()
             / progress_items.len() as f64;
 
+        // CRITICAL: For government accountability, ANY positive progress counts as "improving"
+        // This includes "excellent" (>50%), "good" (25-50%), and "moderate" (0-25% closure)
+        // Rationale: Citizens and officials need to see ALL progress toward closing gaps
         let improving_components = progress_items
             .iter()
-            .filter(|p| p.progress_status == "excellent" || p.progress_status == "good")
+            .filter(|p| {
+                p.progress_status == "excellent"
+                    || p.progress_status == "good"
+                    || p.progress_status == "moderate"
+            })
             .count();
 
         let declining_components = progress_items

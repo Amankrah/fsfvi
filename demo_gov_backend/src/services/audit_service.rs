@@ -18,7 +18,7 @@ impl AuditService {
     /// Log a security event
     pub async fn log_security_event(
         &self,
-        user_id: Option<Uuid>,
+        user_id: Option<&str>,
         event_type: &str,
         description: &str,
         ip_address: Option<&str>,
@@ -74,7 +74,7 @@ impl AuditService {
     /// Log login attempt
     pub async fn log_login_attempt(
         &self,
-        user_id: Option<Uuid>,
+        user_id: Option<&str>,
         username: &str,
         ip_address: &str,
         user_agent: Option<&str>,
@@ -102,7 +102,7 @@ impl AuditService {
     /// Log password change
     pub async fn log_password_change(
         &self,
-        user_id: Uuid,
+        user_id: &str,
         username: &str,
         ip_address: &str,
         user_agent: Option<&str>,
@@ -130,7 +130,7 @@ impl AuditService {
     /// Log logout
     pub async fn log_logout(
         &self,
-        user_id: Uuid,
+        user_id: &str,
         username: &str,
         ip_address: &str,
         user_agent: Option<&str>,
@@ -173,7 +173,7 @@ impl AuditService {
     /// Get security events for a specific user
     pub async fn get_user_events(
         &self,
-        user_id: Uuid,
+        user_id: &str,
         limit: i32,
     ) -> Result<Vec<AuditLogEntry>, sqlx::Error> {
         let events = sqlx::query_as::<_, AuditLogEntry>(

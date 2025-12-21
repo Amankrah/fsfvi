@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        INSERT INTO api_keys (\n            id, government_id, created_by_user_id, name,\n            key_hash, key_prefix, scopes, expires_at\n        )\n        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)\n        RETURNING id, created_at\n        ",
+  "query": "\n        INSERT INTO api_keys (\n            id, government_id, created_by_user_id, name,\n            key_hash, key_prefix, scopes, expires_at, must_rotate_by\n        )\n        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)\n        RETURNING id, created_at\n        ",
   "describe": {
     "columns": [
       {
@@ -23,6 +23,7 @@
         "Varchar",
         "Varchar",
         "Jsonb",
+        "Timestamptz",
         "Timestamptz"
       ]
     },
@@ -31,5 +32,5 @@
       false
     ]
   },
-  "hash": "73d866221aafd85646f043a382f81a65e003402f72720e45b337af62d50b53a0"
+  "hash": "7bc7a32ae5f09b7a37a73f81b357c120347ec8fbb4562abbd76f969105e2331d"
 }

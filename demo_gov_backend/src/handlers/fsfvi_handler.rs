@@ -134,9 +134,17 @@ pub struct PeerComparisonRequest {
 
 #[derive(Debug, Deserialize)]
 pub struct GapClosureRequest {
+    pub baseline_fiscal_year: i32,
+    pub current_fiscal_year: i32,
+    pub target_period_months: usize,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct TargetRecommendRequest {
     pub fiscal_year: Option<i32>,
     pub reporting_period: Option<String>,
-    pub target_period_months: usize,
+    pub target_timeline_months: usize,
+    pub peer_countries: Option<Vec<String>>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -369,21 +377,41 @@ pub async fn peer_comparison(
         })));
     }
 
-    // CRITICAL PRODUCTION FIX: Convert peer country names to PeerCountryData
-    // In production, this must fetch actual component values from a peer database
-    // For now, we create placeholder structures - THIS MUST BE REPLACED with real data
-    let peer_countries_data: Vec<crate::services::fsfvi_service::models::PeerCountryData> = request
-        .peer_countries
-        .iter()
-        .map(|country_name| {
-            log::warn!("Creating empty peer data for {} - THIS IS A PLACEHOLDER. Production systems must load actual peer component values from database!", country_name);
-            crate::services::fsfvi_service::models::PeerCountryData {
-                country_name: country_name.clone(),
-                // TODO PRODUCTION: Fetch actual component values from peer_country_data table
-                component_values: std::collections::HashMap::new(),
-            }
-        })
-        .collect();
+    // Fetch real peer country data from database
+    let mut peer_countries_data: Vec<crate::services::fsfvi_service::models::PeerCountryData> = Vec::new();
+
+    for country_name in &request.peer_countries {
+        // Map country name to government_id (lowercase for database lookup)
+        let government_id = country_name.to_lowercase();
+
+        log::info!("Fetching peer data for {} (gov_id: {})", country_name, government_id);
+
+        // Fetch components for this peer country (same fiscal year as the request)
+        let peer_components = DataFetcher::fetch_components(
+            &state.db_pool,
+            &government_id,
+            request.fiscal_year,
+            request.reporting_period.as_deref(),
+        )
+        .await
+        .map_err(|e| {
+            log::warn!("Failed to fetch peer data for {}: {}", country_name, e);
+            actix_web::error::ErrorInternalServerError(format!("Failed to fetch peer data for {}: {}", country_name, e))
+        })?;
+
+        // Convert ComponentInput list to HashMap<ComponentType, f64>
+        let mut component_values = std::collections::HashMap::new();
+        for comp in peer_components {
+            component_values.insert(comp.component_type.clone(), comp.observed_value);
+        }
+
+        log::info!("Loaded {} components for peer country {}", component_values.len(), country_name);
+
+        peer_countries_data.push(crate::services::fsfvi_service::models::PeerCountryData {
+            country_name: country_name.clone(),
+            component_values,
+        });
+    }
 
     let result = state
         .performance_gap_service
@@ -405,7 +433,112 @@ pub async fn track_gap_closure(
     state: web::Data<FsfviAppState>,
 ) -> Result<HttpResponse> {
     let user = extract_user_from_token(&req)?;
-    log::info!("User {} tracking gap closure", user.username);
+    log::info!(
+        "User {} tracking gap closure: FY {} → FY {}",
+        user.username,
+        request.baseline_fiscal_year,
+        request.current_fiscal_year
+    );
+
+    // Fetch baseline components (historical data)
+    let baseline_components = DataFetcher::fetch_components(
+        &state.db_pool,
+        &user.government_id,
+        Some(request.baseline_fiscal_year),
+        None,
+    )
+    .await
+    .map_err(|e| actix_web::error::ErrorInternalServerError(format!("Failed to fetch baseline data: {}", e)))?;
+
+    if baseline_components.is_empty() {
+        return Ok(HttpResponse::BadRequest().json(json!({
+            "success": false,
+            "message": format!("No validated data found for baseline FY {}", request.baseline_fiscal_year)
+        })));
+    }
+
+    // Fetch current components (latest data)
+    let current_components = DataFetcher::fetch_components(
+        &state.db_pool,
+        &user.government_id,
+        Some(request.current_fiscal_year),
+        None,
+    )
+    .await
+    .map_err(|e| actix_web::error::ErrorInternalServerError(format!("Failed to fetch current data: {}", e)))?;
+
+    if current_components.is_empty() {
+        return Ok(HttpResponse::BadRequest().json(json!({
+            "success": false,
+            "message": format!("No validated data found for current FY {}", request.current_fiscal_year)
+        })));
+    }
+
+    log::info!(
+        "Fetched {} baseline components (FY {}) and {} current components (FY {})",
+        baseline_components.len(),
+        request.baseline_fiscal_year,
+        current_components.len(),
+        request.current_fiscal_year
+    );
+
+    let result = state
+        .performance_gap_service
+        .track_gap_closure(baseline_components, current_components, request.target_period_months)
+        .await
+        .map_err(|e| actix_web::error::ErrorInternalServerError(format!("Tracking failed: {}", e)))?;
+
+    // Calculate monthly closure rate for each component based on actual fiscal year difference
+    // CRITICAL: This calculation depends on the actual time between fiscal years, not the generic target_period_months
+    let time_period_months = (request.current_fiscal_year - request.baseline_fiscal_year) * 12;
+
+    let mut report = result.data;
+
+    // Add monthly closure rate to each component
+    for component in &mut report.component_progress {
+        // Monthly closure rate = gap closure percent / actual time period in months
+        // Example: 33.3% gap closure over 12 months = 2.78% per month
+        let monthly_rate = if time_period_months > 0 {
+            component.gap_closure_percent / time_period_months as f64
+        } else {
+            0.0 // If same fiscal year (shouldn't happen), rate is 0
+        };
+
+        component.monthly_closure_rate = Some(monthly_rate);
+
+        log::debug!(
+            "Component {}: gap_closure={:.1}%, time_period={}mo, monthly_rate={:.2}%/mo",
+            component.component_type,
+            component.gap_closure_percent,
+            time_period_months,
+            monthly_rate
+        );
+    }
+
+    log::info!(
+        "Gap closure tracking complete: {} components over {} months (FY {} → FY {})",
+        report.component_progress.len(),
+        time_period_months,
+        request.baseline_fiscal_year,
+        request.current_fiscal_year
+    );
+
+    Ok(HttpResponse::Ok().json(json!({
+        "success": true,
+        "data": report
+    })))
+}
+
+/// POST /api/government/fsfvi/performance-gaps/recommend-targets
+/// Generate realistic improvement targets
+pub async fn recommend_targets(
+    req: HttpRequest,
+    request: web::Json<TargetRecommendRequest>,
+    state: web::Data<FsfviAppState>,
+) -> Result<HttpResponse> {
+    let user = extract_user_from_token(&req)?;
+    log::info!("User {} requesting target recommendations for {} months timeline",
+        user.username, request.target_timeline_months);
 
     let components = DataFetcher::fetch_components(
         &state.db_pool,
@@ -423,60 +556,38 @@ pub async fn track_gap_closure(
         })));
     }
 
-    // CRITICAL PRODUCTION FIX: track_gap_closure needs baseline AND current components
-    // For single-period analysis, we use the same components as both baseline and current
-    // Production systems should fetch historical baseline data from the database
-    log::warn!("Using same components for baseline and current in gap closure tracking. Production systems should fetch historical baseline data!");
+    // Convert peer country names to PeerCountryData if requested
+    let peer_countries_data = if let Some(peer_names) = &request.peer_countries {
+        let mut peer_data = Vec::new();
+        for country_name in peer_names {
+            let government_id = country_name.to_lowercase();
+            let peer_components = DataFetcher::fetch_components(
+                &state.db_pool,
+                &government_id,
+                request.fiscal_year,
+                request.reporting_period.as_deref(),
+            )
+            .await
+            .map_err(|e| actix_web::error::ErrorInternalServerError(format!("Failed to fetch peer data for {}: {}", country_name, e)))?;
 
-    let baseline_components = components.clone();
-    let current_components = components;
+            let mut component_values = std::collections::HashMap::new();
+            for comp in peer_components {
+                component_values.insert(comp.component_type.clone(), comp.observed_value);
+            }
 
-    let result = state
-        .performance_gap_service
-        .track_gap_closure(baseline_components, current_components, request.target_period_months)
-        .await
-        .map_err(|e| actix_web::error::ErrorInternalServerError(format!("Tracking failed: {}", e)))?;
-
-    Ok(HttpResponse::Ok().json(json!({
-        "success": true,
-        "data": result.data
-    })))
-}
-
-/// POST /api/government/fsfvi/performance-gaps/recommend-targets
-/// Generate realistic improvement targets
-pub async fn recommend_targets(
-    req: HttpRequest,
-    query: web::Query<FiscalYearQuery>,
-    state: web::Data<FsfviAppState>,
-) -> Result<HttpResponse> {
-    let user = extract_user_from_token(&req)?;
-    log::info!("User {} requesting target recommendations", user.username);
-
-    let components = DataFetcher::fetch_components(
-        &state.db_pool,
-        &user.government_id,
-        query.fiscal_year,
-        query.reporting_period.as_deref(),
-    )
-    .await
-    .map_err(|e| actix_web::error::ErrorInternalServerError(format!("Failed to fetch data: {}", e)))?;
-
-    if components.is_empty() {
-        return Ok(HttpResponse::BadRequest().json(json!({
-            "success": false,
-            "message": "No validated data found"
-        })));
-    }
-
-    // recommend_targets requires target_timeline_months and optional peer_countries
-    // Using default 24 months (2 years) as a realistic planning horizon
-    let target_timeline_months = 24;
-    let peer_countries = None; // Production: could fetch from peer database if requested
+            peer_data.push(crate::services::fsfvi_service::models::PeerCountryData {
+                country_name: country_name.clone(),
+                component_values,
+            });
+        }
+        Some(peer_data)
+    } else {
+        None
+    };
 
     let result = state
         .performance_gap_service
-        .recommend_targets(components, target_timeline_months, peer_countries)
+        .recommend_targets(components, request.target_timeline_months, peer_countries_data)
         .await
         .map_err(|e| actix_web::error::ErrorInternalServerError(format!("Recommendation failed: {}", e)))?;
 

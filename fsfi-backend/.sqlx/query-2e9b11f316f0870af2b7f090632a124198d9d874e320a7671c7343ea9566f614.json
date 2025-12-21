@@ -1,0 +1,147 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            ak.id, ak.government_id, ak.created_by_user_id, ak.name,\n            ak.key_hash, ak.key_prefix,\n            ak.status as \"status: crate::models::api_key::ApiKeyStatus\",\n            ak.scopes, ak.rate_limit_override,\n            ak.last_used, ak.usage_count, ak.created_at, ak.expires_at,\n            ak.revoked_at, ak.revoked_by_user_id, ak.revocation_reason,\n            ak.must_rotate_by,\n            g.government_name,\n            u.email as created_by_email,\n            u.full_name as created_by_name\n        FROM api_keys ak\n        JOIN governments g ON ak.government_id = g.id\n        JOIN users u ON ak.created_by_user_id = u.id\n        WHERE ak.id = $1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "government_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "created_by_user_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "key_hash",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 5,
+        "name": "key_prefix",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 6,
+        "name": "status: crate::models::api_key::ApiKeyStatus",
+        "type_info": {
+          "Custom": {
+            "name": "api_key_status",
+            "kind": {
+              "Enum": [
+                "active",
+                "expired",
+                "revoked"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "scopes",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 8,
+        "name": "rate_limit_override",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 9,
+        "name": "last_used",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 10,
+        "name": "usage_count",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 11,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 12,
+        "name": "expires_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 13,
+        "name": "revoked_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 14,
+        "name": "revoked_by_user_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 15,
+        "name": "revocation_reason",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 16,
+        "name": "must_rotate_by",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 17,
+        "name": "government_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 18,
+        "name": "created_by_email",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 19,
+        "name": "created_by_name",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "2e9b11f316f0870af2b7f090632a124198d9d874e320a7671c7343ea9566f614"
+}

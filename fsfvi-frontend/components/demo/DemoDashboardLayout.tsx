@@ -10,9 +10,10 @@ import {
   Menu,
   X,
   ChevronRight,
+  BarChart3,
 } from 'lucide-react';
 
-type NavigationItem = 'profile' | 'security';
+type NavigationItem = 'profile' | 'security' | 'performance-gap';
 
 interface DemoDashboardLayoutProps {
   children?: React.ReactNode;
@@ -41,6 +42,12 @@ export function DemoDashboardLayout({ children, activeNav, setActiveNav }: DemoD
 
   const navigationItems = [
     {
+      id: 'performance-gap' as NavigationItem,
+      label: 'Performance Gap Analysis',
+      icon: BarChart3,
+      description: 'Analyze food system performance gaps',
+    },
+    {
       id: 'profile' as NavigationItem,
       label: 'Profile',
       icon: User,
@@ -63,6 +70,7 @@ export function DemoDashboardLayout({ children, activeNav, setActiveNav }: DemoD
             {/* Logo and Title */}
             <div className="flex items-center space-x-4">
               <button
+                type="button"
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
                 className="lg:hidden p-2 rounded-md text-gray-600 hover:text-gray-900 hover:bg-gray-100"
               >
@@ -82,7 +90,7 @@ export function DemoDashboardLayout({ children, activeNav, setActiveNav }: DemoD
                     Demo Government Portal
                   </h1>
                   <p className="text-xs text-gray-600 hidden sm:block">
-                    FSFVI Account Management
+                    FSFVI Dashboard
                   </p>
                 </div>
               </div>
@@ -116,6 +124,7 @@ export function DemoDashboardLayout({ children, activeNav, setActiveNav }: DemoD
                 const isActive = activeNav === item.id;
                 return (
                   <button
+                    type="button"
                     key={item.id}
                     onClick={() => {
                       setActiveNav(item.id);
@@ -144,9 +153,9 @@ export function DemoDashboardLayout({ children, activeNav, setActiveNav }: DemoD
           <aside className="hidden lg:block lg:col-span-3">
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden sticky top-24">
               <div className="p-4 bg-gradient-to-r from-blue-50 to-cyan-50 border-b border-gray-200">
-                <h2 className="font-semibold text-gray-900">Account Settings</h2>
+                <h2 className="font-semibold text-gray-900">Dashboard</h2>
                 <p className="text-sm text-gray-600 mt-1">
-                  Manage your account and security
+                  Manage your food system data
                 </p>
               </div>
 
@@ -157,6 +166,7 @@ export function DemoDashboardLayout({ children, activeNav, setActiveNav }: DemoD
 
                   return (
                     <button
+                      type="button"
                       key={item.id}
                       onClick={() => setActiveNav(item.id)}
                       className={`w-full group flex items-center justify-between px-3 py-3 rounded-lg transition-all mb-1 ${
@@ -168,7 +178,7 @@ export function DemoDashboardLayout({ children, activeNav, setActiveNav }: DemoD
                       <div className="flex items-center space-x-3">
                         <Icon className={`h-5 w-5 ${isActive ? 'text-white' : 'text-gray-600'}`} />
                         <div className="text-left">
-                          <p className={`font-medium ${isActive ? 'text-white' : 'text-gray-900'}`}>
+                          <p className={`font-medium text-sm ${isActive ? 'text-white' : 'text-gray-900'}`}>
                             {item.label}
                           </p>
                           <p className={`text-xs mt-0.5 ${isActive ? 'text-blue-100' : 'text-gray-600'}`}>

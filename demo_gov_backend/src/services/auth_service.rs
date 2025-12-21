@@ -75,7 +75,7 @@ impl AuthService {
 
             // Log to audit service
             self.audit_service.log_login_attempt(
-                Some(user.id),
+                Some(&user.id),
                 &user.username,
                 ip_address,
                 request.user_agent.as_deref(),
@@ -146,7 +146,7 @@ impl AuthService {
                         let (is_valid, updated_codes) = self.two_fa_service.verify_backup_code(backup_codes, two_fa_code)?;
                         if is_valid {
                             // Update backup codes in database (remove used code)
-                            self.update_user_backup_codes(user.id, &updated_codes).await?;
+                            self.update_user_backup_codes(&user.id, &updated_codes).await?;
                         }
                         is_valid
                     } else {
@@ -186,7 +186,7 @@ impl AuthService {
     }
 
     /// Change user password
-    pub async fn change_password(&mut self, user_id: Uuid, request: ChangePasswordRequest) -> AuthResult<()> {
+    pub async fn change_password(&mut self, user_id: &str, request: ChangePasswordRequest) -> AuthResult<()> {
         log::debug!("Password change attempt for user ID: {}", user_id);
         log::debug!("Current password length: {}", request.current_password.len());
         log::debug!("New password length: {}", request.new_password.len());
@@ -280,7 +280,7 @@ impl AuthService {
 
                 // Log this security event
                 if let Err(e) = self.security_event_service.log_event(
-                    Some(user_id),
+                    Some(&user_id),
                     "blacklisted_token_use_attempt",
                     "Attempt to use blacklisted token",
                     None,
@@ -310,7 +310,7 @@ impl AuthService {
         );
 
         // Get user from database to check session
-        let user = self.get_user_by_id(token_validation.user_id).await?;
+        let user = self.get_user_by_id(&token_validation.user_id).await?;
 
         // Check if session is still valid
         if let (Some(session_token), Some(session_expires_at)) = (&user.session_token, user.session_expires_at) {
@@ -357,14 +357,14 @@ impl AuthService {
         );
 
         // Get user from database to check session
-        let user = self.get_user_by_id(token_validation.user_id).await?;
+        let user = self.get_user_by_id(&token_validation.user_id).await?;
 
         // Check if session is still valid
         if let (Some(session_token), Some(session_expires_at)) = (&user.session_token, user.session_expires_at) {
             if session_token == &token_validation.session_id && session_expires_at > Utc::now() {
                 // Build SessionInfo with all details
                 let session_info = crate::models::user::SessionInfo {
-                    user_id: user.id,
+                    user_id: user.id.clone(),
                     username: user.username.clone(),
                     role: user.role.clone(),
                     is_temporary_password: user.is_temporary_password,
@@ -390,7 +390,7 @@ impl AuthService {
 
     /// Logout user (invalidate session)
     /// SECURITY: Accepts the JWT token to blacklist it, preventing reuse after logout
-    pub async fn logout(&mut self, user_id: Uuid, token: Option<&str>) -> AuthResult<()> {
+    pub async fn logout(&mut self, user_id: &str, token: Option<&str>) -> AuthResult<()> {
         // Get user info for audit logging
         let user = self.get_user_by_id(user_id).await?;
 
@@ -451,7 +451,7 @@ impl AuthService {
     /// Get audit logs for security monitoring
     /// CRITICAL: Provides access to immutable audit trail for compliance and security analysis
     /// Only accessible to authenticated users - filters by user_id for privacy
-    pub async fn get_audit_logs(&self, user_id: Uuid, limit: i32) -> AuthResult<Vec<crate::models::auth::AuditLogEntry>> {
+    pub async fn get_audit_logs(&self, user_id: &str, limit: i32) -> AuthResult<Vec<crate::models::auth::AuditLogEntry>> {
         self.audit_service
             .get_user_events(user_id, limit)
             .await
@@ -553,7 +553,7 @@ impl AuthService {
         .ok_or(AuthError::InvalidCredentials)
     }
 
-    async fn get_user_by_id(&self, user_id: Uuid) -> AuthResult<User> {
+    async fn get_user_by_id(&self, user_id: &str) -> AuthResult<User> {
         sqlx::query_as::<_, User>(
             r#"
             SELECT id, username, password_hash,
@@ -607,7 +607,7 @@ impl AuthService {
         Ok(())
     }
 
-    async fn update_user_password(&self, user_id: Uuid, password_hash: &str) -> AuthResult<()> {
+    async fn update_user_password(&self, user_id: &str, password_hash: &str) -> AuthResult<()> {
         let now = Utc::now();
         sqlx::query!(
             r#"
@@ -739,7 +739,7 @@ impl AuthService {
 
         // Log to audit service
         self.audit_service.log_login_attempt(
-            Some(user.id),
+            Some(&user.id),
             &user.username,
             ip_address,
             request.user_agent.as_deref(),
@@ -749,7 +749,7 @@ impl AuthService {
 
         // CRITICAL SECURITY: Log successful login to security events
         self.security_event_service.log_successful_login(
-            user.id,
+            &user.id,
             &user.username,
             ip_address,
             request.user_agent.as_deref(),
@@ -765,7 +765,7 @@ impl AuthService {
     }
 
     /// Update user backup codes
-    async fn update_user_backup_codes(&self, user_id: Uuid, backup_codes: &str) -> AuthResult<()> {
+    async fn update_user_backup_codes(&self, user_id: &str, backup_codes: &str) -> AuthResult<()> {
         let now = Utc::now();
         sqlx::query!(
             "UPDATE users SET two_fa_backup_codes = ?, updated_at = ? WHERE id = ?",
@@ -781,7 +781,7 @@ impl AuthService {
     }
 
     /// Prepare 2FA setup - generates secret and QR code
-    pub async fn prepare_two_fa_setup(&mut self, user_id: Uuid) -> AuthResult<TwoFASetupResponse> {
+    pub async fn prepare_two_fa_setup(&mut self, user_id: &str) -> AuthResult<TwoFASetupResponse> {
         let user = self.get_user_by_id(user_id).await?;
 
         // Generate secret and backup codes
@@ -802,7 +802,7 @@ impl AuthService {
     }
 
     /// Set up 2FA for user - verifies TOTP and enables 2FA
-    pub async fn setup_two_fa(&mut self, user_id: Uuid, request: TwoFASetupRequest) -> AuthResult<TwoFASetupResponse> {
+    pub async fn setup_two_fa(&mut self, user_id: &str, request: TwoFASetupRequest) -> AuthResult<TwoFASetupResponse> {
         let user = self.get_user_by_id(user_id).await?;
 
         // Use the secret and backup codes provided from the prepare phase
@@ -913,7 +913,7 @@ impl AuthService {
                 if is_valid {
                     log::info!("Backup code valid, updating codes in database");
                     // Update backup codes in database (remove used code)
-                    self.update_user_backup_codes(user.id, &updated_codes).await?;
+                    self.update_user_backup_codes(&user.id, &updated_codes).await?;
                 }
                 is_valid
             } else {
@@ -951,7 +951,7 @@ impl AuthService {
     }
 
     /// Disable 2FA for user
-    pub async fn disable_two_fa(&mut self, user_id: Uuid, request: TwoFADisableRequest) -> AuthResult<()> {
+    pub async fn disable_two_fa(&mut self, user_id: &str, request: TwoFADisableRequest) -> AuthResult<()> {
         let user = self.get_user_by_id(user_id).await?;
         
         // Verify password

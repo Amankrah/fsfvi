@@ -18,9 +18,10 @@ impl Default for UserRole {
 }
 
 /// User model for database
+/// CRITICAL: id is stored as TEXT in SQLite, not BLOB
 #[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
 pub struct User {
-    pub id: Uuid,
+    pub id: String, // UUID stored as TEXT in database
     pub username: String,
     pub password_hash: String,
     pub role: UserRole,
@@ -60,7 +61,7 @@ pub struct UserResponse {
 impl From<User> for UserResponse {
     fn from(user: User) -> Self {
         UserResponse {
-            id: user.id.to_string(),
+            id: user.id, // Already a String
             username: user.username,
             role: user.role,
             is_temporary_password: user.is_temporary_password,
@@ -217,10 +218,11 @@ fn validate_password_strength(password: &str) -> Result<(), validator::Validatio
 }
 
 /// Security event for logging
+/// CRITICAL: user_id stored as TEXT in database
 #[derive(Debug, Serialize, Deserialize, FromRow)]
 pub struct SecurityEvent {
-    pub id: Uuid,
-    pub user_id: Option<Uuid>,
+    pub id: String, // UUID stored as TEXT
+    pub user_id: Option<String>, // UUID stored as TEXT
     pub event_type: String,
     pub description: String,
     pub ip_address: Option<String>,
@@ -234,7 +236,7 @@ impl SecurityEvent {
     /// Create a new security event for logging
     /// CRITICAL: Government audit trail requires explicit event creation
     pub fn new(
-        user_id: Option<Uuid>,
+        user_id: Option<&str>,
         event_type: String,
         description: String,
         ip_address: Option<String>,
@@ -243,8 +245,8 @@ impl SecurityEvent {
         metadata: Option<serde_json::Value>,
     ) -> Self {
         Self {
-            id: Uuid::new_v4(),
-            user_id,
+            id: Uuid::new_v4().to_string(),
+            user_id: user_id.map(|s| s.to_string()),
             event_type,
             description,
             ip_address,
@@ -259,7 +261,7 @@ impl SecurityEvent {
 /// Session information
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SessionInfo {
-    pub user_id: Uuid,
+    pub user_id: String, // UUID stored as string
     pub username: String,
     pub role: UserRole,
     pub is_temporary_password: bool,

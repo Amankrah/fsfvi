@@ -1,0 +1,58 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            al.timestamp,\n            al.ip_address,\n            al.user_agent,\n            al.error_message,\n            u.email,\n            u.full_name,\n            g.government_name\n        FROM audit_logs al\n        LEFT JOIN users u ON al.user_id = u.id\n        LEFT JOIN governments g ON al.government_id = g.id\n        WHERE al.action = 'login_failed'\n          AND al.timestamp >= NOW() - ($1::integer || ' hours')::interval\n        ORDER BY al.timestamp DESC\n        LIMIT 100\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "timestamp",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 1,
+        "name": "ip_address",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "user_agent",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "error_message",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "email",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 5,
+        "name": "full_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 6,
+        "name": "government_name",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      true,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "f79ec7f38b097f12603bfb13926765d873805b93cd99cf4a3ace9155b5122694"
+}

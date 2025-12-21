@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT\n            id,\n            country_code,\n            country_name,\n            government_name,\n            government_type as \"government_type: crate::models::government::GovernmentType\",\n            tier as \"tier: crate::models::government::AccessTier\",\n            status as \"status: crate::models::government::GovernmentStatus\",\n            contact_email,\n            created_at,\n            activated_at\n        FROM governments\n        ORDER BY country_name\n        ",
+  "query": "\n        SELECT\n            id,\n            country_code,\n            country_name,\n            government_name,\n            government_type as \"government_type: crate::models::government::GovernmentType\",\n            tier as \"tier: crate::models::government::AccessTier\",\n            status as \"status: crate::models::government::GovernmentStatus\",\n            contact_email,\n            primary_contact_name,\n            primary_contact_title,\n            created_at,\n            activated_at\n        FROM governments\n        ORDER BY country_name\n        ",
   "describe": {
     "columns": [
       {
@@ -82,11 +82,21 @@
       },
       {
         "ordinal": 8,
+        "name": "primary_contact_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 9,
+        "name": "primary_contact_title",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 10,
         "name": "created_at",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 9,
+        "ordinal": 11,
         "name": "activated_at",
         "type_info": "Timestamptz"
       }
@@ -104,8 +114,10 @@
       false,
       false,
       false,
+      false,
+      false,
       true
     ]
   },
-  "hash": "0cba812f24ee1f6d6412c29db117d0405207032ba9ab25c03f7aca2132de0df7"
+  "hash": "c40cb2f311406a6e7cf84c7d7f300e9909b724a322511ac579c33e09862e3475"
 }

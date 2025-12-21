@@ -85,6 +85,13 @@ impl DataFetcher {
         let mut components = Vec::new();
 
         for row in rows {
+            // CRITICAL: Explicitly specify Option<f64> type for NULL-able columns
+            // SQLite NULL values must be read as Option<f64>, not f64
+            let weight: Option<f64> = row.try_get::<Option<f64>, _>("weight")
+                .unwrap_or(None);
+            let sensitivity_parameter: Option<f64> = row.try_get::<Option<f64>, _>("sensitivity_parameter")
+                .unwrap_or(None);
+
             let component = ComponentInput {
                 component_id: row.try_get("component_id").ok(),
                 component_type: row.try_get("component_type")
@@ -107,8 +114,8 @@ impl DataFetcher {
                         "Missing financial_allocation_usd: {}",
                         e
                     )))?,
-                weight: row.try_get("weight").ok(),
-                sensitivity_parameter: row.try_get("sensitivity_parameter").ok(),
+                weight,
+                sensitivity_parameter,
             };
 
             // Validate component data integrity

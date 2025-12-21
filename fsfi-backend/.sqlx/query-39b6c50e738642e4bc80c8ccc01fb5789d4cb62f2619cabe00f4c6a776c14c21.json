@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE users\n        SET password_hash = $1,\n            failed_login_attempts = 0,\n            locked_until = NULL,\n            updated_at = NOW()\n        WHERE id = $2\n        RETURNING id\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Varchar",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "39b6c50e738642e4bc80c8ccc01fb5789d4cb62f2619cabe00f4c6a776c14c21"
+}

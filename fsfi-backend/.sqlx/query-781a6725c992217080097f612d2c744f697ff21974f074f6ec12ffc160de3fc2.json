@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE api_keys\n        SET status = 'revoked'::api_key_status,\n            revoked_at = NOW(),\n            revoked_by_user_id = $1,\n            revocation_reason = 'Automatically revoked due to new API key generation (one-key-per-user policy)'\n        WHERE created_by_user_id = $1\n        AND government_id = $2\n        AND status = 'active'::api_key_status\n        RETURNING id\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "781a6725c992217080097f612d2c744f697ff21974f074f6ec12ffc160de3fc2"
+}

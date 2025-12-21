@@ -1,0 +1,40 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            ip_address,\n            COUNT(*) as attempt_count,\n            MAX(timestamp) as last_attempt,\n            array_agg(DISTINCT action::text) as actions\n        FROM audit_logs\n        WHERE action IN ('login_failed', 'unauthorized_access', 'rate_limit_exceeded')\n          AND timestamp >= NOW() - ($1::integer || ' hours')::interval\n        GROUP BY ip_address\n        HAVING COUNT(*) >= 5\n        ORDER BY attempt_count DESC\n        LIMIT 50\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "ip_address",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 1,
+        "name": "attempt_count",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "last_attempt",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 3,
+        "name": "actions",
+        "type_info": "TextArray"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4"
+      ]
+    },
+    "nullable": [
+      false,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "3c98c17fdcc07c64e9929aad2c74ccc73d832c51fc3b96e48148f5f6c3cdaf23"
+}

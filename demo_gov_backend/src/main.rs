@@ -293,6 +293,13 @@ async fn run_initial_migration(pool: &SqlitePool) -> Result<(), sqlx::Error> {
         ("002_raw_data.sql", include_str!("../migrations/002_raw_data.sql")),
         ("003_fsfvi_data.sql", include_str!("../migrations/003_fsfvi_data.sql")),
         ("004_fsfvi_results.sql", include_str!("../migrations/004_fsfvi_results.sql")),
+        ("005_security_events.sql", include_str!("../migrations/005_security_events.sql")),
+        ("006_demo_fsfvi_data.sql", include_str!("../migrations/006_demo_fsfvi_data.sql")),
+        ("007_fix_optional_fields.sql", include_str!("../migrations/007_fix_optional_fields.sql")),
+        ("008_historical_fsfvi_data.sql", include_str!("../migrations/008_historical_fsfvi_data.sql")),
+        // NOTE: Migration 009 (peer countries data) must be run separately using:
+        // cargo run --bin add_peer_data
+        // This is because it has foreign key dependencies that need to be resolved in the correct order
     ];
 
     for (name, migration_sql) in migrations {

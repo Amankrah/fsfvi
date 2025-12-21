@@ -19,6 +19,7 @@
 /// - Currency conversion handled at input if needed
 /// - Results always returned in USD
 
+pub mod auth_extract;
 pub mod budget_optimization;
 pub mod handlers;
 pub mod models;

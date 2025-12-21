@@ -73,7 +73,8 @@ impl TokenService {
         // Additional validation
         self.validate_claims(&claims)?;
 
-        let user_id = Uuid::parse_str(&claims.sub)
+        // Validate UUID format (claims.sub is already a String)
+        Uuid::parse_str(&claims.sub)
             .map_err(|_| AuthError::InvalidToken)?;
 
         let expires_at = chrono::DateTime::from_timestamp(claims.exp as i64, 0)
@@ -81,7 +82,7 @@ impl TokenService {
             .with_timezone(&Utc);
 
         Ok(TokenValidation {
-            user_id,
+            user_id: claims.sub,
             username: claims.username,
             role: claims.role,
             session_id: claims.session_id,
@@ -106,14 +107,16 @@ impl TokenService {
     }
 
     /// Extract user ID from token without full validation (for logging purposes)
-    pub fn extract_user_id(&self, token: &str) -> Option<Uuid> {
+    pub fn extract_user_id(&self, token: &str) -> Option<String> {
         // Create a more lenient validation for extraction
         let mut lenient_validation = Validation::new(Algorithm::HS256);
         lenient_validation.validate_exp = false;
         lenient_validation.validate_aud = false;
 
         if let Ok(token_data) = decode::<Claims>(token, &self.decoding_key, &lenient_validation) {
-            Uuid::parse_str(&token_data.claims.sub).ok()
+            // Validate it's a proper UUID format before returning the string
+            Uuid::parse_str(&token_data.claims.sub).ok()?;
+            Some(token_data.claims.sub)
         } else {
             None
         }

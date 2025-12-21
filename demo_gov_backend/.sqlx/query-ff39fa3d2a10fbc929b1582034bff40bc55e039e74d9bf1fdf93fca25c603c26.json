@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            UPDATE users\n            SET password_hash = ?, is_temporary_password = ?,\n                password_changed_at = ?, updated_at = ?\n            WHERE id = ?\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 5
+    },
+    "nullable": []
+  },
+  "hash": "ff39fa3d2a10fbc929b1582034bff40bc55e039e74d9bf1fdf93fca25c603c26"
+}

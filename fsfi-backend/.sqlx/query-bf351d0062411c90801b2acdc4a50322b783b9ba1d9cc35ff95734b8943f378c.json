@@ -1,0 +1,52 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            ak.id,\n            ak.name,\n            ak.revoked_at,\n            ak.revocation_reason,\n            g.government_name,\n            u.full_name as revoked_by\n        FROM api_keys ak\n        JOIN governments g ON ak.government_id = g.id\n        LEFT JOIN users u ON ak.revoked_by_user_id = u.id\n        WHERE ak.status = 'revoked'\n          AND ak.revoked_at >= NOW() - ($1::integer || ' hours')::interval\n        ORDER BY ak.revoked_at DESC\n        LIMIT 50\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "revoked_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 3,
+        "name": "revocation_reason",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "government_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 5,
+        "name": "revoked_by",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "bf351d0062411c90801b2acdc4a50322b783b9ba1d9cc35ff95734b8943f378c"
+}

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            UPDATE users\n            SET login_attempts = ?, is_locked = ?, lockout_expiry = ?,\n                last_login = ?, session_token = ?, session_expires_at = ?,\n                updated_at = ?\n            WHERE id = ?\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 8
+    },
+    "nullable": []
+  },
+  "hash": "1dab705235548f1db17573443c9d2ee5f0c6715dea641bc58944cc2363c9df7e"
+}
