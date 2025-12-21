@@ -41,7 +41,7 @@ impl AssessmentService {
 
         // Validate weighting method if provided
         if let Some(ref method) = weighting_method {
-            const VALID_METHODS: &[&str] = &["Hybrid", "Expert", "Financial", "Network"];
+            const VALID_METHODS: &[&str] = &["hybrid", "expert", "financial", "network"];
             if !VALID_METHODS.contains(&method.as_str()) {
                 return Err(FsfviServiceError::ValidationError(format!(
                     "Invalid weighting_method '{}'. Must be one of: {}",
@@ -54,12 +54,13 @@ impl AssessmentService {
         // Validate scenario if provided
         if let Some(ref scen) = scenario {
             const VALID_SCENARIOS: &[&str] = &[
-                "NormalOperations",
-                "ClimateShock",
-                "EconomicCrisis",
-                "ConflictDisplacement",
-                "PandemicResponse",
-                "PostDisasterRecovery",
+                "normal_operations",
+                "climate_shock",
+                "financial_crisis",
+                "pandemic_disruption",
+                "supply_chain_disruption",
+                "cyber_threats",
+                "political_instability",
             ];
             if !VALID_SCENARIOS.contains(&scen.as_str()) {
                 return Err(FsfviServiceError::ValidationError(format!(

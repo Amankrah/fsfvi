@@ -101,3 +101,8 @@ serial_test = "3.0"
 name = "performance_gap_integration_tests"
 path = "tests/performance_gap_integration_tests.rs"
 harness = true
+
+[[test]]
+name = "assessment_integration_tests"
+path = "tests/assessment_integration_tests.rs"
+harness = true

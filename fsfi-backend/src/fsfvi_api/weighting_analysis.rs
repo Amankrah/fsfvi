@@ -126,16 +126,17 @@ async fn analyze_scenario_sensitivity_hybrid(
 ) -> Result<HttpResponse, AppError> {
     let start = Instant::now();
 
-    let claims = req.extensions().get::<Claims>().cloned()
-        .ok_or_else(|| AppError::AuthenticationError("Missing authentication".to_string()))?;
+    // Extract auth context (works with both JWT and API key)
+    let auth_ctx = crate::fsfvi_api::auth_extract::extract_auth_context(&req)?;
+    let user_id = auth_ctx.user_id;
 
-    let user_id = Uuid::parse_str(&claims.sub)
-        .map_err(|_| AppError::AuthenticationError("Invalid user ID".to_string()))?;
-
-    if claims.role != UserRole::Developer && claims.role != UserRole::Admin {
-        return Err(AppError::AuthenticationError(
-            "Access denied. Developer or Admin role required.".to_string(),
-        ));
+    // Verify role for JWT users (API keys with "*" scope have full access)
+    if let Some(claims) = req.extensions().get::<Claims>() {
+        if claims.role != UserRole::Developer && claims.role != UserRole::Admin {
+            return Err(AppError::AuthenticationError(
+                "Access denied. Developer or Admin role required.".to_string(),
+            ));
+        }
     }
 
     body.validate()
@@ -170,16 +171,17 @@ async fn analyze_scenario_sensitivity_expert(
 ) -> Result<HttpResponse, AppError> {
     let start = Instant::now();
 
-    let claims = req.extensions().get::<Claims>().cloned()
-        .ok_or_else(|| AppError::AuthenticationError("Missing authentication".to_string()))?;
+    // Extract auth context (works with both JWT and API key)
+    let auth_ctx = crate::fsfvi_api::auth_extract::extract_auth_context(&req)?;
+    let user_id = auth_ctx.user_id;
 
-    let user_id = Uuid::parse_str(&claims.sub)
-        .map_err(|_| AppError::AuthenticationError("Invalid user ID".to_string()))?;
-
-    if claims.role != UserRole::Developer && claims.role != UserRole::Admin {
-        return Err(AppError::AuthenticationError(
-            "Access denied. Developer or Admin role required.".to_string(),
-        ));
+    // Verify role for JWT users (API keys with "*" scope have full access)
+    if let Some(claims) = req.extensions().get::<Claims>() {
+        if claims.role != UserRole::Developer && claims.role != UserRole::Admin {
+            return Err(AppError::AuthenticationError(
+                "Access denied. Developer or Admin role required.".to_string(),
+            ));
+        }
     }
 
     body.validate()
@@ -221,16 +223,17 @@ async fn analyze_financial_weights(
 ) -> Result<HttpResponse, AppError> {
     let start = Instant::now();
 
-    let claims = req.extensions().get::<Claims>().cloned()
-        .ok_or_else(|| AppError::AuthenticationError("Missing authentication".to_string()))?;
+    // Extract auth context (works with both JWT and API key)
+    let auth_ctx = crate::fsfvi_api::auth_extract::extract_auth_context(&req)?;
+    let user_id = auth_ctx.user_id;
 
-    let user_id = Uuid::parse_str(&claims.sub)
-        .map_err(|_| AppError::AuthenticationError("Invalid user ID".to_string()))?;
-
-    if claims.role != UserRole::Developer && claims.role != UserRole::Admin {
-        return Err(AppError::AuthenticationError(
-            "Access denied. Developer or Admin role required.".to_string(),
-        ));
+    // Verify role for JWT users (API keys with "*" scope have full access)
+    if let Some(claims) = req.extensions().get::<Claims>() {
+        if claims.role != UserRole::Developer && claims.role != UserRole::Admin {
+            return Err(AppError::AuthenticationError(
+                "Access denied. Developer or Admin role required.".to_string(),
+            ));
+        }
     }
 
     body.validate()
@@ -275,16 +278,17 @@ async fn compare_network_algorithms(
 ) -> Result<HttpResponse, AppError> {
     let start = Instant::now();
 
-    let claims = req.extensions().get::<Claims>().cloned()
-        .ok_or_else(|| AppError::AuthenticationError("Missing authentication".to_string()))?;
+    // Extract auth context (works with both JWT and API key)
+    let auth_ctx = crate::fsfvi_api::auth_extract::extract_auth_context(&req)?;
+    let user_id = auth_ctx.user_id;
 
-    let user_id = Uuid::parse_str(&claims.sub)
-        .map_err(|_| AppError::AuthenticationError("Invalid user ID".to_string()))?;
-
-    if claims.role != UserRole::Developer && claims.role != UserRole::Admin {
-        return Err(AppError::AuthenticationError(
-            "Access denied. Developer or Admin role required.".to_string(),
-        ));
+    // Verify role for JWT users (API keys with "*" scope have full access)
+    if let Some(claims) = req.extensions().get::<Claims>() {
+        if claims.role != UserRole::Developer && claims.role != UserRole::Admin {
+            return Err(AppError::AuthenticationError(
+                "Access denied. Developer or Admin role required.".to_string(),
+            ));
+        }
     }
 
     let scenario = body.scenario.as_deref();
@@ -317,16 +321,17 @@ async fn analyze_context_sensitivity(
 ) -> Result<HttpResponse, AppError> {
     let start = Instant::now();
 
-    let claims = req.extensions().get::<Claims>().cloned()
-        .ok_or_else(|| AppError::AuthenticationError("Missing authentication".to_string()))?;
+    // Extract auth context (works with both JWT and API key)
+    let auth_ctx = crate::fsfvi_api::auth_extract::extract_auth_context(&req)?;
+    let user_id = auth_ctx.user_id;
 
-    let user_id = Uuid::parse_str(&claims.sub)
-        .map_err(|_| AppError::AuthenticationError("Invalid user ID".to_string()))?;
-
-    if claims.role != UserRole::Developer && claims.role != UserRole::Admin {
-        return Err(AppError::AuthenticationError(
-            "Access denied. Developer or Admin role required.".to_string(),
-        ));
+    // Verify role for JWT users (API keys with "*" scope have full access)
+    if let Some(claims) = req.extensions().get::<Claims>() {
+        if claims.role != UserRole::Developer && claims.role != UserRole::Admin {
+            return Err(AppError::AuthenticationError(
+                "Access denied. Developer or Admin role required.".to_string(),
+            ));
+        }
     }
 
     body.validate()
@@ -361,16 +366,17 @@ async fn get_expert_weight_validation(
 ) -> Result<HttpResponse, AppError> {
     let start = Instant::now();
 
-    let claims = req.extensions().get::<Claims>().cloned()
-        .ok_or_else(|| AppError::AuthenticationError("Missing authentication".to_string()))?;
+    // Extract auth context (works with both JWT and API key)
+    let auth_ctx = crate::fsfvi_api::auth_extract::extract_auth_context(&req)?;
+    let user_id = auth_ctx.user_id;
 
-    let user_id = Uuid::parse_str(&claims.sub)
-        .map_err(|_| AppError::AuthenticationError("Invalid user ID".to_string()))?;
-
-    if claims.role != UserRole::Developer && claims.role != UserRole::Admin {
-        return Err(AppError::AuthenticationError(
-            "Access denied. Developer or Admin role required.".to_string(),
-        ));
+    // Verify role for JWT users (API keys with "*" scope have full access)
+    if let Some(claims) = req.extensions().get::<Claims>() {
+        if claims.role != UserRole::Developer && claims.role != UserRole::Admin {
+            return Err(AppError::AuthenticationError(
+                "Access denied. Developer or Admin role required.".to_string(),
+            ));
+        }
     }
 
     let scenario = body.scenario.as_deref();
@@ -402,16 +408,17 @@ async fn compare_expert_scenarios(
 ) -> Result<HttpResponse, AppError> {
     let start = Instant::now();
 
-    let claims = req.extensions().get::<Claims>().cloned()
-        .ok_or_else(|| AppError::AuthenticationError("Missing authentication".to_string()))?;
+    // Extract auth context (works with both JWT and API key)
+    let auth_ctx = crate::fsfvi_api::auth_extract::extract_auth_context(&req)?;
+    let user_id = auth_ctx.user_id;
 
-    let user_id = Uuid::parse_str(&claims.sub)
-        .map_err(|_| AppError::AuthenticationError("Invalid user ID".to_string()))?;
-
-    if claims.role != UserRole::Developer && claims.role != UserRole::Admin {
-        return Err(AppError::AuthenticationError(
-            "Access denied. Developer or Admin role required.".to_string(),
-        ));
+    // Verify role for JWT users (API keys with "*" scope have full access)
+    if let Some(claims) = req.extensions().get::<Claims>() {
+        if claims.role != UserRole::Developer && claims.role != UserRole::Admin {
+            return Err(AppError::AuthenticationError(
+                "Access denied. Developer or Admin role required.".to_string(),
+            ));
+        }
     }
 
     body.validate()
@@ -445,16 +452,17 @@ async fn get_available_scenarios(
 ) -> Result<HttpResponse, AppError> {
     let start = Instant::now();
 
-    let claims = req.extensions().get::<Claims>().cloned()
-        .ok_or_else(|| AppError::AuthenticationError("Missing authentication".to_string()))?;
+    // Extract auth context (works with both JWT and API key)
+    let auth_ctx = crate::fsfvi_api::auth_extract::extract_auth_context(&req)?;
+    let user_id = auth_ctx.user_id;
 
-    let user_id = Uuid::parse_str(&claims.sub)
-        .map_err(|_| AppError::AuthenticationError("Invalid user ID".to_string()))?;
-
-    if claims.role != UserRole::Developer && claims.role != UserRole::Admin {
-        return Err(AppError::AuthenticationError(
-            "Access denied. Developer or Admin role required.".to_string(),
-        ));
+    // Verify role for JWT users (API keys with "*" scope have full access)
+    if let Some(claims) = req.extensions().get::<Claims>() {
+        if claims.role != UserRole::Developer && claims.role != UserRole::Admin {
+            return Err(AppError::AuthenticationError(
+                "Access denied. Developer or Admin role required.".to_string(),
+            ));
+        }
     }
 
     let scenarios = state.fsfvi_service.weighting_analysis.get_available_scenarios();

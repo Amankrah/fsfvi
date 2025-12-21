@@ -196,46 +196,171 @@ pub struct AssessmentRequest {
     pub currency: Option<String>,
 }
 
+/// Assessment Report from FSFVI API
+/// Matches: fsfi-backend/src/fsfvi/service/vulnerability_assessment.rs:428-434
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AssessmentReport {
-    pub fsfvi_score: f64,
-    pub vulnerability_level: String,
-    pub component_vulnerabilities: Vec<ComponentVulnerability>,
-    pub system_insights: SystemInsights,
-    pub recommendations: Vec<Recommendation>,
+    pub executive_summary: ExecutiveSummary,
+    pub system_result: SystemFsfviResult,
+    pub component_insights: Vec<ComponentInsight>,
+    pub methodology: MethodologyInfo,
+    pub metadata: ReportMetadata,
+}
+
+/// Executive Summary
+/// Matches: fsfi-backend/src/fsfvi/service/vulnerability_assessment.rs:437-446
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExecutiveSummary {
+    pub overall_fsfvi: f64,
+    pub vulnerability_percentage: f64,
+    pub risk_level: String,
+    pub key_finding: String,
+    pub components_analyzed: usize,
+    pub critical_components: usize,
+    pub immediate_actions_required: usize,
+    pub top_vulnerabilities: Vec<ComponentSummary>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ComponentVulnerability {
-    pub component_type: String,
-    pub vulnerability_score: f64,
-    pub performance_gap: f64,
+pub struct ComponentSummary {
+    pub name: String,
+    pub vulnerability: f64,
+    pub contribution_percent: f64,
+}
+
+/// System FSFVI Result
+/// Matches: fsfi-backend/src/fsfvi/fsfvi_core/metrics.rs:30-60
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SystemFsfviResult {
+    pub fsfvi_value: f64,
+    pub vulnerability_percent: f64,
+    pub risk_level: String,
+    pub total_allocation: f64,
+    pub total_allocation_millions: f64,
+    pub component_statistics: ComponentStatistics,
+    pub priority_distribution: HashMap<String, usize>,
+    pub critical_components: Vec<ComponentInfo>,
+    pub high_risk_components: Vec<ComponentInfo>,
+    pub components_requiring_immediate_attention: usize,
+    pub component_contributions: Vec<ComponentContribution>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub top_3_vulnerability_contributors: Option<Vec<ComponentContribution>>,
+    pub resilience_indicators: ResilienceIndicators,
+    pub efficiency_metrics: EfficiencyMetrics,
+    pub government_insights: GovernmentInsights,
+    pub action_priorities: ActionPriorities,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ComponentStatistics {
+    pub total_components: usize,
+    pub average_vulnerability: f64,
+    pub weighted_average_vulnerability: f64,
+    pub max_vulnerability: f64,
+    pub min_vulnerability: f64,
+    pub vulnerability_standard_deviation: f64,
+    pub vulnerability_range: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ComponentInfo {
+    pub name: String,
+    pub vulnerability: f64,
     pub weight: f64,
-    pub sensitivity: f64,
+    pub priority_level: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SystemInsights {
-    pub most_vulnerable_components: Vec<String>,
-    pub highest_impact_components: Vec<String>,
-    pub total_budget_usd: f64,
-    pub budget_efficiency_score: f64,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Recommendation {
-    pub priority: String,
+pub struct ComponentContribution {
+    pub component_name: String,
     pub component_type: String,
-    pub action: String,
-    pub rationale: String,
-    pub estimated_impact: f64,
+    pub vulnerability: f64,
+    pub weight: f64,
+    pub weighted_vulnerability: f64,
+    pub contribution_to_system_vulnerability_percent: f64,
+    pub financial_allocation: f64,
+    pub allocation_percent: f64,
+    pub priority_level: String,
+    pub efficiency_ratio: f64,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ResilienceIndicators {
+    pub vulnerability_concentration: f64,
+    pub component_balance: f64,
+    pub resource_efficiency: f64,
+    pub critical_dependency_risk: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EfficiencyMetrics {
+    pub allocation_concentration: f64,
+    pub vulnerability_concentration: f64,
+    pub diversification_index: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GovernmentInsights {
+    pub financing_efficiency_percent: f64,
+    pub intervention_urgency: String,
+    pub budget_optimization_potential: String,
+    pub system_stability: String,
+    pub resource_allocation_quality: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ActionPriorities {
+    pub immediate_actions_0_6_months: Vec<String>,
+    pub strategic_actions_6_24_months: Vec<String>,
+    pub resource_recommendations: Vec<String>,
+    pub overall_urgency: String,
+    pub estimated_intervention_cost: String,
+}
+
+/// Component Insight
+/// Matches: fsfi-backend/src/fsfvi/service/vulnerability_assessment.rs:456-466
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ComponentInsight {
+    pub component_name: String,
+    pub component_type: String,
+    pub vulnerability: f64,
+    pub weight: f64,
+    pub contribution_to_system: f64,
+    pub priority_level: String,
+    pub efficiency_index: f64,
+    pub is_critical: bool,
+    pub recommendations: Vec<String>,
+}
+
+/// Methodology Info
+/// Matches: fsfi-backend/src/fsfvi/service/vulnerability_assessment.rs:469-474
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MethodologyInfo {
+    pub weighting_method: String,
+    pub scenario: String,
+    pub context_used: bool,
+    pub sensitivity_estimation: String,
+}
+
+/// Report Metadata
+/// Matches: fsfi-backend/src/fsfvi/service/vulnerability_assessment.rs:477-481
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReportMetadata {
+    pub country: Option<String>,
+    pub assessment_date: String,
+    pub total_budget_analyzed: f64,
+    pub currency: String,
+}
+
+/// Quick Check Result (simplified assessment)
+/// Matches: fsfi-backend/src/fsfvi/service/vulnerability_assessment.rs:485-491
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct QuickCheckResult {
     pub fsfvi_score: f64,
-    pub vulnerability_level: String,
+    pub risk_level: String,
     pub critical_components: Vec<String>,
+    pub immediate_actions_needed: usize,
+    pub summary: String,
 }
 
 // ============================================================================

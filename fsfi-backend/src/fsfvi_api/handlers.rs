@@ -8,7 +8,6 @@ use actix_web::{web, HttpMessage, HttpRequest, HttpResponse};
 use sqlx::PgPool;
 use std::sync::Arc;
 use std::time::Instant;
-use uuid::Uuid;
 use validator::Validate;
 
 use crate::fsfvi::service::FsfviService;
@@ -61,16 +60,14 @@ pub async fn run_assessment(
 ) -> Result<HttpResponse, AppError> {
     let start = Instant::now();
 
-    // Extract claims from request
-    let claims = req.extensions().get::<Claims>().cloned()
-        .ok_or_else(|| AppError::AuthenticationError("Missing authentication".to_string()))?;
+    // Extract auth context (works with both JWT and API key)
+    let auth_ctx = crate::fsfvi_api::auth_extract::extract_auth_context(&req)?;
+    let user_id = auth_ctx.user_id;
 
-    // Check permission
-
-    // Parse user ID from claims
-    let user_id = Uuid::parse_str(&claims.sub)
-        .map_err(|_| AppError::AuthenticationError("Invalid user ID".to_string()))?;
-    require_permission!(claims, FsfviPermission::RunAssessment);
+    // Check permission for JWT users (API keys with "*" scope have full access)
+    if let Some(claims) = req.extensions().get::<Claims>() {
+        require_permission!(claims, FsfviPermission::RunAssessment);
+    }
 
     // Validate request
     payload.validate().map_err(|e| AppError::ValidationError(format!("Validation error: {}", e)))?;
@@ -148,15 +145,14 @@ pub async fn quick_check(
 ) -> Result<HttpResponse, AppError> {
     let start = Instant::now();
 
-    let claims = req.extensions().get::<Claims>().cloned()
-        .ok_or_else(|| AppError::AuthenticationError("Missing authentication".to_string()))?;
+    // Extract auth context (works with both JWT and API key)
+    let auth_ctx = crate::fsfvi_api::auth_extract::extract_auth_context(&req)?;
+    let user_id = auth_ctx.user_id;
 
-
-    // Parse user ID from claims
-    let user_id = Uuid::parse_str(&claims.sub)
-        .map_err(|_| AppError::AuthenticationError("Invalid user ID".to_string()))?;
-
-    require_permission!(claims, FsfviPermission::RunAssessment);
+    // Check permission for JWT users (API keys with "*" scope have full access)
+    if let Some(claims) = req.extensions().get::<Claims>() {
+        require_permission!(claims, FsfviPermission::RunAssessment);
+    }
 
     let components: Vec<crate::fsfvi::validators::Component> = payload
         .iter()
@@ -209,15 +205,14 @@ pub async fn generate_multi_year_plan(
 ) -> Result<HttpResponse, AppError> {
     let start = Instant::now();
 
-    let claims = req.extensions().get::<Claims>().cloned()
-        .ok_or_else(|| AppError::AuthenticationError("Missing authentication".to_string()))?;
+    // Extract auth context (works with both JWT and API key)
+    let auth_ctx = crate::fsfvi_api::auth_extract::extract_auth_context(&req)?;
+    let user_id = auth_ctx.user_id;
 
-
-    // Parse user ID from claims
-    let user_id = Uuid::parse_str(&claims.sub)
-        .map_err(|_| AppError::AuthenticationError("Invalid user ID".to_string()))?;
-
-    require_permission!(claims, FsfviPermission::GenerateStrategicPlan);
+    // Check permission for JWT users (API keys with "*" scope have full access)
+    if let Some(claims) = req.extensions().get::<Claims>() {
+        require_permission!(claims, FsfviPermission::GenerateStrategicPlan);
+    }
 
     payload.validate().map_err(|e| AppError::ValidationError(e.to_string()))?;
 
@@ -296,15 +291,14 @@ pub async fn generate_mtef(
 ) -> Result<HttpResponse, AppError> {
     let start = Instant::now();
 
-    let claims = req.extensions().get::<Claims>().cloned()
-        .ok_or_else(|| AppError::AuthenticationError("Missing authentication".to_string()))?;
+    // Extract auth context (works with both JWT and API key)
+    let auth_ctx = crate::fsfvi_api::auth_extract::extract_auth_context(&req)?;
+    let user_id = auth_ctx.user_id;
 
-
-    // Parse user ID from claims
-    let user_id = Uuid::parse_str(&claims.sub)
-        .map_err(|_| AppError::AuthenticationError("Invalid user ID".to_string()))?;
-
-    require_permission!(claims, FsfviPermission::GenerateMTEF);
+    // Check permission for JWT users (API keys with "*" scope have full access)
+    if let Some(claims) = req.extensions().get::<Claims>() {
+        require_permission!(claims, FsfviPermission::GenerateMTEF);
+    }
 
     payload.validate().map_err(|e| AppError::ValidationError(e.to_string()))?;
 
@@ -360,13 +354,14 @@ pub async fn analyze_investment_sequencing(
 ) -> Result<HttpResponse, AppError> {
     let start = Instant::now();
 
-    let claims = req.extensions().get::<Claims>().cloned()
-        .ok_or_else(|| AppError::AuthenticationError("Missing authentication".to_string()))?;
+    // Extract auth context (works with both JWT and API key)
+    let auth_ctx = crate::fsfvi_api::auth_extract::extract_auth_context(&req)?;
+    let user_id = auth_ctx.user_id;
 
-    let user_id = Uuid::parse_str(&claims.sub)
-        .map_err(|_| AppError::AuthenticationError("Invalid user ID".to_string()))?;
-
-    require_permission!(claims, FsfviPermission::GenerateStrategicPlan);
+    // Check permission for JWT users (API keys with "*" scope have full access)
+    if let Some(claims) = req.extensions().get::<Claims>() {
+        require_permission!(claims, FsfviPermission::GenerateStrategicPlan);
+    }
 
     payload.validate().map_err(|e| AppError::ValidationError(e.to_string()))?;
 
@@ -418,13 +413,14 @@ pub async fn generate_resource_mobilization(
 ) -> Result<HttpResponse, AppError> {
     let start = Instant::now();
 
-    let claims = req.extensions().get::<Claims>().cloned()
-        .ok_or_else(|| AppError::AuthenticationError("Missing authentication".to_string()))?;
+    // Extract auth context (works with both JWT and API key)
+    let auth_ctx = crate::fsfvi_api::auth_extract::extract_auth_context(&req)?;
+    let user_id = auth_ctx.user_id;
 
-    let user_id = Uuid::parse_str(&claims.sub)
-        .map_err(|_| AppError::AuthenticationError("Invalid user ID".to_string()))?;
-
-    require_permission!(claims, FsfviPermission::GenerateStrategicPlan);
+    // Check permission for JWT users (API keys with "*" scope have full access)
+    if let Some(claims) = req.extensions().get::<Claims>() {
+        require_permission!(claims, FsfviPermission::GenerateStrategicPlan);
+    }
 
     payload.validate().map_err(|e| AppError::ValidationError(e.to_string()))?;
 
@@ -747,15 +743,14 @@ pub async fn run_sensitivity_analysis(
 ) -> Result<HttpResponse, AppError> {
     let start = Instant::now();
 
-    let claims = req.extensions().get::<Claims>().cloned()
-        .ok_or_else(|| AppError::AuthenticationError("Missing authentication".to_string()))?;
+    // Extract auth context (works with both JWT and API key)
+    let auth_ctx = crate::fsfvi_api::auth_extract::extract_auth_context(&req)?;
+    let user_id = auth_ctx.user_id;
 
-
-    // Parse user ID from claims
-    let user_id = Uuid::parse_str(&claims.sub)
-        .map_err(|_| AppError::AuthenticationError("Invalid user ID".to_string()))?;
-
-    require_permission!(claims, FsfviPermission::RunSensitivityAnalysis);
+    // Check permission for JWT users (API keys with "*" scope have full access)
+    if let Some(claims) = req.extensions().get::<Claims>() {
+        require_permission!(claims, FsfviPermission::RunSensitivityAnalysis);
+    }
 
     payload.validate().map_err(|e| AppError::ValidationError(e.to_string()))?;
 
@@ -848,15 +843,14 @@ pub async fn generate_ahp_matrix(
 ) -> Result<HttpResponse, AppError> {
     let start = Instant::now();
 
-    let claims = req.extensions().get::<Claims>().cloned()
-        .ok_or_else(|| AppError::AuthenticationError("Missing authentication".to_string()))?;
+    // Extract auth context (works with both JWT and API key)
+    let auth_ctx = crate::fsfvi_api::auth_extract::extract_auth_context(&req)?;
+    let user_id = auth_ctx.user_id;
 
-
-    // Parse user ID from claims
-    let user_id = Uuid::parse_str(&claims.sub)
-        .map_err(|_| AppError::AuthenticationError("Invalid user ID".to_string()))?;
-
-    require_permission!(claims, FsfviPermission::ViewMatrices);
+    // Check permission for JWT users (API keys with "*" scope have full access)
+    if let Some(claims) = req.extensions().get::<Claims>() {
+        require_permission!(claims, FsfviPermission::ViewMatrices);
+    }
 
     let matrix = state
         .fsfvi_service
@@ -893,15 +887,14 @@ pub async fn generate_network_matrix(
 ) -> Result<HttpResponse, AppError> {
     let start = Instant::now();
 
-    let claims = req.extensions().get::<Claims>().cloned()
-        .ok_or_else(|| AppError::AuthenticationError("Missing authentication".to_string()))?;
+    // Extract auth context (works with both JWT and API key)
+    let auth_ctx = crate::fsfvi_api::auth_extract::extract_auth_context(&req)?;
+    let user_id = auth_ctx.user_id;
 
-
-    // Parse user ID from claims
-    let user_id = Uuid::parse_str(&claims.sub)
-        .map_err(|_| AppError::AuthenticationError("Invalid user ID".to_string()))?;
-
-    require_permission!(claims, FsfviPermission::ViewMatrices);
+    // Check permission for JWT users (API keys with "*" scope have full access)
+    if let Some(claims) = req.extensions().get::<Claims>() {
+        require_permission!(claims, FsfviPermission::ViewMatrices);
+    }
 
     let matrix = state
         .fsfvi_service
@@ -942,15 +935,14 @@ pub async fn customize_ahp_matrix(
 ) -> Result<HttpResponse, AppError> {
     let start = Instant::now();
 
-    let claims = req.extensions().get::<Claims>().cloned()
-        .ok_or_else(|| AppError::AuthenticationError("Missing authentication".to_string()))?;
+    // Extract auth context (works with both JWT and API key)
+    let auth_ctx = crate::fsfvi_api::auth_extract::extract_auth_context(&req)?;
+    let user_id = auth_ctx.user_id;
 
-
-    // Parse user ID from claims
-    let user_id = Uuid::parse_str(&claims.sub)
-        .map_err(|_| AppError::AuthenticationError("Invalid user ID".to_string()))?;
-
-    require_permission!(claims, FsfviPermission::CustomizeMatrices);
+    // Check permission for JWT users (API keys with "*" scope have full access)
+    if let Some(claims) = req.extensions().get::<Claims>() {
+        require_permission!(claims, FsfviPermission::CustomizeMatrices);
+    }
 
     payload.validate().map_err(|e| AppError::ValidationError(e.to_string()))?;
 
@@ -1000,15 +992,14 @@ pub async fn export_matrices_csv(
 ) -> Result<HttpResponse, AppError> {
     let start = Instant::now();
 
-    let claims = req.extensions().get::<Claims>().cloned()
-        .ok_or_else(|| AppError::AuthenticationError("Missing authentication".to_string()))?;
+    // Extract auth context (works with both JWT and API key)
+    let auth_ctx = crate::fsfvi_api::auth_extract::extract_auth_context(&req)?;
+    let user_id = auth_ctx.user_id;
 
-
-    // Parse user ID from claims
-    let user_id = Uuid::parse_str(&claims.sub)
-        .map_err(|_| AppError::AuthenticationError("Invalid user ID".to_string()))?;
-
-    require_permission!(claims, FsfviPermission::ViewMatrices);
+    // Check permission for JWT users (API keys with "*" scope have full access)
+    if let Some(claims) = req.extensions().get::<Claims>() {
+        require_permission!(claims, FsfviPermission::ViewMatrices);
+    }
 
     let export = state
         .fsfvi_service
@@ -1051,15 +1042,14 @@ pub async fn compare_scenarios(
 ) -> Result<HttpResponse, AppError> {
     let start = Instant::now();
 
-    let claims = req.extensions().get::<Claims>().cloned()
-        .ok_or_else(|| AppError::AuthenticationError("Missing authentication".to_string()))?;
+    // Extract auth context (works with both JWT and API key)
+    let auth_ctx = crate::fsfvi_api::auth_extract::extract_auth_context(&req)?;
+    let user_id = auth_ctx.user_id;
 
-
-    // Parse user ID from claims
-    let user_id = Uuid::parse_str(&claims.sub)
-        .map_err(|_| AppError::AuthenticationError("Invalid user ID".to_string()))?;
-
-    require_permission!(claims, FsfviPermission::RunScenarioSimulation);
+    // Check permission for JWT users (API keys with "*" scope have full access)
+    if let Some(claims) = req.extensions().get::<Claims>() {
+        require_permission!(claims, FsfviPermission::RunScenarioSimulation);
+    }
 
     payload.validate().map_err(|e| AppError::ValidationError(e.to_string()))?;
 
@@ -1107,15 +1097,14 @@ pub async fn simulate_crisis(
 ) -> Result<HttpResponse, AppError> {
     let start = Instant::now();
 
-    let claims = req.extensions().get::<Claims>().cloned()
-        .ok_or_else(|| AppError::AuthenticationError("Missing authentication".to_string()))?;
+    // Extract auth context (works with both JWT and API key)
+    let auth_ctx = crate::fsfvi_api::auth_extract::extract_auth_context(&req)?;
+    let user_id = auth_ctx.user_id;
 
-
-    // Parse user ID from claims
-    let user_id = Uuid::parse_str(&claims.sub)
-        .map_err(|_| AppError::AuthenticationError("Invalid user ID".to_string()))?;
-
-    require_permission!(claims, FsfviPermission::RunScenarioSimulation);
+    // Check permission for JWT users (API keys with "*" scope have full access)
+    if let Some(claims) = req.extensions().get::<Claims>() {
+        require_permission!(claims, FsfviPermission::RunScenarioSimulation);
+    }
 
     payload.validate().map_err(|e| AppError::ValidationError(e.to_string()))?;
 
@@ -1163,15 +1152,14 @@ pub async fn simulate_budget_changes(
 ) -> Result<HttpResponse, AppError> {
     let start = Instant::now();
 
-    let claims = req.extensions().get::<Claims>().cloned()
-        .ok_or_else(|| AppError::AuthenticationError("Missing authentication".to_string()))?;
+    // Extract auth context (works with both JWT and API key)
+    let auth_ctx = crate::fsfvi_api::auth_extract::extract_auth_context(&req)?;
+    let user_id = auth_ctx.user_id;
 
-
-    // Parse user ID from claims
-    let user_id = Uuid::parse_str(&claims.sub)
-        .map_err(|_| AppError::AuthenticationError("Invalid user ID".to_string()))?;
-
-    require_permission!(claims, FsfviPermission::RunScenarioSimulation);
+    // Check permission for JWT users (API keys with "*" scope have full access)
+    if let Some(claims) = req.extensions().get::<Claims>() {
+        require_permission!(claims, FsfviPermission::RunScenarioSimulation);
+    }
 
     payload.validate().map_err(|e| AppError::ValidationError(e.to_string()))?;
 
@@ -1230,15 +1218,14 @@ pub async fn simulate_intervention(
 ) -> Result<HttpResponse, AppError> {
     let start = Instant::now();
 
-    let claims = req.extensions().get::<Claims>().cloned()
-        .ok_or_else(|| AppError::AuthenticationError("Missing authentication".to_string()))?;
+    // Extract auth context (works with both JWT and API key)
+    let auth_ctx = crate::fsfvi_api::auth_extract::extract_auth_context(&req)?;
+    let user_id = auth_ctx.user_id;
 
-
-    // Parse user ID from claims
-    let user_id = Uuid::parse_str(&claims.sub)
-        .map_err(|_| AppError::AuthenticationError("Invalid user ID".to_string()))?;
-
-    require_permission!(claims, FsfviPermission::RunScenarioSimulation);
+    // Check permission for JWT users (API keys with "*" scope have full access)
+    if let Some(claims) = req.extensions().get::<Claims>() {
+        require_permission!(claims, FsfviPermission::RunScenarioSimulation);
+    }
 
     payload.validate().map_err(|e| AppError::ValidationError(e.to_string()))?;
 
@@ -1302,15 +1289,14 @@ pub async fn generate_policy_recommendations(
 ) -> Result<HttpResponse, AppError> {
     let start = Instant::now();
 
-    let claims = req.extensions().get::<Claims>().cloned()
-        .ok_or_else(|| AppError::AuthenticationError("Missing authentication".to_string()))?;
+    // Extract auth context (works with both JWT and API key)
+    let auth_ctx = crate::fsfvi_api::auth_extract::extract_auth_context(&req)?;
+    let user_id = auth_ctx.user_id;
 
-
-    // Parse user ID from claims
-    let user_id = Uuid::parse_str(&claims.sub)
-        .map_err(|_| AppError::AuthenticationError("Invalid user ID".to_string()))?;
-
-    require_permission!(claims, FsfviPermission::GeneratePolicyRecommendations);
+    // Check permission for JWT users (API keys with "*" scope have full access)
+    if let Some(claims) = req.extensions().get::<Claims>() {
+        require_permission!(claims, FsfviPermission::GeneratePolicyRecommendations);
+    }
 
     payload.validate().map_err(|e| AppError::ValidationError(e.to_string()))?;
 
@@ -1367,15 +1353,14 @@ pub async fn generate_crisis_response(
 ) -> Result<HttpResponse, AppError> {
     let start = Instant::now();
 
-    let claims = req.extensions().get::<Claims>().cloned()
-        .ok_or_else(|| AppError::AuthenticationError("Missing authentication".to_string()))?;
+    // Extract auth context (works with both JWT and API key)
+    let auth_ctx = crate::fsfvi_api::auth_extract::extract_auth_context(&req)?;
+    let user_id = auth_ctx.user_id;
 
-
-    // Parse user ID from claims
-    let user_id = Uuid::parse_str(&claims.sub)
-        .map_err(|_| AppError::AuthenticationError("Invalid user ID".to_string()))?;
-
-    require_permission!(claims, FsfviPermission::GenerateCrisisResponse);
+    // Check permission for JWT users (API keys with "*" scope have full access)
+    if let Some(claims) = req.extensions().get::<Claims>() {
+        require_permission!(claims, FsfviPermission::GenerateCrisisResponse);
+    }
 
     payload.validate().map_err(|e| AppError::ValidationError(e.to_string()))?;
 
@@ -1427,15 +1412,14 @@ pub async fn track_progress(
 ) -> Result<HttpResponse, AppError> {
     let start = Instant::now();
 
-    let claims = req.extensions().get::<Claims>().cloned()
-        .ok_or_else(|| AppError::AuthenticationError("Missing authentication".to_string()))?;
+    // Extract auth context (works with both JWT and API key)
+    let auth_ctx = crate::fsfvi_api::auth_extract::extract_auth_context(&req)?;
+    let user_id = auth_ctx.user_id;
 
-
-    // Parse user ID from claims
-    let user_id = Uuid::parse_str(&claims.sub)
-        .map_err(|_| AppError::AuthenticationError("Invalid user ID".to_string()))?;
-
-    require_permission!(claims, FsfviPermission::ViewProgressTracking);
+    // Check permission for JWT users (API keys with "*" scope have full access)
+    if let Some(claims) = req.extensions().get::<Claims>() {
+        require_permission!(claims, FsfviPermission::ViewProgressTracking);
+    }
 
     payload.validate().map_err(|e| AppError::ValidationError(e.to_string()))?;
 
@@ -1494,15 +1478,14 @@ pub async fn generate_stakeholder_brief(
 ) -> Result<HttpResponse, AppError> {
     let start = Instant::now();
 
-    let claims = req.extensions().get::<Claims>().cloned()
-        .ok_or_else(|| AppError::AuthenticationError("Missing authentication".to_string()))?;
+    // Extract auth context (works with both JWT and API key)
+    let auth_ctx = crate::fsfvi_api::auth_extract::extract_auth_context(&req)?;
+    let user_id = auth_ctx.user_id;
 
-
-    // Parse user ID from claims
-    let user_id = Uuid::parse_str(&claims.sub)
-        .map_err(|_| AppError::AuthenticationError("Invalid user ID".to_string()))?;
-
-    require_permission!(claims, FsfviPermission::GenerateStakeholderBrief);
+    // Check permission for JWT users (API keys with "*" scope have full access)
+    if let Some(claims) = req.extensions().get::<Claims>() {
+        require_permission!(claims, FsfviPermission::GenerateStakeholderBrief);
+    }
 
     payload.validate().map_err(|e| AppError::ValidationError(e.to_string()))?;
 
