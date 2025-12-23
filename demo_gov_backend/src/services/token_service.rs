@@ -159,7 +159,7 @@ mod tests {
 
     fn create_test_user() -> User {
         User {
-            id: Uuid::new_v4(),
+            id: Uuid::new_v4().to_string(),
             username: "test_user".to_string(),
             password_hash: "dummy_hash".to_string(),
             role: UserRole::DemoGovernment,

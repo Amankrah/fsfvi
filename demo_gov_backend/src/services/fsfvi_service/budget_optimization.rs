@@ -42,7 +42,15 @@ impl BudgetOptimizationService {
             self.validate_component(component)?;
         }
 
-        let request = AllocationEfficiencyRequest { components };
+        // Convert to budget component format (financial_allocation in millions)
+        let budget_components: Vec<BudgetComponent> = components
+            .iter()
+            .map(|c| c.to_budget_component())
+            .collect();
+
+        let request = AllocationEfficiencyRequest {
+            components: budget_components,
+        };
 
         let body = serde_json::to_value(&request)
             .map_err(|e| FsfviServiceError::ValidationError(format!(
@@ -50,9 +58,19 @@ impl BudgetOptimizationService {
                 e
             )))?;
 
-        self.client
+        let mut response: ApiResponse<AllocationEfficiencyReport> = self.client
             .post("/api/v1/fsfvi/optimization/budget/analyze-efficiency", body)
-            .await
+            .await?;
+
+        // Convert response allocations from millions USD back to raw USD
+        response.data.total_budget *= 1_000_000.0;
+        for analysis in &mut response.data.reallocation_analysis {
+            analysis.current_allocation *= 1_000_000.0;
+            analysis.recommended_allocation *= 1_000_000.0;
+            analysis.difference *= 1_000_000.0; // CRITICAL FIX: Convert difference as well
+        }
+
+        Ok(response)
     }
 
     /// Generate step-by-step budget reallocation plan
@@ -62,9 +80,12 @@ impl BudgetOptimizationService {
     ///
     /// Creates a practical implementation plan to transition from current
     /// allocations to optimized allocations with phased approach
+    ///
+    /// CRITICAL: objective parameter allows government to choose optimization strategy
     pub async fn generate_reallocation_plan(
         &self,
         components: Vec<ComponentInput>,
+        objective: OptimizationObjective,
         constraints: Option<OptimizationConstraints>,
     ) -> Result<ApiResponse<ReallocationPlan>, FsfviServiceError> {
         if components.is_empty() {
@@ -73,15 +94,33 @@ impl BudgetOptimizationService {
             ));
         }
 
-        log::info!("Generating reallocation plan for {} components", components.len());
+        log::info!(
+            "Generating reallocation plan for {} components with objective: {:?}",
+            components.len(),
+            objective
+        );
 
         for component in &components {
             self.validate_component(component)?;
         }
 
+        // Convert to budget component format (financial_allocation in millions)
+        let budget_components: Vec<BudgetComponent> = components
+            .iter()
+            .map(|c| c.to_budget_component())
+            .collect();
+
+        // Convert constraints from raw USD to millions USD
+        let constraints_millions = constraints.map(|c| OptimizationConstraints {
+            min_allocation_per_component: c.min_allocation_per_component / 1_000_000.0,
+            max_change_percent: c.max_change_percent,
+            implementation_months: c.implementation_months,
+        });
+
         let request = ReallocationPlanRequest {
-            components,
-            constraints,
+            components: budget_components,
+            objective, // CRITICAL: Pass government's chosen optimization strategy
+            constraints: constraints_millions,
         };
 
         let body = serde_json::to_value(&request)
@@ -90,9 +129,22 @@ impl BudgetOptimizationService {
                 e
             )))?;
 
-        self.client
+        let mut response: ApiResponse<ReallocationPlan> = self.client
             .post("/api/v1/fsfvi/optimization/budget/generate-plan", body)
-            .await
+            .await?;
+
+        // Convert response allocations from millions USD back to raw USD
+        response.data.total_budget *= 1_000_000.0;
+        for (_, allocation) in response.data.optimal_allocations.iter_mut() {
+            *allocation *= 1_000_000.0;
+        }
+        for phase in &mut response.data.implementation_phases {
+            for (_, allocation) in phase.allocations.iter_mut() {
+                *allocation *= 1_000_000.0;
+            }
+        }
+
+        Ok(response)
     }
 
     /// Calculate return on investment for budget scenarios
@@ -124,9 +176,28 @@ impl BudgetOptimizationService {
             self.validate_component(component)?;
         }
 
+        // Convert to budget component format (financial_allocation in millions)
+        let budget_components: Vec<BudgetComponent> = components
+            .iter()
+            .map(|c| c.to_budget_component())
+            .collect();
+
+        // Convert scenario allocations from raw USD to millions USD
+        let scenarios_millions: Vec<BudgetScenario> = scenarios
+            .into_iter()
+            .map(|s| BudgetScenario {
+                name: s.name,
+                baseline_fsfvi: s.baseline_fsfvi,
+                changes: s.changes.into_iter().map(|c| AllocationChange {
+                    component_type: c.component_type,
+                    new_allocation: c.new_allocation / 1_000_000.0,
+                }).collect(),
+            })
+            .collect();
+
         let request = RoiAnalysisRequest {
-            components,
-            scenarios,
+            components: budget_components,
+            scenarios: scenarios_millions,
         };
 
         let body = serde_json::to_value(&request)
@@ -135,9 +206,16 @@ impl BudgetOptimizationService {
                 e
             )))?;
 
-        self.client
+        let mut response: ApiResponse<RoiAnalysisReport> = self.client
             .post("/api/v1/fsfvi/optimization/budget/calculate-roi", body)
-            .await
+            .await?;
+
+        // Convert response investments from millions USD back to raw USD
+        for scenario in &mut response.data.scenarios {
+            scenario.investment *= 1_000_000.0;
+        }
+
+        Ok(response)
     }
 
     /// Optimize budget allocation using Linear Programming
@@ -169,10 +247,23 @@ impl BudgetOptimizationService {
             self.validate_component(component)?;
         }
 
+        // Convert to budget component format (financial_allocation in millions)
+        let budget_components: Vec<BudgetComponent> = components
+            .iter()
+            .map(|c| c.to_budget_component())
+            .collect();
+
+        // Convert constraints from raw USD to millions USD
+        let constraints_millions = constraints.map(|c| OptimizationConstraints {
+            min_allocation_per_component: c.min_allocation_per_component / 1_000_000.0,
+            max_change_percent: c.max_change_percent,
+            implementation_months: c.implementation_months,
+        });
+
         let request = OptimizationRequest {
-            components,
+            components: budget_components,
             objective,
-            constraints,
+            constraints: constraints_millions,
         };
 
         let body = serde_json::to_value(&request)
@@ -181,9 +272,16 @@ impl BudgetOptimizationService {
                 e
             )))?;
 
-        self.client
+        let mut response: ApiResponse<OptimizationResult> = self.client
             .post("/api/v1/fsfvi/optimization/budget/optimize", body)
-            .await
+            .await?;
+
+        // Convert response allocations from millions USD back to raw USD
+        for (_, allocation) in response.data.optimal_allocations.iter_mut() {
+            *allocation *= 1_000_000.0;
+        }
+
+        Ok(response)
     }
 
     fn validate_component(&self, component: &ComponentInput) -> Result<(), FsfviServiceError> {
@@ -219,7 +317,7 @@ impl BudgetOptimizationService {
 
         if component.financial_allocation_usd < 0.0 || !component.financial_allocation_usd.is_finite() {
             return Err(FsfviServiceError::ValidationError(format!(
-                "Invalid financial_allocation_usd for '{}'",
+                "Invalid financial_allocation for '{}'",
                 component.component_type
             )));
         }
@@ -234,145 +332,137 @@ impl BudgetOptimizationService {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct AllocationEfficiencyRequest {
-    pub components: Vec<ComponentInput>,
+    pub components: Vec<BudgetComponent>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct AllocationEfficiencyReport {
     pub current_fsfvi: f64,
     pub total_budget: f64,
-    pub allocation_concentration_hhi: f64,
-    pub component_efficiency: Vec<ComponentEfficiency>,
-    pub recommended_reallocations: Vec<ReallocationRecommendation>,
+    pub allocation_concentration: f64,
+    pub reallocation_analysis: Vec<ComponentAllocationAnalysis>,
     pub improvement_potential: f64,
+    pub key_insights: Vec<String>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct ComponentEfficiency {
+pub struct ComponentAllocationAnalysis {
     pub component_type: String,
     pub current_allocation: f64,
-    pub allocation_share: f64,
-    pub vulnerability_contribution: f64,
+    pub recommended_allocation: f64,
+    pub difference: f64,
+    pub percent_change: f64,
     pub efficiency_score: f64,
     pub status: String,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct ReallocationRecommendation {
-    pub component_type: String,
-    pub current_allocation: f64,
-    pub recommended_allocation: f64,
-    pub change_amount: f64,
-    pub change_percent: f64,
-    pub rationale: String,
-}
-
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ReallocationPlanRequest {
-    pub components: Vec<ComponentInput>,
+    pub components: Vec<BudgetComponent>,
+    pub objective: OptimizationObjective, // CRITICAL: Government policy decision
     pub constraints: Option<OptimizationConstraints>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ReallocationPlan {
     pub baseline_fsfvi: f64,
-    pub expected_fsfvi: f64,
-    pub optimal_allocations: Vec<ComponentAllocation>,
+    pub estimated_fsfvi_after_reallocation: f64,
+    pub expected_improvement: f64,
+    pub expected_improvement_percent: f64,
+    pub total_budget: f64,
+    pub optimal_allocations: std::collections::HashMap<String, f64>,
     pub implementation_phases: Vec<ImplementationPhase>,
-    pub risks: Vec<String>,
-}
-
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct ComponentAllocation {
-    pub component_type: String,
-    pub current_allocation: f64,
-    pub optimal_allocation: f64,
-    pub expected_impact: f64,
+    pub risks_and_mitigation: Vec<RiskMitigation>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ImplementationPhase {
     pub phase_number: usize,
-    pub timeline_months: usize,
-    pub actions: Vec<String>,
-    pub budget_changes: Vec<BudgetChange>,
+    pub duration_months: usize,
+    pub allocations: std::collections::HashMap<String, f64>,
+    pub milestones: Vec<String>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct BudgetChange {
-    pub component_type: String,
-    pub amount: f64,
+pub struct RiskMitigation {
+    pub risk: String,
+    pub mitigation: String,
+    pub priority: String,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct RoiAnalysisRequest {
-    pub components: Vec<ComponentInput>,
+    pub components: Vec<BudgetComponent>,
     pub scenarios: Vec<BudgetScenario>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct BudgetScenario {
-    pub scenario_name: String,
-    pub component_allocations: std::collections::HashMap<String, f64>,
+    pub name: String,
+    pub baseline_fsfvi: f64,
+    pub changes: Vec<AllocationChange>,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct AllocationChange {
+    pub component_type: String,
+    pub new_allocation: f64,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct RoiAnalysisReport {
-    pub baseline_fsfvi: f64,
-    pub scenario_results: Vec<ScenarioRoiResult>,
-    pub ranking_by_roi: Vec<String>,
-    pub best_roi_scenario: String,
+    pub scenarios: Vec<ScenarioRoi>,
+    pub best_roi_scenario: Option<String>,
+    pub recommendations: Vec<String>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct ScenarioRoiResult {
+pub struct ScenarioRoi {
     pub scenario_name: String,
-    pub projected_fsfvi: f64,
-    pub total_investment: f64,
+    pub investment: f64,
     pub fsfvi_improvement: f64,
-    pub roi_score: f64,
+    pub roi_per_million: f64,
+    pub cost_effectiveness_rank: usize,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct OptimizationRequest {
-    pub components: Vec<ComponentInput>,
+    pub components: Vec<BudgetComponent>,
     pub objective: OptimizationObjective,
     pub constraints: Option<OptimizationConstraints>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "snake_case")]
 pub enum OptimizationObjective {
     MinimizeFsfvi,
     MaximizeEfficiency,
-    Balanced,
+    BalanceRisk,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct OptimizationConstraints {
-    pub total_budget_ceiling: Option<f64>,
-    pub min_allocation_per_component: Option<f64>,
+    pub min_allocation_per_component: f64,
     pub max_change_percent: Option<f64>,
-    pub priority_components: Option<Vec<String>>,
+    pub implementation_months: usize,
 }
 
 impl Default for OptimizationConstraints {
     fn default() -> Self {
         Self {
-            total_budget_ceiling: None,
-            min_allocation_per_component: None,
-            max_change_percent: Some(50.0),
-            priority_components: None,
+            min_allocation_per_component: 0.0,
+            max_change_percent: Some(30.0),
+            implementation_months: 12,
         }
     }
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct OptimizationResult {
+    pub objective: OptimizationObjective,
     pub baseline_fsfvi: f64,
     pub optimized_fsfvi: f64,
     pub improvement: f64,
-    pub optimal_allocations: Vec<ComponentAllocation>,
-    pub convergence_iterations: usize,
-    pub convergence_status: String,
+    pub optimal_allocations: std::collections::HashMap<String, f64>,
+    pub iterations_performed: usize,
+    pub convergence_achieved: bool,
 }

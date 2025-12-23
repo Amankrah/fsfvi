@@ -56,6 +56,8 @@ pub struct ReallocationPlanRequest {
     /// Components with current allocations
     #[validate(length(min = 1, message = "At least one component is required"))]
     pub components: Vec<Component>,
+    /// Optimization objective (CRITICAL: Government policy decision)
+    pub objective: OptimizationObjective,
     /// Optimization constraints
     pub constraints: Option<OptimizationConstraints>,
 }
@@ -179,10 +181,15 @@ async fn generate_reallocation_plan(
         .clone()
         .unwrap_or_else(OptimizationConstraints::default);
 
+    tracing::info!(
+        "Generating reallocation plan with objective: {:?}",
+        body.objective
+    );
+
     let plan = state
         .fsfvi_service
         .budget
-        .generate_reallocation_plan(body.components.clone(), constraints)
+        .generate_reallocation_plan(body.components.clone(), body.objective, constraints) // ← CRITICAL: Pass objective
         .map_err(|e| {
             tracing::error!("Reallocation plan generation failed: {:?}", e);
             AppError::InternalError(format!("Plan generation failed: {}", e))

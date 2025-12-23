@@ -249,9 +249,11 @@ async fn test_run_assessment_with_real_data() {
                 "FSFVI score must be a finite number"
             );
 
-            // Validate vulnerability level is one of the standard classifications
+            // Validate vulnerability level is one of the standard FSFVI classifications
+            // FSFVI uses: "low", "medium", "high", "critical"
+            // See: fsfi-backend/src/fsfvi/config.rs:422-431
             assert!(
-                ["low", "moderate", "high", "critical"]
+                ["low", "medium", "high", "critical"]
                     .contains(&report.system_result.risk_level.as_str()),
                 "Vulnerability level '{}' is not a valid classification",
                 report.system_result.risk_level
@@ -302,12 +304,12 @@ async fn test_run_assessment_with_real_data() {
             println!("\n=== System Result ===");
             println!("Critical Components:");
             for comp in &report.system_result.critical_components {
-                println!("  - {}: vulnerability={:.6}, priority={}", comp.name, comp.vulnerability, comp.priority_level);
+                println!("  - {}: vulnerability={:.6}, priority={}", comp.name, comp.vulnerability, comp.priority_level.as_deref().unwrap_or("N/A"));
             }
 
             println!("\nHigh Risk Components:");
             for comp in &report.system_result.high_risk_components {
-                println!("  - {}: vulnerability={:.6}, priority={}", comp.name, comp.vulnerability, comp.priority_level);
+                println!("  - {}: vulnerability={:.6}, priority={}", comp.name, comp.vulnerability, comp.priority_level.as_deref().unwrap_or("N/A"));
             }
 
             println!("\nBudget Analysis:");
@@ -660,8 +662,10 @@ async fn test_quick_check_with_real_data() {
                 "Quick check FSFVI score must be non-negative"
             );
 
+            // FSFVI uses: "low", "medium", "high", "critical"
+            // See: fsfi-backend/src/fsfvi/config.rs:422-431
             assert!(
-                ["low", "moderate", "high", "critical"]
+                ["low", "medium", "high", "critical"]
                     .contains(&quick_result.risk_level.as_str()),
                 "Quick check vulnerability level must be valid, got: {}",
                 quick_result.risk_level

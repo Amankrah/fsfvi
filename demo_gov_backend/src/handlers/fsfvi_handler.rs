@@ -79,6 +79,14 @@ pub struct FiscalYearQuery {
 }
 
 #[derive(Debug, Deserialize)]
+pub struct AssessmentQuery {
+    pub fiscal_year: Option<i32>,
+    pub reporting_period: Option<String>,
+    pub weighting_method: Option<String>,
+    pub scenario: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
 pub struct HistoricalTrendsQuery {
     #[serde(deserialize_with = "deserialize_fiscal_years")]
     pub fiscal_years: Vec<i32>,
@@ -605,11 +613,16 @@ pub async fn recommend_targets(
 /// Run comprehensive FSFVI vulnerability assessment
 pub async fn run_assessment(
     req: HttpRequest,
-    query: web::Query<FiscalYearQuery>,
+    query: web::Query<AssessmentQuery>,
     state: web::Data<FsfviAppState>,
 ) -> Result<HttpResponse> {
     let user = extract_user_from_token(&req)?;
-    log::info!("User {} running FSFVI assessment", user.username);
+    log::info!(
+        "User {} running FSFVI assessment (weighting: {:?}, scenario: {:?})",
+        user.username,
+        query.weighting_method,
+        query.scenario
+    );
 
     let components = DataFetcher::fetch_components(
         &state.db_pool,
@@ -627,17 +640,16 @@ pub async fn run_assessment(
         })));
     }
 
-    // run_assessment requires country_name, weighting_method, and scenario (all optional)
-    // Using defaults: no specific country, Hybrid weighting, NormalOperations scenario
+    // Pass through weighting method and scenario from query params
     let country_name = Some(user.government_id.clone());
-    let weighting_method = None; // Will use Hybrid (default)
-    let scenario = None; // Will use NormalOperations (default)
+    let weighting_method = query.weighting_method.clone();
+    let scenario = query.scenario.clone();
 
     let result = state
         .assessment_service
         .run_assessment(components, country_name, weighting_method, scenario)
         .await
-        .map_err(|e| actix_web::error::ErrorInternalServerError(format!("Assessment failed: {}", e)))?;
+        .map_err(|e| handle_fsfvi_error(e, "run_assessment"))?;
 
     Ok(HttpResponse::Ok().json(json!({
         "success": true,
@@ -891,7 +903,11 @@ pub async fn generate_reallocation_plan(
     state: web::Data<FsfviAppState>,
 ) -> Result<HttpResponse> {
     let user = extract_user_from_token(&req)?;
-    log::info!("User {} generating reallocation plan", user.username);
+    log::info!(
+        "User {} generating reallocation plan with objective: {}",
+        user.username,
+        request.objective
+    );
 
     let components = DataFetcher::fetch_components(
         &state.db_pool,
@@ -909,16 +925,30 @@ pub async fn generate_reallocation_plan(
         })));
     }
 
+    // CRITICAL: Parse optimization objective from request (government policy decision)
+    let objective = match request.objective.to_lowercase().as_str() {
+        "minimize_fsfvi" => crate::services::fsfvi_service::budget_optimization::OptimizationObjective::MinimizeFsfvi,
+        "maximize_efficiency" => crate::services::fsfvi_service::budget_optimization::OptimizationObjective::MaximizeEfficiency,
+        "balanced" | "balance_risk" => crate::services::fsfvi_service::budget_optimization::OptimizationObjective::BalanceRisk,
+        _ => {
+            return Ok(HttpResponse::BadRequest().json(json!({
+                "success": false,
+                "message": format!(
+                    "Invalid objective '{}'. Use: minimize_fsfvi, maximize_efficiency, or balanced",
+                    request.objective
+                )
+            })));
+        }
+    };
+
     // Build constraints
-    let constraints = if request.total_budget_ceiling.is_some()
-        || request.min_allocation_per_component.is_some()
+    let constraints = if request.min_allocation_per_component.is_some()
         || request.max_change_percent.is_some()
     {
         Some(crate::services::fsfvi_service::budget_optimization::OptimizationConstraints {
-            total_budget_ceiling: request.total_budget_ceiling,
-            min_allocation_per_component: request.min_allocation_per_component,
+            min_allocation_per_component: request.min_allocation_per_component.unwrap_or(0.0),
             max_change_percent: request.max_change_percent,
-            priority_components: None,
+            implementation_months: 12, // Default 12-month implementation plan
         })
     } else {
         None
@@ -926,7 +956,7 @@ pub async fn generate_reallocation_plan(
 
     let result = state
         .budget_optimization_service
-        .generate_reallocation_plan(components, constraints)
+        .generate_reallocation_plan(components, objective, constraints) // ← CRITICAL: Pass objective
         .await
         .map_err(|e| actix_web::error::ErrorInternalServerError(format!("Planning failed: {}", e)))?;
 
@@ -971,13 +1001,35 @@ pub async fn calculate_roi(
     }
 
     // Convert request scenarios to service BudgetScenario format
-    use crate::services::fsfvi_service::budget_optimization::BudgetScenario;
+    use crate::services::fsfvi_service::budget_optimization::{BudgetScenario, AllocationChange};
+
+    // Calculate baseline FSFVI from current components
+    let baseline_fsfvi: f64 = components
+        .iter()
+        .map(|c| {
+            let gap = (c.benchmark_value - c.observed_value).max(0.0) / c.benchmark_value.max(0.0001);
+            gap * c.weight.unwrap_or(1.0 / components.len() as f64)
+        })
+        .sum();
+
     let scenarios: Vec<BudgetScenario> = request
         .scenarios
         .iter()
-        .map(|s| BudgetScenario {
-            scenario_name: s.scenario_name.clone(),
-            component_allocations: s.allocations.clone(),
+        .map(|s| {
+            let changes: Vec<AllocationChange> = s
+                .allocations
+                .iter()
+                .map(|(component_type, new_allocation)| AllocationChange {
+                    component_type: component_type.clone(),
+                    new_allocation: *new_allocation,
+                })
+                .collect();
+
+            BudgetScenario {
+                name: s.scenario_name.clone(),
+                baseline_fsfvi,
+                changes,
+            }
         })
         .collect();
 
@@ -1023,7 +1075,7 @@ pub async fn optimize_allocation(
     let objective = match request.objective.as_str() {
         "minimize_fsfvi" => crate::services::fsfvi_service::budget_optimization::OptimizationObjective::MinimizeFsfvi,
         "maximize_efficiency" => crate::services::fsfvi_service::budget_optimization::OptimizationObjective::MaximizeEfficiency,
-        "balanced" => crate::services::fsfvi_service::budget_optimization::OptimizationObjective::Balanced,
+        "balanced" => crate::services::fsfvi_service::budget_optimization::OptimizationObjective::BalanceRisk,
         _ => return Ok(HttpResponse::BadRequest().json(json!({
             "success": false,
             "message": "Invalid objective. Use: minimize_fsfvi, maximize_efficiency, or balanced"
@@ -1031,15 +1083,13 @@ pub async fn optimize_allocation(
     };
 
     // Build constraints
-    let constraints = if request.total_budget_ceiling.is_some()
-        || request.min_allocation_per_component.is_some()
+    let constraints = if request.min_allocation_per_component.is_some()
         || request.max_change_percent.is_some()
     {
         Some(crate::services::fsfvi_service::budget_optimization::OptimizationConstraints {
-            total_budget_ceiling: request.total_budget_ceiling,
-            min_allocation_per_component: request.min_allocation_per_component,
+            min_allocation_per_component: request.min_allocation_per_component.unwrap_or(0.0),
             max_change_percent: request.max_change_percent,
-            priority_components: None,
+            implementation_months: 12, // Default 12-month implementation plan
         })
     } else {
         None

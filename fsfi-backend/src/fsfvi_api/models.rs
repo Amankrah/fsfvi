@@ -78,7 +78,10 @@ impl From<ComponentInput> for Component {
             component_type: input.component_type,
             observed_value: input.observed_value,
             benchmark_value: input.benchmark_value,
-            financial_allocation: input.financial_allocation_usd, // Already in USD
+            // CRITICAL: FSFVI core expects allocation in millions of USD
+            // The efficiency calculation and sensitivity parameters are calibrated for millions
+            // See: fsfvi_core/calculations.rs:152 - "per million USD invested"
+            financial_allocation: input.financial_allocation_usd / 1_000_000.0,
             weight: input.weight,
             sensitivity_parameter: input.sensitivity_parameter,
         }

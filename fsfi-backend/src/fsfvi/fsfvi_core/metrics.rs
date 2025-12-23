@@ -128,6 +128,7 @@ pub struct ComponentResult {
     pub weighted_vulnerability: f64,
     pub weight: f64,
     pub financial_allocation: f64,
+    pub sensitivity_parameter: f64,
     pub priority_level: String,
     pub efficiency_index: f64,
 }
@@ -547,6 +548,7 @@ mod tests {
                 weighted_vulnerability: 0.15,
                 weight: 0.5,
                 financial_allocation: 1000.0,
+                sensitivity_parameter: 0.002,
                 priority_level: "medium".to_string(),
                 efficiency_index: 10.0,
             },
@@ -557,6 +559,7 @@ mod tests {
                 weighted_vulnerability: 0.10,
                 weight: 0.5,
                 financial_allocation: 800.0,
+                sensitivity_parameter: 0.003,
                 priority_level: "low".to_string(),
                 efficiency_index: 15.0,
             },

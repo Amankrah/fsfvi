@@ -111,6 +111,8 @@ pub fn calculate_vulnerability(
     let clamped_gap = clamp(gap, 0.0, 1.0);
 
     // Core FSFVI vulnerability calculation: υᵢ(fᵢ) = δᵢ · 1/(1 + αᵢfᵢ)
+    // IMPORTANT: allocation parameter is already in millions USD (converted in models.rs:84)
+    // Sensitivity parameters are calibrated for allocations in millions
     let financial_effectiveness = sensitivity * allocation; // αᵢfᵢ (dimensionless)
     let mut denominator = 1.0 + financial_effectiveness;
 
@@ -153,12 +155,16 @@ pub fn calculate_weighted_vulnerability(vulnerability: f64, weight: f64) -> Fsfv
 /// - Higher values = better resource effectiveness
 /// - Typical range: 0.1% to 50% depending on allocation size
 /// - Interpretation: % effectiveness gained per $1M invested
+///
+/// IMPORTANT: allocation parameter must be in MILLIONS USD
+/// (already converted in models.rs From<ComponentInput> trait implementation)
 pub fn calculate_efficiency_index(vulnerability: f64, allocation: f64) -> FsfviResult<f64> {
     if allocation == 0.0 {
         return Ok(0.0);
     }
 
-    // Efficiency = (1 - vulnerability) / allocation * 100 (percentage per million USD)
+    // Efficiency = (1 - vulnerability) / allocation × 100 (percentage per million USD)
+    // FIXED: allocation parameter is already in millions USD, no conversion needed
     let efficiency = safe_divide(clamp(1.0 - vulnerability, 0.0, 1.0) * 100.0, allocation, 0.0);
     Ok(efficiency)
 }

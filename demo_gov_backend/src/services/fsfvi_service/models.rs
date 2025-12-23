@@ -16,8 +16,43 @@ pub struct ComponentInput {
     pub component_type: String,
     pub observed_value: f64,
     pub benchmark_value: f64,
+    /// Financial allocation in USD
+    /// Assessment API expects this as "financial_allocation_usd"
+    /// Budget Optimization API expects "financial_allocation" (in millions)
     pub financial_allocation_usd: f64,
     pub weight: Option<f64>,
+    pub sensitivity_parameter: Option<f64>,
+}
+
+impl ComponentInput {
+    /// Convert to budget optimization Component format
+    /// Budget optimization API expects financial_allocation in MILLIONS USD
+    pub fn to_budget_component(&self) -> BudgetComponent {
+        BudgetComponent {
+            component_id: self.component_id.clone(),
+            component_type: self.component_type.clone(),
+            observed_value: self.observed_value,
+            benchmark_value: self.benchmark_value,
+            financial_allocation: self.financial_allocation_usd / 1_000_000.0,
+            weight: self.weight,
+            sensitivity_parameter: self.sensitivity_parameter,
+        }
+    }
+}
+
+/// Budget Component format for Budget Optimization API
+/// Matches: fsfi-backend/src/fsfvi/validators.rs:Component
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BudgetComponent {
+    pub component_id: Option<String>,
+    pub component_type: String,
+    pub observed_value: f64,
+    pub benchmark_value: f64,
+    /// Financial allocation in MILLIONS of USD (not raw USD)
+    pub financial_allocation: f64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub weight: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub sensitivity_parameter: Option<f64>,
 }
 
@@ -266,8 +301,13 @@ pub struct ComponentStatistics {
 pub struct ComponentInfo {
     pub name: String,
     pub vulnerability: f64,
+    /// Allocation in MILLIONS USD (backend sends in millions, not raw USD)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub allocation: Option<f64>,
     pub weight: f64,
-    pub priority_level: String,
+    /// Priority level is not always included in all contexts
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub priority_level: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -318,7 +358,7 @@ pub struct ActionPriorities {
 }
 
 /// Component Insight
-/// Matches: fsfi-backend/src/fsfvi/service/vulnerability_assessment.rs:456-466
+/// Matches: fsfi-backend/src/fsfvi/service/vulnerability_assessment.rs:456-468
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ComponentInsight {
     pub component_name: String,
@@ -326,6 +366,7 @@ pub struct ComponentInsight {
     pub vulnerability: f64,
     pub weight: f64,
     pub contribution_to_system: f64,
+    pub sensitivity_parameter: f64,
     pub priority_level: String,
     pub efficiency_index: f64,
     pub is_critical: bool,
@@ -417,3 +458,9 @@ pub struct MtefPlan {
     pub target_fsfvi: f64,
     pub yearly_plans: Vec<YearlyPlan>,
 }
+
+// ============================================================================
+// Budget Optimization Models
+// ============================================================================
+// NOTE: Budget optimization types are defined in budget_optimization.rs
+// and re-exported through mod.rs to avoid duplicate definitions

@@ -40,3 +40,12 @@ pub use sensitivity_analysis::SensitivityAnalysisService;
 pub use scenario_simulation::ScenarioSimulationService;
 pub use decision_support::DecisionSupportService;
 pub use matrix_generation::MatrixGenerationService;
+
+// Re-export budget optimization types for external use (tests, handlers)
+#[allow(unused_imports)]
+pub use budget_optimization::{
+    AllocationChange,
+    BudgetScenario,
+    OptimizationConstraints,
+    OptimizationObjective,
+};

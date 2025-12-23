@@ -401,6 +401,13 @@ pub fn analyze_financial_allocations(
 /// - > 1.0: Over-allocated relative to vulnerability
 /// - < 1.0: Under-allocated relative to vulnerability
 /// - = 1.0: Perfectly aligned
+///
+/// CRITICAL FIX: Edge case handling for near-zero vulnerability
+/// - When vulnerability < 1e-6 (effectively zero), the component is performing well
+/// - Efficiency ratio becomes undefined (division by ~0)
+/// - OLD: Return hardcoded 100.0 (creates suspicious efficiency=100.0 in reports)
+/// - NEW: Return a large but bounded value based on actual weight magnitude
+///        efficiency = (fin_weight / 1e-6) capped at reasonable maximum
 pub fn compare_allocation_to_vulnerability(
     components: &[Component],
     vulnerabilities: &HashMap<String, f64>,
@@ -412,12 +419,27 @@ pub fn compare_allocation_to_vulnerability(
     for (comp_type, &fin_weight) in financial_weights.iter() {
         if let Some(&vulnerability) = vulnerabilities.get(comp_type) {
             let efficiency = if vulnerability > 1e-6 {
+                // Normal case: calculate actual efficiency ratio
                 fin_weight / vulnerability
             } else {
-                100.0 // Very high efficiency if no vulnerability
+                // CRITICAL EDGE CASE: Near-zero vulnerability (component performing well)
+                // Instead of hardcoded 100.0, calculate based on weight magnitude
+                // Use small denominator (1e-6) to get large but meaningful value
+                // Cap at 1000.0 to avoid extreme outliers in reports
+                (fin_weight / 1e-6).min(1000.0)
             };
 
             allocation_efficiency.insert(comp_type.clone(), efficiency);
+
+            // Log edge cases for government audit trail
+            if vulnerability <= 1e-6 {
+                tracing::warn!(
+                    "Component '{}' has near-zero vulnerability ({:.8}), efficiency capped at {:.1}",
+                    comp_type,
+                    vulnerability,
+                    efficiency
+                );
+            }
         }
     }
 
@@ -425,9 +447,11 @@ pub fn compare_allocation_to_vulnerability(
 }
 
 /// Compare effective (cost-adjusted) weights with vulnerability
-/// 
+///
 /// More sophisticated than raw comparison - accounts for the fact that
 /// $1 in nutrition may have more impact than $1 in governance.
+///
+/// CRITICAL FIX: Same edge case handling as compare_allocation_to_vulnerability
 pub fn compare_effective_allocation_to_vulnerability(
     components: &[Component],
     vulnerabilities: &HashMap<String, f64>,
@@ -440,12 +464,25 @@ pub fn compare_effective_allocation_to_vulnerability(
     for (comp_type, &eff_weight) in effective_weights.iter() {
         if let Some(&vulnerability) = vulnerabilities.get(comp_type) {
             let efficiency = if vulnerability > 1e-6 {
+                // Normal case: calculate actual efficiency ratio
                 eff_weight / vulnerability
             } else {
-                100.0
+                // CRITICAL EDGE CASE: Near-zero vulnerability
+                // Use meaningful calculation instead of hardcoded 100.0
+                (eff_weight / 1e-6).min(1000.0)
             };
 
             allocation_efficiency.insert(comp_type.clone(), efficiency);
+
+            // Log edge cases for government audit trail
+            if vulnerability <= 1e-6 {
+                tracing::warn!(
+                    "Component '{}' has near-zero vulnerability ({:.8}) in effective allocation comparison, efficiency capped at {:.1}",
+                    comp_type,
+                    vulnerability,
+                    efficiency
+                );
+            }
         }
     }
 

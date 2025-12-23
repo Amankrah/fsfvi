@@ -198,7 +198,7 @@ impl AuthService {
         }
 
         // Get current user
-        let user = self.get_user_by_id(user_id).await?;
+        let user = self.get_user_by_id(&user_id.to_string()).await?;
         log::debug!("Retrieved user: {} (temporary: {})", user.username, user.is_temporary_password);
         log::debug!("Stored password hash prefix: {}", user.password_hash.chars().take(20).collect::<String>());
 
@@ -392,7 +392,7 @@ impl AuthService {
     /// SECURITY: Accepts the JWT token to blacklist it, preventing reuse after logout
     pub async fn logout(&mut self, user_id: &str, token: Option<&str>) -> AuthResult<()> {
         // Get user info for audit logging
-        let user = self.get_user_by_id(user_id).await?;
+        let user = self.get_user_by_id(&user_id.to_string()).await?;
 
         // CRITICAL SECURITY: Blacklist the token to prevent reuse
         // Even though we clear the session, the JWT itself remains valid until expiry
@@ -782,7 +782,7 @@ impl AuthService {
 
     /// Prepare 2FA setup - generates secret and QR code
     pub async fn prepare_two_fa_setup(&mut self, user_id: &str) -> AuthResult<TwoFASetupResponse> {
-        let user = self.get_user_by_id(user_id).await?;
+        let user = self.get_user_by_id(&user_id.to_string()).await?;
 
         // Generate secret and backup codes
         let secret = self.two_fa_service.generate_secret();
@@ -803,7 +803,7 @@ impl AuthService {
 
     /// Set up 2FA for user - verifies TOTP and enables 2FA
     pub async fn setup_two_fa(&mut self, user_id: &str, request: TwoFASetupRequest) -> AuthResult<TwoFASetupResponse> {
-        let user = self.get_user_by_id(user_id).await?;
+        let user = self.get_user_by_id(&user_id.to_string()).await?;
 
         // Use the secret and backup codes provided from the prepare phase
         let secret = request.secret.clone();
@@ -952,7 +952,7 @@ impl AuthService {
 
     /// Disable 2FA for user
     pub async fn disable_two_fa(&mut self, user_id: &str, request: TwoFADisableRequest) -> AuthResult<()> {
-        let user = self.get_user_by_id(user_id).await?;
+        let user = self.get_user_by_id(&user_id.to_string()).await?;
         
         // Verify password
         let password_valid = self.password_service.verify_password(&request.password, &user.password_hash).unwrap_or(false);
@@ -1171,7 +1171,7 @@ mod tests {
         }
 
         // Verify user is now locked
-        let user = service.get_user_by_id(user_id).await.unwrap();
+        let user = service.get_user_by_id(&user_id.to_string()).await.unwrap();
         assert!(user.is_locked);
         assert!(user.lockout_expiry.is_some());
         assert!(user.login_attempts >= max_attempts as i32);
@@ -1207,7 +1207,7 @@ mod tests {
         let user_id = create_test_user(&pool, "test_user", &password_hash, false).await;
 
         // Verify initial login_attempts is 0
-        let user = service.get_user_by_id(user_id).await.unwrap();
+        let user = service.get_user_by_id(&user_id.to_string()).await.unwrap();
         assert_eq!(user.login_attempts, 0);
 
         // Attempt login with wrong password
@@ -1222,7 +1222,7 @@ mod tests {
         let _ = service.authenticate(request, "127.0.0.1").await;
 
         // Verify login_attempts incremented
-        let user = service.get_user_by_id(user_id).await.unwrap();
+        let user = service.get_user_by_id(&user_id.to_string()).await.unwrap();
         assert_eq!(user.login_attempts, 1);
     }
 
@@ -1249,7 +1249,7 @@ mod tests {
         }
 
         // Verify login_attempts is 2
-        let user = service.get_user_by_id(user_id).await.unwrap();
+        let user = service.get_user_by_id(&user_id.to_string()).await.unwrap();
         assert_eq!(user.login_attempts, 2);
 
         // Successful login
@@ -1265,7 +1265,7 @@ mod tests {
         assert!(result.is_ok());
 
         // Verify login_attempts reset to 0
-        let user = service.get_user_by_id(user_id).await.unwrap();
+        let user = service.get_user_by_id(&user_id.to_string()).await.unwrap();
         assert_eq!(user.login_attempts, 0);
         assert!(!user.is_locked);
         assert!(user.lockout_expiry.is_none());
@@ -1288,11 +1288,11 @@ mod tests {
             confirm_password: "NewPhrase@2025!Changed".to_string(),
         };
 
-        let result = service.change_password(user_id, request).await;
+        let result = service.change_password(&user_id.to_string(), request).await;
         assert!(result.is_ok());
 
         // Verify new password works
-        let user = service.get_user_by_id(user_id).await.unwrap();
+        let user = service.get_user_by_id(&user_id.to_string()).await.unwrap();
         assert!(service.password_service.verify_password("NewPhrase@2025!Changed", &user.password_hash).unwrap());
         assert!(!user.is_temporary_password); // Should be set to false after password change
     }
@@ -1314,7 +1314,7 @@ mod tests {
             confirm_password: "NewPhrase@2025!Changed".to_string(),
         };
 
-        let result = service.change_password(user_id, request).await;
+        let result = service.change_password(&user_id.to_string(), request).await;
         assert!(result.is_err());
         assert!(matches!(result.unwrap_err(), AuthError::InvalidCredentials));
     }
@@ -1336,7 +1336,7 @@ mod tests {
             confirm_password: "DifferentPhrase@2025!Wrong".to_string(),
         };
 
-        let result = service.change_password(user_id, request).await;
+        let result = service.change_password(&user_id.to_string(), request).await;
         assert!(result.is_err());
         assert!(matches!(result.unwrap_err(), AuthError::PasswordMismatch));
     }
@@ -1358,7 +1358,7 @@ mod tests {
             confirm_password: "weak".to_string(),
         };
 
-        let result = service.change_password(user_id, request).await;
+        let result = service.change_password(&user_id.to_string(), request).await;
         assert!(result.is_err());
         assert!(matches!(result.unwrap_err(), AuthError::PasswordTooWeak));
     }
@@ -1380,7 +1380,7 @@ mod tests {
             confirm_password: current_password.to_string(),
         };
 
-        let result = service.change_password(user_id, request).await;
+        let result = service.change_password(&user_id.to_string(), request).await;
         assert!(result.is_err());
         match result.unwrap_err() {
             AuthError::InternalError(msg) => {
@@ -1413,7 +1413,7 @@ mod tests {
         assert!(result.is_ok());
 
         // Verify user has is_temporary_password flag
-        let user = service.get_user_by_id(user_id).await.unwrap();
+        let user = service.get_user_by_id(&user_id.to_string()).await.unwrap();
         assert!(user.is_temporary_password);
 
         // Change password
@@ -1423,11 +1423,11 @@ mod tests {
             confirm_password: "NewPhrase@2025!Changed".to_string(),
         };
 
-        let result = service.change_password(user_id, request).await;
+        let result = service.change_password(&user_id.to_string(), request).await;
         assert!(result.is_ok());
 
         // Verify is_temporary_password is now false
-        let user = service.get_user_by_id(user_id).await.unwrap();
+        let user = service.get_user_by_id(&user_id.to_string()).await.unwrap();
         assert!(!user.is_temporary_password);
     }
 
@@ -1496,15 +1496,15 @@ mod tests {
         let token = login_response.token.clone();
 
         // Verify session exists
-        let user = service.get_user_by_id(user_id).await.unwrap();
+        let user = service.get_user_by_id(&user_id.to_string()).await.unwrap();
         assert!(user.session_token.is_some());
 
         // Logout
-        let result = service.logout(user_id, Some(&token)).await;
+        let result = service.logout(&user_id.to_string(), Some(&token)).await;
         assert!(result.is_ok());
 
         // Verify session cleared
-        let user = service.get_user_by_id(user_id).await.unwrap();
+        let user = service.get_user_by_id(&user_id.to_string()).await.unwrap();
         assert!(user.session_token.is_none());
         assert!(user.session_expires_at.is_none());
     }
@@ -1537,7 +1537,7 @@ mod tests {
         assert!(result.is_ok());
 
         // Logout with token
-        let result = service.logout(user_id, Some(&token)).await;
+        let result = service.logout(&user_id.to_string(), Some(&token)).await;
         assert!(result.is_ok());
 
         // Token should be blacklisted and fail validation

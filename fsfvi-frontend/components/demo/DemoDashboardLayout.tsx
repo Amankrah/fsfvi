@@ -11,9 +11,11 @@ import {
   X,
   ChevronRight,
   BarChart3,
+  FileCheck,
+  DollarSign,
 } from 'lucide-react';
 
-type NavigationItem = 'profile' | 'security' | 'performance-gap';
+type NavigationItem = 'profile' | 'security' | 'performance-gap' | 'assessment' | 'budget-optimization';
 
 interface DemoDashboardLayoutProps {
   children?: React.ReactNode;
@@ -42,10 +44,22 @@ export function DemoDashboardLayout({ children, activeNav, setActiveNav }: DemoD
 
   const navigationItems = [
     {
+      id: 'assessment' as NavigationItem,
+      label: 'FSFVI Assessment',
+      icon: FileCheck,
+      description: 'Food system vulnerability assessment',
+    },
+    {
       id: 'performance-gap' as NavigationItem,
       label: 'Performance Gap Analysis',
       icon: BarChart3,
       description: 'Analyze food system performance gaps',
+    },
+    {
+      id: 'budget-optimization' as NavigationItem,
+      label: 'Budget Optimization',
+      icon: DollarSign,
+      description: 'Optimize resource allocation for food security',
     },
     {
       id: 'profile' as NavigationItem,

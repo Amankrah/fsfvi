@@ -48,6 +48,21 @@ pub fn estimate_sensitivity_hardcoded(
     benchmark_value: f64,
     financial_allocation: f64,
 ) -> FsfviResult<f64> {
+    // CRITICAL: Near-zero allocations cause numerical instability
+    // Return base sensitivity without adjustments for very small allocations
+    if financial_allocation < MIN_ALLOCATION_FOR_ESTIMATION {
+        let base_sensitivity = get_base_sensitivity(component_type);
+        tracing::warn!(
+            "Financial allocation ${:.1}M below minimum threshold ${:.0}M in hardcoded estimation. Using base sensitivity {:.6} without adjustments",
+            financial_allocation,
+            MIN_ALLOCATION_FOR_ESTIMATION,
+            base_sensitivity
+        );
+        return Ok(base_sensitivity
+            .max(VALIDATION_CONFIG.min_sensitivity_parameter)
+            .min(0.005));
+    }
+
     // Get baseline sensitivity for component type
     let mut estimated_parameter = get_base_sensitivity(component_type);
 
@@ -129,6 +144,11 @@ pub fn estimate_sensitivity_empirical(
     }
 }
 
+/// Minimum allocation threshold for reliable sensitivity estimation (in millions USD)
+/// Below this threshold, numerical instability occurs in optimization calculations
+/// Government use case: Allocations < $5M should be handled separately or combined
+const MIN_ALLOCATION_FOR_ESTIMATION: f64 = 5.0;
+
 /// Estimate sensitivity from current allocation-performance relationship
 fn estimate_from_allocation_performance(
     observed_value: f64,
@@ -142,6 +162,19 @@ fn estimate_from_allocation_performance(
     if performance_gap <= 0.0 || financial_allocation <= 0.0 {
         // Use theoretically-derived expected value instead of hardcoded default
         // This ensures government decisions are based on economic literature
+        return Ok(bounds.expected);
+    }
+
+    // CRITICAL: Near-zero allocations cause numerical instability in optimization
+    // When allocation < $5M, division operations produce extreme sensitivity values
+    // that propagate through FSFVI calculations and cause system crashes
+    if financial_allocation < MIN_ALLOCATION_FOR_ESTIMATION {
+        tracing::warn!(
+            "Financial allocation ${:.1}M below minimum threshold ${:.0}M for reliable estimation. Using theoretical expected value {:.6}",
+            financial_allocation,
+            MIN_ALLOCATION_FOR_ESTIMATION,
+            bounds.expected
+        );
         return Ok(bounds.expected);
     }
 
