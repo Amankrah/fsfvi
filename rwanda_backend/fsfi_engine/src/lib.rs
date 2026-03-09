@@ -25,6 +25,7 @@ pub mod auth;
 pub mod config;
 pub mod core;
 pub mod errors;
+pub mod services;
 pub mod weighting;
 
 use pyo3::prelude::*;
@@ -43,6 +44,9 @@ fn fsfi_engine(m: &Bound<'_, PyModule>) -> PyResult<()> {
 
     // Register weighting system functions
     weighting::register_module(m)?;
+
+    // Register high-level services (assessment, optimization, gap analysis)
+    services::register_module(m)?;
 
     Ok(())
 }
