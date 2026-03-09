@@ -1,0 +1,71 @@
+{
+  "app": {
+    "title": "République du Rwanda — Tableau de bord FSFI",
+    "subtitle": "Intelligence Financière des Systèmes Alimentaires",
+    "ministry": "Ministère de l'Agriculture et des Ressources Animales",
+    "republic": "République du Rwanda"
+  },
+  "nav": {
+    "overview": "Aperçu National",
+    "assessment": "Évaluation FSFI",
+    "performance": "Analyse des Écarts",
+    "budget": "Optimisation Budgétaire",
+    "provinces": "Provinces",
+    "districts": "Districts",
+    "psta5": "Suivi PSTA 5",
+    "seasonal": "Tableau Saisonnier",
+    "reports": "Rapports",
+    "alerts": "Alertes",
+    "data_entry": "Saisie des Données",
+    "profile": "Profil",
+    "security": "Sécurité"
+  },
+  "auth": {
+    "sign_in": "Se Connecter",
+    "sign_out": "Se Déconnecter",
+    "username": "Nom d'utilisateur",
+    "password": "Mot de passe",
+    "signing_in": "Connexion en cours...",
+    "secure_auth": "Authentification Gouvernementale Sécurisée",
+    "enter_credentials": "Entrez vos identifiants pour continuer",
+    "auth_failed": "Échec de l'Authentification",
+    "contact_admin": "Contactez votre administrateur système pour obtenir de l'aide",
+    "change_password": "Changer le Mot de Passe",
+    "current_password": "Mot de passe actuel",
+    "new_password": "Nouveau mot de passe",
+    "confirm_password": "Confirmer le mot de passe"
+  },
+  "overview": {
+    "national_fsfi": "Indice d'Intelligence Financière du Système Alimentaire du Rwanda",
+    "risk_level": "Niveau de Risque",
+    "yoy_change": "Variation Annuelle",
+    "critical_components": "Composantes Critiques",
+    "total_budget": "Budget Agricole",
+    "province_breakdown": "Répartition par Province",
+    "alerts_banner": "Alertes Actives"
+  },
+  "risk": {
+    "low": "Faible",
+    "moderate": "Modéré",
+    "high": "Élevé",
+    "critical": "Critique"
+  },
+  "common": {
+    "loading": "Chargement...",
+    "error": "Une erreur est survenue",
+    "retry": "Réessayer",
+    "save": "Enregistrer",
+    "cancel": "Annuler",
+    "submit": "Soumettre",
+    "export": "Exporter",
+    "filter": "Filtrer",
+    "search": "Rechercher",
+    "fiscal_year": "Année Fiscale",
+    "season": "Saison",
+    "district": "District",
+    "province": "Province",
+    "national": "National",
+    "score": "Score",
+    "trend": "Tendance"
+  }
+}

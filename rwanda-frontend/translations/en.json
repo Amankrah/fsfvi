@@ -1,0 +1,71 @@
+{
+  "app": {
+    "title": "Republic of Rwanda — FSFI Dashboard",
+    "subtitle": "Food Systems Financial Intelligence",
+    "ministry": "Ministry of Agriculture and Animal Resources",
+    "republic": "Republic of Rwanda"
+  },
+  "nav": {
+    "overview": "National Overview",
+    "assessment": "FSFI Assessment",
+    "performance": "Performance Gap",
+    "budget": "Budget Optimization",
+    "provinces": "Provinces",
+    "districts": "Districts",
+    "psta5": "PSTA 5 Tracker",
+    "seasonal": "Seasonal Dashboard",
+    "reports": "Reports",
+    "alerts": "Alerts",
+    "data_entry": "Data Entry",
+    "profile": "Profile",
+    "security": "Security"
+  },
+  "auth": {
+    "sign_in": "Sign In",
+    "sign_out": "Sign Out",
+    "username": "Username",
+    "password": "Password",
+    "signing_in": "Signing in...",
+    "secure_auth": "Secure Government Authentication",
+    "enter_credentials": "Enter your credentials to continue",
+    "auth_failed": "Authentication Failed",
+    "contact_admin": "Contact your system administrator for assistance",
+    "change_password": "Change Password",
+    "current_password": "Current Password",
+    "new_password": "New Password",
+    "confirm_password": "Confirm Password"
+  },
+  "overview": {
+    "national_fsfi": "Rwanda Food System Financial Intelligence Index",
+    "risk_level": "Risk Level",
+    "yoy_change": "Year-over-Year Change",
+    "critical_components": "Critical Components",
+    "total_budget": "Agriculture Budget",
+    "province_breakdown": "Province Breakdown",
+    "alerts_banner": "Active Alerts"
+  },
+  "risk": {
+    "low": "Low",
+    "moderate": "Moderate",
+    "high": "High",
+    "critical": "Critical"
+  },
+  "common": {
+    "loading": "Loading...",
+    "error": "An error occurred",
+    "retry": "Retry",
+    "save": "Save",
+    "cancel": "Cancel",
+    "submit": "Submit",
+    "export": "Export",
+    "filter": "Filter",
+    "search": "Search",
+    "fiscal_year": "Fiscal Year",
+    "season": "Season",
+    "district": "District",
+    "province": "Province",
+    "national": "National",
+    "score": "Score",
+    "trend": "Trend"
+  }
+}

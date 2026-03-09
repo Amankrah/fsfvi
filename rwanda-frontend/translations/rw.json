@@ -1,0 +1,71 @@
+{
+  "app": {
+    "title": "Repubulika y'u Rwanda — FSFI Ikibaho",
+    "subtitle": "Ubumenyi bw'Imari y'Ibiribwa",
+    "ministry": "Minisiteri y'Ubuhinzi n'Ubworozi",
+    "republic": "Repubulika y'u Rwanda"
+  },
+  "nav": {
+    "overview": "Isuzuma Rusange",
+    "assessment": "Isuzuma FSFI",
+    "performance": "Isesengura ry'Imikorere",
+    "budget": "Guteza Imbere Ingengo y'Imari",
+    "provinces": "Intara",
+    "districts": "Uturere",
+    "psta5": "PSTA 5 Igenzura",
+    "seasonal": "Ikibaho cy'Igihembwe",
+    "reports": "Raporo",
+    "alerts": "Imenyesha",
+    "data_entry": "Kwinjiza Amakuru",
+    "profile": "Umwirondoro",
+    "security": "Umutekano"
+  },
+  "auth": {
+    "sign_in": "Kwinjira",
+    "sign_out": "Gusohoka",
+    "username": "Izina ry'ukoresha",
+    "password": "Ijambo ry'ibanga",
+    "signing_in": "Kwinjira...",
+    "secure_auth": "Kwemeza Umutekano wa Guverinoma",
+    "enter_credentials": "Injiza amazina yawe kugira ngo ukomeze",
+    "auth_failed": "Kwemeza Byanze",
+    "contact_admin": "Hamagara umuyobozi wa sisitemu kugira ngo ugufashe",
+    "change_password": "Guhindura Ijambo ry'Ibanga",
+    "current_password": "Ijambo ry'ibanga rya none",
+    "new_password": "Ijambo ry'ibanga rishya",
+    "confirm_password": "Emeza ijambo ry'ibanga"
+  },
+  "overview": {
+    "national_fsfi": "Umubare w'Imari y'Ibiribwa mu Rwanda",
+    "risk_level": "Urwego rw'Ingaruka",
+    "yoy_change": "Ihinduka ku Mwaka",
+    "critical_components": "Ibice Bikomeye",
+    "total_budget": "Ingengo y'Imari y'Ubuhinzi",
+    "province_breakdown": "Isesengura ry'Intara",
+    "alerts_banner": "Imenyesha Ikora"
+  },
+  "risk": {
+    "low": "Bike",
+    "moderate": "Hagati",
+    "high": "Byinshi",
+    "critical": "Bikomeye"
+  },
+  "common": {
+    "loading": "Gutegereza...",
+    "error": "Habaye ikosa",
+    "retry": "Ongera ugerageze",
+    "save": "Bika",
+    "cancel": "Hagarika",
+    "submit": "Ohereza",
+    "export": "Kohereza",
+    "filter": "Shyira mu byiciro",
+    "search": "Shakisha",
+    "fiscal_year": "Umwaka w'Imari",
+    "season": "Igihembwe",
+    "district": "Akarere",
+    "province": "Intara",
+    "national": "Igihugu",
+    "score": "Amanota",
+    "trend": "Intambwe"
+  }
+}

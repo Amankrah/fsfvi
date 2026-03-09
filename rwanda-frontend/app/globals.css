@@ -1,0 +1,44 @@
+@import "tailwindcss";
+
+:root {
+  /* Rwanda Flag Colors */
+  --rw-blue: #00A1DE;
+  --rw-green: #20603D;
+  --rw-yellow: #FAD201;
+
+  /* Government UI Colors */
+  --rw-dark: #1A1A2E;
+  --rw-gray-900: #111827;
+  --rw-gray-600: #4B5563;
+  --rw-gray-100: #F3F4F6;
+  --rw-white: #FFFFFF;
+
+  /* FSFI Risk Scale */
+  --risk-low: #10B981;
+  --risk-moderate: #F59E0B;
+  --risk-high: #F97316;
+  --risk-critical: #EF4444;
+
+  /* Base */
+  --background: #ffffff;
+  --foreground: #111827;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-rw-blue: var(--rw-blue);
+  --color-rw-green: var(--rw-green);
+  --color-rw-yellow: var(--rw-yellow);
+  --color-rw-dark: var(--rw-dark);
+  --color-risk-low: var(--risk-low);
+  --color-risk-moderate: var(--risk-moderate);
+  --color-risk-high: var(--risk-high);
+  --color-risk-critical: var(--risk-critical);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
