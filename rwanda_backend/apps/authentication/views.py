@@ -82,7 +82,9 @@ class LoginView(APIView):
             import fsfi_engine
 
             is_valid = fsfi_engine.py_verify_password(password, user.password_hash)
-        except Exception:
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error(f"Password verify error: {e}")
             is_valid = False
 
         if not is_valid:
