@@ -86,6 +86,7 @@ impl Scenario {
 ///
 /// Six components representing the fundamental pillars of food system resilience,
 /// derived from international food security frameworks (FAO, World Bank, etc.).
+/// NOTE: This is the legacy 6-component structure, kept for backwards compatibility.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ComponentType {
@@ -110,7 +111,83 @@ impl ComponentType {
     }
 }
 
-/// Normalize component type string to standard category
+/// Indicator-based component types for Rwanda FSFSI
+///
+/// Eight components based on the Rwanda budget mapping structure with 37 indicators.
+/// This is the primary structure for indicator-level FSFSI assessments.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum IndicatorComponent {
+    Markets,
+    CropProduction,
+    Nutrition,
+    Research,
+    PostHarvest,
+    Environment,
+    AnimalSystems,
+    Finance,
+}
+
+impl IndicatorComponent {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            IndicatorComponent::Markets => "markets",
+            IndicatorComponent::CropProduction => "crop_production",
+            IndicatorComponent::Nutrition => "nutrition",
+            IndicatorComponent::Research => "research",
+            IndicatorComponent::PostHarvest => "post_harvest",
+            IndicatorComponent::Environment => "environment",
+            IndicatorComponent::AnimalSystems => "animal_systems",
+            IndicatorComponent::Finance => "finance",
+        }
+    }
+
+    pub fn display_name(&self) -> &'static str {
+        match self {
+            IndicatorComponent::Markets => "Markets",
+            IndicatorComponent::CropProduction => "Crop Production",
+            IndicatorComponent::Nutrition => "Nutrition",
+            IndicatorComponent::Research => "Research",
+            IndicatorComponent::PostHarvest => "Post-Harvest",
+            IndicatorComponent::Environment => "Environment",
+            IndicatorComponent::AnimalSystems => "Animal Systems",
+            IndicatorComponent::Finance => "Finance",
+        }
+    }
+
+    /// Get all 8 indicator components in order
+    pub fn all() -> [IndicatorComponent; 8] {
+        [
+            IndicatorComponent::Markets,
+            IndicatorComponent::CropProduction,
+            IndicatorComponent::Nutrition,
+            IndicatorComponent::Research,
+            IndicatorComponent::PostHarvest,
+            IndicatorComponent::Environment,
+            IndicatorComponent::AnimalSystems,
+            IndicatorComponent::Finance,
+        ]
+    }
+}
+
+/// Normalize indicator component string to IndicatorComponent enum
+pub fn normalize_indicator_component(component: &str) -> IndicatorComponent {
+    let normalized = component.to_lowercase().trim().replace(' ', "_").replace('-', "_");
+
+    match normalized.as_str() {
+        "markets" | "market" => IndicatorComponent::Markets,
+        "crop_production" | "crop" | "crops" => IndicatorComponent::CropProduction,
+        "nutrition" => IndicatorComponent::Nutrition,
+        "research" | "research_innovation" => IndicatorComponent::Research,
+        "post_harvest" | "postharvest" => IndicatorComponent::PostHarvest,
+        "environment" | "environmental" => IndicatorComponent::Environment,
+        "animal_systems" | "animal" | "livestock" => IndicatorComponent::AnimalSystems,
+        "finance" | "financial" | "financing" => IndicatorComponent::Finance,
+        _ => IndicatorComponent::Markets, // default
+    }
+}
+
+/// Normalize component type string to standard category (legacy 6-component)
 ///
 /// Handles variant input formats and legacy naming conventions.
 /// Defaults to `AgriculturalDevelopment` if input doesn't match any known pattern.
@@ -355,11 +432,26 @@ fn normalize_component(component_type: &str) -> PyResult<String> {
     Ok(normalize_component_type(component_type).as_str().to_string())
 }
 
+#[pyfunction]
+fn py_normalize_indicator_component(component: &str) -> PyResult<String> {
+    Ok(normalize_indicator_component(component).as_str().to_string())
+}
+
+#[pyfunction]
+fn py_get_indicator_components() -> PyResult<Vec<String>> {
+    Ok(IndicatorComponent::all()
+        .iter()
+        .map(|c| c.as_str().to_string())
+        .collect())
+}
+
 /// Register config types and functions with the Python module
 pub fn register_module(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(get_default_config, m)?)?;
     m.add_function(wrap_pyfunction!(get_stress_level, m)?)?;
     m.add_function(wrap_pyfunction!(normalize_component, m)?)?;
+    m.add_function(wrap_pyfunction!(py_normalize_indicator_component, m)?)?;
+    m.add_function(wrap_pyfunction!(py_get_indicator_components, m)?)?;
     Ok(())
 }
 
@@ -442,5 +534,42 @@ mod tests {
             + config.hybrid_cascade_weight
             + config.hybrid_financial_weight;
         assert!((sum - 1.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_indicator_component_all() {
+        let all = IndicatorComponent::all();
+        assert_eq!(all.len(), 8);
+        assert_eq!(all[0], IndicatorComponent::Markets);
+        assert_eq!(all[7], IndicatorComponent::Finance);
+    }
+
+    #[test]
+    fn test_indicator_component_as_str() {
+        assert_eq!(IndicatorComponent::Markets.as_str(), "markets");
+        assert_eq!(IndicatorComponent::CropProduction.as_str(), "crop_production");
+        assert_eq!(IndicatorComponent::Nutrition.as_str(), "nutrition");
+        assert_eq!(IndicatorComponent::Research.as_str(), "research");
+        assert_eq!(IndicatorComponent::PostHarvest.as_str(), "post_harvest");
+        assert_eq!(IndicatorComponent::Environment.as_str(), "environment");
+        assert_eq!(IndicatorComponent::AnimalSystems.as_str(), "animal_systems");
+        assert_eq!(IndicatorComponent::Finance.as_str(), "finance");
+    }
+
+    #[test]
+    fn test_normalize_indicator_component() {
+        assert_eq!(normalize_indicator_component("markets"), IndicatorComponent::Markets);
+        assert_eq!(normalize_indicator_component("crop_production"), IndicatorComponent::CropProduction);
+        assert_eq!(normalize_indicator_component("Nutrition"), IndicatorComponent::Nutrition);
+        assert_eq!(normalize_indicator_component("post-harvest"), IndicatorComponent::PostHarvest);
+        assert_eq!(normalize_indicator_component("ANIMAL_SYSTEMS"), IndicatorComponent::AnimalSystems);
+        assert_eq!(normalize_indicator_component("finance"), IndicatorComponent::Finance);
+    }
+
+    #[test]
+    fn test_indicator_component_display_name() {
+        assert_eq!(IndicatorComponent::Markets.display_name(), "Markets");
+        assert_eq!(IndicatorComponent::CropProduction.display_name(), "Crop Production");
+        assert_eq!(IndicatorComponent::PostHarvest.display_name(), "Post-Harvest");
     }
 }

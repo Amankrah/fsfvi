@@ -111,3 +111,8 @@ harness = true
 name = "budget_optimization_integration_tests"
 path = "tests/budget_optimization_integration_tests.rs"
 harness = true
+
+[[test]]
+name = "strategic_planning_integration_tests"
+path = "tests/strategic_planning_integration_tests.rs"
+harness = true

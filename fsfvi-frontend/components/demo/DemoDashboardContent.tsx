@@ -7,8 +7,9 @@ import { SecuritySection } from './SecuritySection';
 import { PerformanceGapDashboard } from '@/components/performance-gap';
 import { AssessmentDashboard } from '@/components/assessment';
 import { BudgetOptimizationDashboard } from '@/components/budget-optimization';
+import { StrategicPlanningDashboard } from '@/components/strategic-planning';
 
-type NavigationItem = 'profile' | 'security' | 'performance-gap' | 'assessment' | 'budget-optimization';
+type NavigationItem = 'profile' | 'security' | 'performance-gap' | 'assessment' | 'budget-optimization' | 'strategic-planning';
 
 export function DemoDashboardContent() {
   const [activeNav, setActiveNav] = useState<NavigationItem>('assessment');
@@ -21,6 +22,8 @@ export function DemoDashboardContent() {
         return <PerformanceGapDashboard />;
       case 'budget-optimization':
         return <BudgetOptimizationDashboard />;
+      case 'strategic-planning':
+        return <StrategicPlanningDashboard />;
       case 'security':
         return <SecuritySection />;
       case 'profile':

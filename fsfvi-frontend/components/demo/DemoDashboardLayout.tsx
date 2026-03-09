@@ -13,9 +13,10 @@ import {
   BarChart3,
   FileCheck,
   DollarSign,
+  TrendingUp,
 } from 'lucide-react';
 
-type NavigationItem = 'profile' | 'security' | 'performance-gap' | 'assessment' | 'budget-optimization';
+type NavigationItem = 'profile' | 'security' | 'performance-gap' | 'assessment' | 'budget-optimization' | 'strategic-planning';
 
 interface DemoDashboardLayoutProps {
   children?: React.ReactNode;
@@ -60,6 +61,12 @@ export function DemoDashboardLayout({ children, activeNav, setActiveNav }: DemoD
       label: 'Budget Optimization',
       icon: DollarSign,
       description: 'Optimize resource allocation for food security',
+    },
+    {
+      id: 'strategic-planning' as NavigationItem,
+      label: 'Strategic Planning',
+      icon: TrendingUp,
+      description: 'Multi-year planning and MTEF generation',
     },
     {
       id: 'profile' as NavigationItem,

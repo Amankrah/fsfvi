@@ -120,6 +120,7 @@ impl StrategicPlanningService {
         let mut yearly_plans = Vec::new();
         let mut current_state = request.current_components.clone();
         let mut cumulative_fsfvi = baseline_fsfvi;
+        let baseline_total_budget: f64 = request.current_components.iter().map(|c| c.financial_allocation).sum();
 
         for year in 1..=request.planning_years {
             let year_target_fsfvi = baseline_fsfvi - (annual_reduction_target * year as f64);
@@ -129,11 +130,16 @@ impl StrategicPlanningService {
                 .yearly_budget_constraints
                 .get(&year)
                 .cloned()
-                .unwrap_or_else(|| YearlyBudgetConstraint {
-                    total_budget_ceiling: request.current_components.iter().map(|c| c.financial_allocation).sum::<f64>() * 1.05, // 5% growth assumption
-                    min_allocation_per_component: 0.0,
-                    max_change_percent_from_previous: Some(30.0),
-                    priority_components: vec![],
+                .unwrap_or_else(|| {
+                    // CRITICAL FIX: Apply compound growth year-over-year, not flat 5% from baseline
+                    // Year 1: baseline * 1.05^1, Year 2: baseline * 1.05^2, etc.
+                    let growth_factor = 1.05_f64.powi(year as i32);
+                    YearlyBudgetConstraint {
+                        total_budget_ceiling: baseline_total_budget * growth_factor,
+                        min_allocation_per_component: 0.0,
+                        max_change_percent_from_previous: Some(30.0),
+                        priority_components: vec![],
+                    }
                 });
 
             // Optimize allocation for this year
@@ -154,8 +160,10 @@ impl StrategicPlanningService {
 
         // Step 4: Calculate total investment needed
         let baseline_total_budget: f64 = request.current_components.iter().map(|c| c.financial_allocation).sum();
+        // CRITICAL FIX: Use total_budget field instead of summing recommended_allocations
+        // to avoid floating-point rounding errors
         let final_total_budget: f64 = yearly_plans.last()
-            .map(|p| p.recommended_allocations.values().sum())
+            .map(|p| p.total_budget)
             .unwrap_or(baseline_total_budget);
         let total_additional_investment = final_total_budget - baseline_total_budget;
 
@@ -212,21 +220,25 @@ impl StrategicPlanningService {
         let baseline_budget: f64 = current_components.iter().map(|c| c.financial_allocation).sum();
 
         let mut year_plans = Vec::new();
-        let mut current_state = current_components.clone();
+
+        // CRITICAL FIX: Keep baseline components immutable to prevent compounding
+        // Bug was: scaling current_state each iteration caused allocations to compound
+        let baseline_components = current_components.clone();
 
         for year in 1..=3 {
             let year_budget = baseline_budget * (1.0 + yearly_budget_growth_rate).powi(year as i32);
             let year_target = baseline_fsfvi - ((baseline_fsfvi - target_fsfvi) * (year as f64 / 3.0));
 
-            // Scale up budgets
+            // FIX: Create fresh scaled copy for THIS year only (not from previous year)
+            let mut year_components = baseline_components.clone();
             let budget_scale = year_budget / baseline_budget;
-            for comp in current_state.iter_mut() {
+            for comp in year_components.iter_mut() {
                 comp.financial_allocation *= budget_scale;
             }
 
-            // Optimize
+            // Optimize with year-specific scaled components
             let optimized = self.optimization_service.optimize_allocation(
-                current_state.clone(),
+                year_components.clone(),
                 OptimizationObjective::MinimizeFsfvi,
                 OptimizationConstraints {
                     min_allocation_per_component: 0.0,
@@ -235,11 +247,26 @@ impl StrategicPlanningService {
                 },
             )?;
 
-            // Update state for next year
-            for comp in current_state.iter_mut() {
-                if let Some(&new_alloc) = optimized.optimal_allocations.get(&comp.component_type) {
-                    comp.financial_allocation = new_alloc;
-                }
+            // CRITICAL FIX: Normalize allocations to EXACT budget (enforce conservation)
+            // The optimizer may not perfectly hit the budget ceiling due to constraints
+            let optimized_total: f64 = optimized.optimal_allocations.values().sum();
+            let normalization_factor = year_budget / optimized_total;
+
+            let mut normalized_allocations = HashMap::new();
+            for (comp_type, alloc) in optimized.optimal_allocations {
+                normalized_allocations.insert(comp_type, alloc * normalization_factor);
+            }
+
+            // Verify budget conservation (CRITICAL for government accountability)
+            let final_total: f64 = normalized_allocations.values().sum();
+            let conservation_error = ((final_total - year_budget) / year_budget).abs();
+
+            // Log warning if conservation violated (should never happen with normalization)
+            if conservation_error > 0.0001 {
+                tracing::warn!(
+                    "Budget conservation error in MTEF Year {}: Expected ${:.2}M, Got ${:.2}M, Error: {:.4}%",
+                    year, year_budget, final_total, conservation_error * 100.0
+                );
             }
 
             year_plans.push(MtefYearPlan {
@@ -247,8 +274,8 @@ impl StrategicPlanningService {
                 total_budget: year_budget,
                 target_fsfvi: year_target,
                 projected_fsfvi: optimized.optimized_fsfvi,
-                component_allocations: optimized.optimal_allocations,
-                key_interventions: self.identify_key_interventions(&current_state, year),
+                component_allocations: normalized_allocations,
+                key_interventions: self.identify_key_interventions(&year_components, year),
             });
         }
 

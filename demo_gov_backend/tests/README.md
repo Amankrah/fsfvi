@@ -1,8 +1,8 @@
-# Performance Gap Analysis Service - Integration Tests
+# Demo Government Backend - Integration Tests
 
 ## Overview
 
-This test suite provides **comprehensive integration testing** for the Performance Gap Analysis Service, which is a **critical government decision-making system where livelihoods depend on accurate calculations**.
+This directory contains **comprehensive integration test suites** for the Demo Government FSFVI platform, which is a **critical government decision-making system where livelihoods depend on accurate calculations**.
 
 ### What These Tests Do
 
@@ -132,9 +132,48 @@ cargo test --test performance_gap_integration_tests test_recommend_targets_5_yea
 RUST_LOG=debug cargo test --test performance_gap_integration_tests -- --nocapture
 ```
 
-## Test Categories
+## Test Suites
 
-### 1. API Connectivity Tests
+### 1. Assessment Integration Tests (`assessment_integration_tests.rs`)
+
+**Coverage:** FSFVI vulnerability assessment, quick checks, multiple weighting methods, scenario analysis
+
+**Key Tests:**
+- `test_run_assessment_with_real_data` - Full FSFVI assessment
+- `test_run_assessment_with_hybrid_weighting` - Hybrid weighting method
+- `test_assessment_climate_shock_scenario` - Crisis scenario testing
+- `test_quick_check_with_real_data` - Quick vulnerability check
+
+**20+ tests covering all assessment functionality**
+
+### 2. Budget Optimization Integration Tests (`budget_optimization_integration_tests.rs`)
+
+**Coverage:** Budget allocation efficiency, reallocation planning, ROI analysis, SCP optimization
+
+**Key Tests:**
+- `test_analyze_allocation_efficiency_with_real_data` - Efficiency analysis
+- `test_generate_reallocation_plan_with_real_data` - Budget reallocation
+- `test_optimize_allocation_minimize_fsfvi` - Sequential Convex Programming
+- `test_calculate_roi_with_multiple_scenarios` - ROI comparison
+
+**25+ tests covering all optimization functionality**
+
+### 3. Strategic Planning Integration Tests (`strategic_planning_integration_tests.rs`)
+
+**Coverage:** Multi-year planning, MTEF generation, historical trends, SDG achievement
+
+**Key Tests:**
+- `test_generate_multi_year_plan_with_real_data` - 5-year strategic plans
+- `test_generate_mtef_with_real_data` - Standard 3-year MTEF
+- `test_fetch_historical_trends_multi_year` - Historical trend analysis
+- `test_strategic_planning_for_sdg_achievement` - SDG 2 planning
+- `test_budget_realism_check` - Fiscal feasibility validation
+
+**18+ tests covering all strategic planning functionality**
+
+### 4. Performance Gap Analysis Tests (Legacy)
+
+### 4.1 API Connectivity Tests
 - `test_fsfvi_api_health_check` - Verify API is responding
 - `test_database_connectivity` - Verify database connection
 - `test_demo_data_integrity` - Verify demo data is correctly loaded

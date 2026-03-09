@@ -454,9 +454,24 @@ pub struct MtefRequest {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MtefPlan {
+    pub baseline_year: usize,
     pub baseline_fsfvi: f64,
+    pub target_fsfvi_year_3: f64,
+    pub baseline_budget: f64,
+    pub year_1_plan: MtefYearPlan,
+    pub year_2_plan: MtefYearPlan,
+    pub year_3_plan: MtefYearPlan,
+    pub fiscal_implications: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MtefYearPlan {
+    pub year: usize,
+    pub total_budget: f64,
     pub target_fsfvi: f64,
-    pub yearly_plans: Vec<YearlyPlan>,
+    pub projected_fsfvi: f64,
+    pub component_allocations: HashMap<String, f64>,
+    pub key_interventions: Vec<String>,
 }
 
 // ============================================================================
