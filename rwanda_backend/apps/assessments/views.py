@@ -93,17 +93,21 @@ class QuickCheckView(APIView):
         service = get_assessment_service()
 
         try:
-            # Convert indicators to component format for quick check
+            # Option A: when observed is missing, use neutral gap (observed = benchmark).
+            # Avoids mixing budget-share scale with real benchmark units.
             indicators = serializer.validated_data["indicators"]
-            components = [
-                {
+            components = []
+            for ind in indicators:
+                bench = ind.get("benchmark_value")
+                bench_val = float(bench) if bench is not None else 100.0
+                obs = ind.get("observed_value")
+                obs_val = float(obs) if obs is not None else bench_val
+                components.append({
                     "component_type": ind["indicator_component"],
-                    "observed_value": float(ind.get("observed_value") or ind["share_weighted_percent"] * 100),
-                    "benchmark_value": float(ind.get("benchmark_value") or 100.0),
+                    "observed_value": obs_val,
+                    "benchmark_value": bench_val,
                     "financial_allocation_usd": float(ind["weighted_lcu_bn"]) * 1_000_000,
-                }
-                for ind in indicators
-            ]
+                })
 
             result = service.quick_check(components)
             return Response(result, status=status.HTTP_200_OK)

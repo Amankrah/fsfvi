@@ -1,0 +1,3 @@
+# Rwanda backend Python dependencies (install in venv)
+# Excel import for budget mapping
+openpyxl>=3.1.0

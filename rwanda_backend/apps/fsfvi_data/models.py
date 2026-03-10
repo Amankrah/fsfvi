@@ -158,6 +158,12 @@ class IndicatorData(models.Model):
         blank=True,
         help_text="Target/benchmark value"
     )
+    benchmark_used_type = models.CharField(
+        max_length=100,
+        blank=True,
+        default="",
+        help_text="Benchmark reference when value is missing, e.g. Global_10/90pct, SSA_10/90pct"
+    )
 
     # Financial allocation in USD (converted from LCU)
     financial_allocation_usd = models.DecimalField(
@@ -289,6 +295,53 @@ class ComponentAggregation(models.Model):
 
     def __str__(self):
         return f"{self.get_component_display()} - FY{self.fiscal_year}"
+
+
+class BudgetLineMapping(models.Model):
+    """
+    Raw budget line to food system indicator mapping (from Excel Mapping sheet).
+
+    One row per budget line. Used for traceability and audit.
+    Optimized for bulk insert: minimal constraints, indexed by fiscal_year + indicator.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    fiscal_year = models.IntegerField(db_index=True, help_text="e.g., 2018 from 2018/2019")
+    code = models.CharField(max_length=50, blank=True, default="")
+    mda = models.CharField(max_length=255, blank=True, default="")
+    sub_program_name = models.CharField(max_length=255, blank=True, default="")
+    project_name = models.CharField(max_length=500, blank=True, default="")
+    budget_line = models.CharField(max_length=500, blank=True, default="")
+    type = models.CharField(max_length=50, blank=True, default="")
+    source = models.CharField(max_length=100, blank=True, default="")
+    specific_supportive = models.CharField(max_length=100, blank=True, default="")
+    group = models.CharField(max_length=100, blank=True, default="")
+    food_system_component = models.CharField(max_length=100, blank=True, default="")
+    amount_gross_lcu = models.DecimalField(
+        max_digits=18, decimal_places=2, null=True, blank=True
+    )
+    amount_weighted_lcu = models.DecimalField(
+        max_digits=18, decimal_places=2, null=True, blank=True
+    )
+    primary_indicator = models.CharField(max_length=100, blank=True, default="")
+    direct_effect_pathway = models.TextField(blank=True, default="")
+    key_references = models.TextField(blank=True, default="")
+    match_type = models.CharField(max_length=50, blank=True, default="")
+    notes = models.TextField(blank=True, default="")
+    indicator_component = models.CharField(max_length=50, db_index=True, blank=True, default="")
+    indicator = models.CharField(max_length=255, blank=True, default="")
+    specification = models.TextField(blank=True, default="")
+    benchmark = models.CharField(max_length=100, blank=True, default="")
+    gap = models.CharField(max_length=100, blank=True, default="")
+    responsiveness = models.CharField(max_length=100, blank=True, default="")
+
+    class Meta:
+        db_table = "budget_line_mappings"
+        ordering = ["fiscal_year", "indicator_component", "primary_indicator"]
+        indexes = [
+            models.Index(fields=["fiscal_year", "indicator_component"]),
+        ]
+        verbose_name = "Budget Line Mapping"
+        verbose_name_plural = "Budget Line Mappings"
 
 
 class ExchangeRate(models.Model):

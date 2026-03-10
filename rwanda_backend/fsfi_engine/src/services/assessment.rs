@@ -507,9 +507,20 @@ pub fn assess_indicators(
     let mut gaps = Vec::with_capacity(n);
 
     for (i, ind) in indicators.iter().enumerate() {
-        // Use observed/benchmark if provided, otherwise estimate from budget share
-        let observed = ind.observed_value.unwrap_or(ind.share_weighted_percent * 100.0);
+        // Option A: when observed is missing, use neutral gap (don't substitute budget share).
+        // - If benchmark is set: use observed = benchmark so gap = 0 (no distortion from missing data).
+        // - If both missing: keep synthetic pair (share*100, 10000/n) for backward compatibility.
         let benchmark = ind.benchmark_value.unwrap_or(100.0 / n as f64 * 100.0);
+        let observed = match ind.observed_value {
+            Some(o) => o,
+            None => {
+                if ind.benchmark_value.is_some() {
+                    benchmark
+                } else {
+                    ind.share_weighted_percent * 100.0
+                }
+            }
+        };
 
         let sensitivity = get_indicator_component_sensitivity(&ind.indicator_component);
         let allocation = ind.weighted_lcu_bn;
