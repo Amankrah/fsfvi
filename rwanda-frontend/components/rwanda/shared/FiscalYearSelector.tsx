@@ -1,24 +1,24 @@
 'use client';
 
 import { useFiscalYear } from '@/contexts/FiscalYearContext';
+import { getFiscalYear } from '@/lib/constants/rwanda';
+
+/** Earliest fiscal year offered (aligns with assessment data range). */
+const EARLIEST_FY_START = 2015;
 
 export function FiscalYearSelector() {
   const { fiscalYear, setFiscalYear } = useFiscalYear();
   const currentYear = new Date().getFullYear();
+  const lastYear = Math.max(currentYear, currentYear + 1);
 
-  const years = Array.from({ length: 5 }, (_, i) => {
-    const startYear = currentYear - 2 + i;
-    return {
-      label: `FY ${startYear}/${startYear + 1}`,
-      start_year: startYear,
-      end_year: startYear + 1,
-      start_date: `${startYear}-07-01`,
-      end_date: `${startYear + 1}-06-30`,
-    };
-  });
+  const years = Array.from(
+    { length: lastYear - EARLIEST_FY_START + 1 },
+    (_, i) => getFiscalYear(EARLIEST_FY_START + i)
+  ).reverse();
 
   return (
     <select
+      aria-label="Select fiscal year"
       value={fiscalYear.label}
       onChange={(e) => {
         const selected = years.find((y) => y.label === e.target.value);

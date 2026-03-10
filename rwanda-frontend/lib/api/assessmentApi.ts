@@ -190,6 +190,18 @@ export const assessmentAPI = {
   },
 
   /**
+   * Get fiscal years that have at least one saved assessment (latest first).
+   *
+   * GET /api/assessments/available-years/
+   */
+  getAvailableFiscalYears: async (): Promise<number[]> => {
+    const response = await assessmentClient.get<{ fiscal_years: number[] }>(
+      '/available-years/'
+    );
+    return response.data.fiscal_years;
+  },
+
+  /**
    * Get assessment history for trends
    *
    * GET /api/assessments/history/

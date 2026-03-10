@@ -288,6 +288,7 @@ export interface SavedIndicatorResult {
 // ============================================================================
 
 export interface DashboardSummary {
+  assessment_id?: string | null;
   overall_fsfsi: number;
   stress_level: string;
   fiscal_year: number;
@@ -296,6 +297,9 @@ export interface DashboardSummary {
   top_priorities: ActionPriority[];
   efficiency_index: number;
   yoy_change_percent?: number | null;
+  computed_at?: string | null;
+  /** True when no assessment has been run yet for this fiscal year. */
+  empty?: boolean;
 }
 
 export interface ComponentSummary {

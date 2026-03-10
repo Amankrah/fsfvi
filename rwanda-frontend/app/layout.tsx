@@ -7,6 +7,7 @@ import { AlertProvider } from '@/contexts/AlertContext';
 export const metadata: Metadata = {
   title: 'Republic of Rwanda — FSFI Dashboard',
   description: 'Food Systems Financial Intelligence — Ministry of Agriculture and Animal Resources',
+  icons: { icon: '/icon.svg' },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

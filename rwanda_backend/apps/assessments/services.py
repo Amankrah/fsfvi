@@ -295,11 +295,32 @@ class AssessmentService:
             qs = qs.filter(fiscal_year__lte=end_year)
         return list(qs.order_by("fiscal_year").values())
 
-    def get_dashboard_summary(self, fiscal_year: int = None) -> dict | None:
-        """Get summary data for dashboard display."""
+    def get_available_fiscal_years(self) -> list[int]:
+        """Return distinct fiscal years that have at least one assessment, latest first."""
+        return list(
+            AssessmentResult.objects.values_list("fiscal_year", flat=True)
+            .distinct()
+            .order_by("-fiscal_year")
+        )
+
+    def get_dashboard_summary(self, fiscal_year: int = None) -> dict:
+        """Get summary data for dashboard display. Returns empty summary when no assessment exists."""
         assessment = self.get_latest_assessment(fiscal_year)
         if not assessment:
-            return None
+            year = fiscal_year or 2024
+            return {
+                "assessment_id": None,
+                "overall_fsfsi": 0.0,
+                "stress_level": "low",
+                "fiscal_year": year,
+                "total_budget_lcu_bn": 0.0,
+                "components": [],
+                "top_priorities": [],
+                "efficiency_index": 0.0,
+                "yoy_change_percent": None,
+                "computed_at": None,
+                "empty": True,
+            }
 
         components = [
             {
@@ -330,6 +351,7 @@ class AssessmentService:
             "efficiency_index": float(assessment.efficiency_index or 0),
             "yoy_change_percent": float(history.yoy_change_percent) if history and history.yoy_change_percent else None,
             "computed_at": assessment.computed_at.isoformat(),
+            "empty": False,
         }
 
     def load_indicators_from_db(self, fiscal_year: int) -> list[dict]:

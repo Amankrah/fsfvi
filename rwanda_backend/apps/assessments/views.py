@@ -178,14 +178,21 @@ class DashboardSummaryView(APIView):
         summary = service.get_dashboard_summary(
             fiscal_year=int(fiscal_year) if fiscal_year else None
         )
-
-        if not summary:
-            return Response(
-                {"error": "No assessment data available"},
-                status=status.HTTP_404_NOT_FOUND,
-            )
-
         return Response(summary)
+
+
+class AvailableFiscalYearsView(APIView):
+    """
+    List fiscal years that have at least one saved assessment (latest first).
+
+    GET /api/assessments/available-years/
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        service = get_assessment_service()
+        years = service.get_available_fiscal_years()
+        return Response({"fiscal_years": years})
 
 
 class AssessmentHistoryView(APIView):

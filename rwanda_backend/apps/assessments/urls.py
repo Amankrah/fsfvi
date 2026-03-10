@@ -9,6 +9,7 @@ from .views import (
     AssessmentDetailView,
     AssessmentHistoryView,
     AssessmentListView,
+    AvailableFiscalYearsView,
     DashboardSummaryView,
     QuickCheckView,
     RunAssessmentView,
@@ -45,6 +46,8 @@ urlpatterns = [
     path("<uuid:assessment_id>/", AssessmentDetailView.as_view(), name="assessment-detail"),
     # GET /api/assessments/dashboard/ - Dashboard summary
     path("dashboard/", DashboardSummaryView.as_view(), name="dashboard-summary"),
+    # GET /api/assessments/available-years/ - Fiscal years that have assessments
+    path("available-years/", AvailableFiscalYearsView.as_view(), name="available-fiscal-years"),
     # GET /api/assessments/history/ - Assessment history
     path("history/", AssessmentHistoryView.as_view(), name="assessment-history"),
 

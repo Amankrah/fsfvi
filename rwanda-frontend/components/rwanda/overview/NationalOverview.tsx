@@ -1,10 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useFiscalYear } from '@/contexts/FiscalYearContext';
 import { FiscalYearSelector } from '@/components/rwanda/shared/FiscalYearSelector';
-import { getCurrentSeason } from '@/lib/constants/rwanda';
+import { getCurrentSeason, getFiscalYear } from '@/lib/constants/rwanda';
 import { getRiskBgColor, formatRWFCompact, formatScore } from '@/lib/utils/formatters';
 import { assessmentAPI } from '@/lib/api/assessmentApi';
 import type { DashboardSummary, ComponentSummary } from '@/lib/types/assessment';
@@ -23,12 +23,13 @@ type StressLevel = 'low' | 'medium' | 'high' | 'critical';
 
 export function NationalOverview() {
   const { t } = useLanguage();
-  const { fiscalYear } = useFiscalYear();
+  const { fiscalYear, setFiscalYear } = useFiscalYear();
   const season = getCurrentSeason();
 
   const [dashboardData, setDashboardData] = useState<DashboardSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const hasAutoSwitchedRef = useRef(false);
 
   useEffect(() => {
     const fetchDashboard = async () => {
@@ -37,6 +38,19 @@ export function NationalOverview() {
       try {
         const data = await assessmentAPI.getDashboardSummary(fiscalYear.start_year);
         setDashboardData(data);
+
+        // If no data for this FY, switch to latest year that has an assessment (once per mount)
+        if (data?.empty === true && !hasAutoSwitchedRef.current) {
+          hasAutoSwitchedRef.current = true;
+          try {
+            const available = await assessmentAPI.getAvailableFiscalYears();
+            if (available.length > 0 && !available.includes(fiscalYear.start_year)) {
+              setFiscalYear(getFiscalYear(available[0]));
+            }
+          } catch {
+            // ignore; keep current FY and show empty state
+          }
+        }
       } catch (err) {
         console.error('Failed to fetch dashboard:', err);
         setError('Unable to load dashboard data. Please try again.');
@@ -46,7 +60,7 @@ export function NationalOverview() {
     };
 
     fetchDashboard();
-  }, [fiscalYear.start_year]);
+  }, [fiscalYear.start_year, setFiscalYear]);
 
   if (loading) {
     return (
@@ -57,7 +71,9 @@ export function NationalOverview() {
     );
   }
 
-  if (error || !dashboardData) {
+  const isEmpty = dashboardData?.empty === true || (dashboardData?.components?.length === 0 && !dashboardData?.assessment_id);
+
+  if (error || !dashboardData || isEmpty) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[400px] text-center">
         <AlertTriangle className="h-12 w-12 text-yellow-500 mb-4" />

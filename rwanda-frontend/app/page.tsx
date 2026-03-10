@@ -8,7 +8,6 @@ import {
   ArrowRight,
   BarChart3,
   Shield,
-  Map,
   TrendingUp,
   DollarSign,
   Target,
@@ -23,12 +22,7 @@ const FEATURES = [
   {
     icon: BarChart3,
     title: 'FSFI Assessment',
-    description: 'Comprehensive food system financial intelligence scoring across all 30 districts.',
-  },
-  {
-    icon: Map,
-    title: 'Geographic Drill-Down',
-    description: 'Province and district-level analysis with interactive mapping of vulnerability.',
+    description: 'National food system financial intelligence scoring at indicator level (37 indicators, 8 components).',
   },
   {
     icon: DollarSign,
@@ -38,7 +32,7 @@ const FEATURES = [
   {
     icon: TrendingUp,
     title: 'Performance Gap Analysis',
-    description: 'Identify gaps, track progress, and benchmark against peer districts.',
+    description: 'Identify gaps, track progress, and benchmark against global and national targets.',
   },
   {
     icon: Target,
@@ -82,126 +76,96 @@ export default function LandingPage() {
         </div>
       </nav>
 
-      {/* Hero Section */}
-      <section className="relative overflow-hidden bg-[var(--rw-dark)] min-h-[90vh] flex items-center">
-        {/* Animated background grid */}
-        <div className="absolute inset-0 opacity-[0.03]" style={{
-          backgroundImage: 'radial-gradient(circle at 1px 1px, white 1px, transparent 0)',
-          backgroundSize: '40px 40px',
-        }} />
-        {/* Gradient orbs */}
-        <div className="absolute top-[-20%] right-[-10%] w-[600px] h-[600px] rounded-full bg-[var(--rw-blue)]/10 blur-[120px]" />
-        <div className="absolute bottom-[-20%] left-[-10%] w-[500px] h-[500px] rounded-full bg-[var(--rw-green)]/10 blur-[120px]" />
-        <div className="absolute top-[40%] left-[30%] w-[300px] h-[300px] rounded-full bg-[var(--rw-yellow)]/5 blur-[100px]" />
+      {/* Hero Section — FSFI rebrand */}
+      <section className="relative overflow-hidden bg-[var(--rw-dark)] min-h-[85vh] flex items-center">
+        {/* Subtle grid */}
+        <div
+          className="absolute inset-0 opacity-[0.04]"
+          style={{
+            backgroundImage: 'linear-gradient(rgba(255,255,255,.08) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.08) 1px, transparent 1px)',
+            backgroundSize: '48px 48px',
+          }}
+        />
+        <div className="absolute top-0 right-0 w-[50%] h-full bg-gradient-to-l from-[var(--rw-blue)]/5 to-transparent" />
+        <div className="absolute bottom-0 left-0 w-[40%] h-[60%] bg-gradient-to-tr from-[var(--rw-green)]/5 to-transparent" />
 
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 w-full">
-          <div className="grid lg:grid-cols-2 gap-16 items-center">
-            {/* Left: Text content */}
-            <div>
-              <div className="inline-flex items-center space-x-2 bg-white/5 backdrop-blur-sm border border-white/10 text-[var(--rw-blue)] px-4 py-2 rounded-full text-sm font-medium mb-8">
-                <div className="w-2 h-2 rounded-full bg-[var(--rw-blue)] animate-pulse" />
-                <span className="text-gray-300">{t('app.ministry')}</span>
-              </div>
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 lg:py-24 w-full">
+          <div className="grid lg:grid-cols-2 gap-12 lg:gap-20 items-center">
+            {/* Left: Copy */}
+            <div className="relative pl-0 lg:pl-4">
+              <div className="absolute left-0 top-0 bottom-0 w-1 rounded-full bg-gradient-to-b from-[var(--rw-blue)] via-[var(--rw-yellow)] to-[var(--rw-green)] hidden lg:block" />
 
-              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-white leading-[1.1] tracking-tight">
-                Food Systems
-                <br />
-                <span className="bg-gradient-to-r from-[var(--rw-blue)] via-[var(--rw-yellow)] to-[var(--rw-green)] bg-clip-text text-transparent">
-                  Financial Intelligence
-                </span>
-              </h1>
-
-              <p className="mt-6 text-lg text-gray-400 leading-relaxed max-w-xl">
-                Transforming how Rwanda invests in food security. Real-time analytics
-                across every province, district, and season — powering PSTA 5 goals
-                with evidence-based decisions.
+              <p className="text-[var(--rw-blue)] font-semibold text-sm uppercase tracking-widest mb-6">
+                {t('app.ministry')} · Rwanda
               </p>
 
-              <div className="mt-10 flex flex-col sm:flex-row gap-4">
+              <h1 className="text-4xl sm:text-5xl lg:text-[3.25rem] xl:text-6xl font-bold text-white leading-[1.08] tracking-tight">
+                <span className="block whitespace-nowrap">Where budget meets</span>
+                <span className="block text-[var(--rw-yellow)] whitespace-nowrap">food system impact</span>
+              </h1>
+
+              <p className="mt-5 text-lg text-gray-400 max-w-md">
+                Scores, gaps, and recommendations from national budget and indicator data.
+              </p>
+
+              <div className="mt-6 flex flex-wrap gap-x-5 gap-y-1 text-sm text-gray-500">
+                <span className="flex items-center gap-1.5">
+                  <Layers className="h-4 w-4 text-[var(--rw-blue)]" />
+                  37 indicators · 8 components
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <Target className="h-4 w-4 text-[var(--rw-green)]" />
+                  PSTA 5
+                </span>
+              </div>
+
+              <div className="mt-8 flex flex-col sm:flex-row gap-4">
                 <Link
                   href="/login"
-                  className="inline-flex items-center justify-center px-7 py-3.5 text-base font-semibold text-[var(--rw-dark)] bg-white rounded-xl hover:bg-gray-100 transition-all shadow-2xl shadow-white/10 group"
+                  className="inline-flex items-center justify-center px-6 py-3.5 text-base font-semibold text-[var(--rw-dark)] bg-white rounded-xl hover:bg-gray-100 transition-all shadow-lg group"
                 >
-                  Access Dashboard
-                  <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
+                  Sign in to dashboard
+                  <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-0.5 transition-transform" />
                 </Link>
                 <a
                   href="#features"
-                  className="inline-flex items-center justify-center px-7 py-3.5 text-base font-semibold text-gray-300 border border-white/15 rounded-xl hover:bg-white/5 hover:text-white transition-all backdrop-blur-sm"
+                  className="inline-flex items-center justify-center px-6 py-3.5 text-base font-semibold text-white/90 border border-white/20 rounded-xl hover:bg-white/10 transition-all"
                 >
-                  Explore Platform
+                  See what it does
                 </a>
               </div>
             </div>
 
-            {/* Right: Visual dashboard preview */}
+            {/* Right: Product card */}
             <div className="hidden lg:block">
               <div className="relative">
-                {/* Outer glow */}
-                <div className="absolute -inset-4 bg-gradient-to-br from-[var(--rw-blue)]/20 via-transparent to-[var(--rw-green)]/20 rounded-3xl blur-2xl" />
-
-                {/* Main card */}
-                <div className="relative bg-white/[0.03] backdrop-blur-md border border-white/10 rounded-2xl p-6 space-y-5">
-                  {/* Mock top bar */}
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <div className="w-3 h-3 rounded-full bg-[var(--risk-low)]" />
-                      <span className="text-xs text-gray-500 font-medium">National FSFI Score</span>
-                    </div>
-                    <span className="text-xs text-gray-600 bg-white/5 px-2 py-1 rounded">FY 2025/2026</span>
+                <div className="absolute -inset-3 bg-gradient-to-br from-[var(--rw-blue)]/15 to-[var(--rw-green)]/15 rounded-3xl blur-2xl" />
+                <div className="relative bg-[var(--rw-dark)]/80 backdrop-blur-sm border border-white/10 rounded-2xl p-6 shadow-2xl">
+                  <div className="flex items-center justify-between mb-6">
+                    <span className="text-sm font-semibold text-gray-300">FSFI at a glance</span>
+                    <span className="text-xs text-gray-500 bg-white/5 px-2.5 py-1 rounded-md">National</span>
                   </div>
-
-                  {/* Score display */}
-                  <div className="flex items-end space-x-4">
-                    <span className="text-6xl font-bold text-white tracking-tight">0.42</span>
-                    <div className="pb-2">
-                      <span className="inline-flex items-center text-emerald-400 text-sm font-semibold">
-                        <TrendingUp className="h-4 w-4 mr-1" />
-                        -3.2%
-                      </span>
-                      <p className="text-xs text-gray-500 mt-0.5">vs last year</p>
-                    </div>
+                  <div className="flex items-baseline gap-3 mb-4">
+                    <span className="text-5xl font-bold text-white tabular-nums">FSFI</span>
+                    <span className="text-2xl font-semibold text-[var(--rw-yellow)]">score</span>
                   </div>
-
-                  {/* Province mini bars */}
-                  <div className="space-y-3 pt-2">
+                  <p className="text-sm text-gray-500 mb-5">
+                    Scores · Gaps · Optimization
+                  </p>
+                  <div className="flex flex-wrap gap-2">
                     {[
-                      { name: 'Kigali City', score: 0.28, color: 'var(--risk-low)' },
-                      { name: 'Eastern', score: 0.51, color: 'var(--risk-high)' },
-                      { name: 'Northern', score: 0.38, color: 'var(--risk-moderate)' },
-                      { name: 'Southern', score: 0.55, color: 'var(--risk-high)' },
-                      { name: 'Western', score: 0.47, color: 'var(--risk-moderate)' },
-                    ].map((prov) => (
-                      <div key={prov.name} className="group">
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-xs text-gray-400 group-hover:text-gray-300 transition-colors">{prov.name}</span>
-                          <span className="text-xs font-mono font-semibold text-gray-300">{prov.score.toFixed(2)}</span>
-                        </div>
-                        <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
-                          <div
-                            className="h-full rounded-full transition-all duration-1000 ease-out"
-                            style={{ width: `${prov.score * 100}%`, backgroundColor: prov.color }}
-                          />
-                        </div>
+                      { icon: BarChart3, label: 'Assessment' },
+                      { icon: TrendingUp, label: 'Gap analysis' },
+                      { icon: DollarSign, label: 'Optimization' },
+                    ].map(({ icon: Icon, label }) => (
+                      <div
+                        key={label}
+                        className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-lg px-3 py-2"
+                      >
+                        <Icon className="h-4 w-4 text-[var(--rw-blue)]" />
+                        <span className="text-xs font-medium text-gray-400">{label}</span>
                       </div>
                     ))}
-                  </div>
-
-                  {/* Bottom pills */}
-                  <div className="flex items-center gap-2 pt-2">
-                    {[
-                      { icon: Wheat, label: 'Season B Active', color: 'text-[var(--rw-yellow)]' },
-                      { icon: Activity, label: '2 Critical Alerts', color: 'text-red-400' },
-                      { icon: Layers, label: '8 Components', color: 'text-[var(--rw-blue)]' },
-                    ].map((pill) => {
-                      const Icon = pill.icon;
-                      return (
-                        <div key={pill.label} className="flex items-center space-x-1.5 bg-white/5 border border-white/5 rounded-full px-3 py-1.5">
-                          <Icon className={`h-3 w-3 ${pill.color}`} />
-                          <span className="text-[10px] text-gray-400 font-medium whitespace-nowrap">{pill.label}</span>
-                        </div>
-                      );
-                    })}
                   </div>
                 </div>
               </div>
@@ -217,8 +181,8 @@ export default function LandingPage() {
             Intelligence for Better Decisions
           </h2>
           <p className="mt-4 text-lg text-gray-600 max-w-2xl mx-auto">
-            A comprehensive platform designed for MINAGRI, MINECOFIN, RAB, and district officials
-            to make data-driven food system investment decisions.
+            A comprehensive platform designed for MINAGRI, MINECOFIN, RAB, and sector officials
+            to make data-driven food system investment decisions at national and indicator level.
           </p>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
