@@ -10,6 +10,7 @@ import json
 
 from django.conf import settings
 from django.utils import timezone
+
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
@@ -45,6 +46,7 @@ class LoginView(APIView):
     """
 
     permission_classes = [AllowAny]
+    authentication_classes = []
 
     def post(self, request):
         serializer = LoginSerializer(data=request.data)
@@ -160,6 +162,7 @@ class MfaVerifyView(APIView):
     """
 
     permission_classes = [AllowAny]
+    authentication_classes = []
 
     def post(self, request):
         serializer = MfaVerifySerializer(data=request.data)
@@ -388,6 +391,7 @@ class RefreshTokenView(APIView):
     """POST /api/auth/refresh — Get new access token using refresh token."""
 
     permission_classes = [AllowAny]
+    authentication_classes = []
 
     def post(self, request):
         serializer = RefreshTokenSerializer(data=request.data)

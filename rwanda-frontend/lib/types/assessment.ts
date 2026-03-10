@@ -81,7 +81,7 @@ export const SCENARIO_DISPLAY_NAMES: Record<Scenario, string> = {
 
 export const STRESS_LEVELS = {
   LOW: 'low',
-  MODERATE: 'moderate',
+  MEDIUM: 'medium',
   HIGH: 'high',
   CRITICAL: 'critical',
 } as const;
@@ -97,7 +97,7 @@ export const STRESS_LEVEL_COLORS: Record<
     text: 'text-green-800',
     border: 'border-green-200',
   },
-  moderate: {
+  medium: {
     bg: 'bg-yellow-50',
     text: 'text-yellow-800',
     border: 'border-yellow-200',

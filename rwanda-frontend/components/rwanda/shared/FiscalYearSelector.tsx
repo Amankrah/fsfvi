@@ -1,20 +1,64 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { useFiscalYear } from '@/contexts/FiscalYearContext';
 import { getFiscalYear } from '@/lib/constants/rwanda';
-
-/** Earliest fiscal year offered (aligns with assessment data range). */
-const EARLIEST_FY_START = 2015;
+import { assessmentAPI } from '@/lib/api/assessmentApi';
 
 export function FiscalYearSelector() {
   const { fiscalYear, setFiscalYear } = useFiscalYear();
-  const currentYear = new Date().getFullYear();
-  const lastYear = Math.max(currentYear, currentYear + 1);
+  const [availableYears, setAvailableYears] = useState<number[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const years = Array.from(
-    { length: lastYear - EARLIEST_FY_START + 1 },
-    (_, i) => getFiscalYear(EARLIEST_FY_START + i)
-  ).reverse();
+  useEffect(() => {
+    let cancelled = false;
+    assessmentAPI
+      .getAvailableFiscalYears()
+      .then((years) => {
+        if (!cancelled) {
+          setAvailableYears(years);
+          // If current selection isn't in the available list, switch to the latest
+          if (years.length > 0 && !years.includes(fiscalYear.start_year)) {
+            setFiscalYear(getFiscalYear(years[0]));
+          }
+        }
+      })
+      .catch((err) => {
+        console.error('[FiscalYearSelector] Failed to fetch available years:', err);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => { cancelled = true; };
+    // Only fetch on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  if (loading) {
+    return (
+      <select
+        aria-label="Select fiscal year"
+        disabled
+        className="h-9 rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-400 focus:outline-none"
+      >
+        <option>{fiscalYear.label}</option>
+      </select>
+    );
+  }
+
+  if (availableYears.length === 0) {
+    return (
+      <select
+        aria-label="Select fiscal year"
+        disabled
+        className="h-9 rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-400 focus:outline-none"
+      >
+        <option>No data available</option>
+      </select>
+    );
+  }
+
+  const years = availableYears.map((y) => getFiscalYear(y));
 
   return (
     <select

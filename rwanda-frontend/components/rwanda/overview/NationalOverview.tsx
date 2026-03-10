@@ -1,11 +1,11 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useFiscalYear } from '@/contexts/FiscalYearContext';
 import { FiscalYearSelector } from '@/components/rwanda/shared/FiscalYearSelector';
-import { getCurrentSeason, getFiscalYear } from '@/lib/constants/rwanda';
-import { getRiskBgColor, formatRWFCompact, formatScore } from '@/lib/utils/formatters';
+import { getCurrentSeason } from '@/lib/constants/rwanda';
+import { getRiskBgColor, getRiskBarColor, formatRWFCompact, formatScore } from '@/lib/utils/formatters';
 import { assessmentAPI } from '@/lib/api/assessmentApi';
 import type { DashboardSummary, ComponentSummary } from '@/lib/types/assessment';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -18,18 +18,16 @@ import {
   BarChart3,
   Loader2,
 } from 'lucide-react';
-
-type StressLevel = 'low' | 'medium' | 'high' | 'critical';
+import type { StressLevel } from '@/lib/utils/formatters';
 
 export function NationalOverview() {
   const { t } = useLanguage();
-  const { fiscalYear, setFiscalYear } = useFiscalYear();
+  const { fiscalYear } = useFiscalYear();
   const season = getCurrentSeason();
 
   const [dashboardData, setDashboardData] = useState<DashboardSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const hasAutoSwitchedRef = useRef(false);
 
   useEffect(() => {
     const fetchDashboard = async () => {
@@ -38,19 +36,6 @@ export function NationalOverview() {
       try {
         const data = await assessmentAPI.getDashboardSummary(fiscalYear.start_year);
         setDashboardData(data);
-
-        // If no data for this FY, switch to latest year that has an assessment (once per mount)
-        if (data?.empty === true && !hasAutoSwitchedRef.current) {
-          hasAutoSwitchedRef.current = true;
-          try {
-            const available = await assessmentAPI.getAvailableFiscalYears();
-            if (available.length > 0 && !available.includes(fiscalYear.start_year)) {
-              setFiscalYear(getFiscalYear(available[0]));
-            }
-          } catch {
-            // ignore; keep current FY and show empty state
-          }
-        }
       } catch (err) {
         console.error('Failed to fetch dashboard:', err);
         setError('Unable to load dashboard data. Please try again.');
@@ -60,7 +45,7 @@ export function NationalOverview() {
     };
 
     fetchDashboard();
-  }, [fiscalYear.start_year, setFiscalYear]);
+  }, [fiscalYear.start_year]);
 
   if (loading) {
     return (
@@ -75,12 +60,23 @@ export function NationalOverview() {
 
   if (error || !dashboardData || isEmpty) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[400px] text-center">
-        <AlertTriangle className="h-12 w-12 text-yellow-500 mb-4" />
-        <h2 className="text-lg font-semibold text-gray-900 mb-2">No Assessment Data</h2>
-        <p className="text-gray-600 max-w-md">
-          {error || 'No assessment data available for this fiscal year. Run an assessment to see dashboard data.'}
-        </p>
+      <div className="space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">{t('overview.national_fsfi')}</h1>
+            <p className="text-sm text-gray-600 mt-1">
+              {fiscalYear.label} — {season.label}
+            </p>
+          </div>
+          <FiscalYearSelector />
+        </div>
+        <div className="flex flex-col items-center justify-center min-h-[400px] text-center">
+          <AlertTriangle className="h-12 w-12 text-yellow-500 mb-4" />
+          <h2 className="text-lg font-semibold text-gray-900 mb-2">No Assessment Data</h2>
+          <p className="text-gray-600 max-w-md">
+            {error || 'No assessment data available for this fiscal year. Select a different fiscal year or run an assessment to see dashboard data.'}
+          </p>
+        </div>
       </div>
     );
   }
@@ -89,7 +85,7 @@ export function NationalOverview() {
   const yoyChange = dashboardData.yoy_change_percent ?? 0;
   const improving = yoyChange < 0;
   const criticalComponents = dashboardData.components.filter(
-    (c) => c.priority_level === 'critical' || c.stress >= 0.75
+    (c) => c.priority_level === 'critical'
   ).length;
 
   return (
@@ -210,11 +206,7 @@ export function NationalOverview() {
 }
 
 function ComponentCard({ component }: { component: ComponentSummary }) {
-  const stressLevel = (
-    component.stress >= 0.75 ? 'critical' :
-    component.stress >= 0.50 ? 'high' :
-    component.stress >= 0.25 ? 'medium' : 'low'
-  ) as StressLevel;
+  const stressLevel = (component.priority_level || 'medium') as StressLevel;
 
   return (
     <div className="bg-gray-50 rounded-lg p-4 border border-gray-200 hover:shadow-md hover:border-[var(--rw-blue)]/30 transition-all">
@@ -235,10 +227,7 @@ function ComponentCard({ component }: { component: ComponentSummary }) {
           className="h-full rounded-full transition-all"
           style={{
             width: `${Math.min(component.stress * 100, 100)}%`,
-            backgroundColor:
-              component.stress <= 0.25 ? 'var(--risk-low)' :
-              component.stress <= 0.50 ? 'var(--risk-moderate)' :
-              component.stress <= 0.75 ? 'var(--risk-high)' : 'var(--risk-critical)',
+            backgroundColor: getRiskBarColor(stressLevel),
           }}
         />
       </div>

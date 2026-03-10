@@ -35,12 +35,15 @@ export function getRiskLabel(stressLevel: StressLevel): string {
   return labels[stressLevel] || 'Unknown';
 }
 
-/** For legacy compatibility - converts score to level (prefer using backend stress_level) */
-export function getRiskLevel(score: number): StressLevel {
-  if (score >= 0.75) return 'critical';
-  if (score >= 0.50) return 'high';
-  if (score >= 0.25) return 'medium';
-  return 'low';
+/** Map backend stress_level to CSS color variable for stress bars */
+export function getRiskBarColor(stressLevel: StressLevel): string {
+  const colors: Record<StressLevel, string> = {
+    low: 'var(--risk-low)',
+    medium: 'var(--risk-moderate)',
+    high: 'var(--risk-high)',
+    critical: 'var(--risk-critical)',
+  };
+  return colors[stressLevel] || colors.medium;
 }
 
 // ============================================================================
