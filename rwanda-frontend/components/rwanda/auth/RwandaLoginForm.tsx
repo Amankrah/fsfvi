@@ -36,7 +36,7 @@ export function RwandaLoginForm({ onTwoFactorRequired }: RwandaLoginFormProps) {
     setIsLoading(true);
 
     try {
-      const response: LoginResponse = await authAPI.login(username, password);
+      const response: LoginResponse = await authAPI.login({ username, password });
 
       if (response.requires_two_fa && response.two_fa_temp_token) {
         if (onTwoFactorRequired) {

@@ -41,7 +41,7 @@
     "yoy_change": "Variation Annuelle",
     "critical_components": "Composantes Critiques",
     "total_budget": "Budget Agricole",
-    "province_breakdown": "Répartition par Province",
+    "component_breakdown": "Répartition par Composante",
     "alerts_banner": "Alertes Actives"
   },
   "risk": {

@@ -41,7 +41,7 @@
     "yoy_change": "Year-over-Year Change",
     "critical_components": "Critical Components",
     "total_budget": "Agriculture Budget",
-    "province_breakdown": "Province Breakdown",
+    "component_breakdown": "Component Breakdown",
     "alerts_banner": "Active Alerts"
   },
   "risk": {
