@@ -7,8 +7,9 @@ import { FiscalYearSelector } from '@/components/rwanda/shared/FiscalYearSelecto
 import { getCurrentSeason } from '@/lib/constants/rwanda';
 import { getRiskBgColor, getRiskBarColor, formatRWFCompact, formatScore } from '@/lib/utils/formatters';
 import { assessmentAPI } from '@/lib/api/assessmentApi';
-import type { DashboardSummary, ComponentSummary } from '@/lib/types/assessment';
+import type { DashboardSummary, ComponentSummary, AssessmentHistory } from '@/lib/types/assessment';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { FSFSITrendChart, ComponentStressTrend, StressHeatmap } from '@/components/rwanda/charts';
 import {
   TrendingUp,
   TrendingDown,
@@ -16,9 +17,12 @@ import {
   DollarSign,
   Activity,
   BarChart3,
+  LineChart,
   Loader2,
 } from 'lucide-react';
 import type { StressLevel } from '@/lib/utils/formatters';
+
+type TrendView = 'fsfsi' | 'components' | 'heatmap';
 
 export function NationalOverview() {
   const { t } = useLanguage();
@@ -26,16 +30,23 @@ export function NationalOverview() {
   const season = getCurrentSeason();
 
   const [dashboardData, setDashboardData] = useState<DashboardSummary | null>(null);
+  const [historyData, setHistoryData] = useState<AssessmentHistory[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [trendView, setTrendView] = useState<TrendView>('fsfsi');
 
   useEffect(() => {
-    const fetchDashboard = async () => {
+    const fetchData = async () => {
       setLoading(true);
       setError(null);
       try {
-        const data = await assessmentAPI.getDashboardSummary(fiscalYear.start_year);
-        setDashboardData(data);
+        // Fetch both dashboard summary and history in parallel
+        const [dashboard, history] = await Promise.all([
+          assessmentAPI.getDashboardSummary(fiscalYear.start_year),
+          assessmentAPI.getHistory(),
+        ]);
+        setDashboardData(dashboard);
+        setHistoryData(history);
       } catch (err) {
         console.error('Failed to fetch dashboard:', err);
         setError('Unable to load dashboard data. Please try again.');
@@ -44,7 +55,7 @@ export function NationalOverview() {
       }
     };
 
-    fetchDashboard();
+    fetchData();
   }, [fiscalYear.start_year]);
 
   if (loading) {
@@ -167,6 +178,65 @@ export function NationalOverview() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Historical Trend Analysis */}
+      {historyData.length > 1 && (
+        <Card>
+          <CardHeader>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <CardTitle className="flex items-center space-x-2">
+                <LineChart className="h-5 w-5 text-[var(--rw-blue)]" />
+                <span>Historical Trend Analysis</span>
+              </CardTitle>
+              <div className="flex rounded-lg border border-gray-200 overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => setTrendView('fsfsi')}
+                  className={`px-3 py-1.5 text-xs font-medium transition-colors ${
+                    trendView === 'fsfsi'
+                      ? 'bg-[var(--rw-blue)] text-white'
+                      : 'bg-white text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  FSFSI Trend
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTrendView('components')}
+                  className={`px-3 py-1.5 text-xs font-medium transition-colors border-l border-gray-200 ${
+                    trendView === 'components'
+                      ? 'bg-[var(--rw-blue)] text-white'
+                      : 'bg-white text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  Components
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTrendView('heatmap')}
+                  className={`px-3 py-1.5 text-xs font-medium transition-colors border-l border-gray-200 ${
+                    trendView === 'heatmap'
+                      ? 'bg-[var(--rw-blue)] text-white'
+                      : 'bg-white text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  Heatmap
+                </button>
+              </div>
+            </div>
+            <p className="text-sm text-gray-500 mt-1">
+              {trendView === 'fsfsi' && 'Overall food system stress index across fiscal years'}
+              {trendView === 'components' && 'Component-level stress trends over time'}
+              {trendView === 'heatmap' && 'Visual overview of stress levels by component and year'}
+            </p>
+          </CardHeader>
+          <CardContent>
+            {trendView === 'fsfsi' && <FSFSITrendChart data={historyData} />}
+            {trendView === 'components' && <ComponentStressTrend data={historyData} />}
+            {trendView === 'heatmap' && <StressHeatmap data={historyData} />}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Component Breakdown */}
       <Card>
