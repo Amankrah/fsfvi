@@ -36,14 +36,25 @@ use serde::{Deserialize, Serialize};
 /// producing a symmetric, bounded gap measure in (0, 1).
 /// The gap does not directly determine stress — it influences optimal allocation.
 pub fn calculate_performance_gap(observed: f64, benchmark: f64) -> FsfiResult<f64> {
+    calculate_performance_gap_directional(observed, benchmark, None)
+}
+
+/// Directional performance gap (FSFSI + direction from Food System Financing Stress Index).
+///
+/// When `higher_is_better` is:
+/// - **Some(true)** (e.g. yield): gap = 0 when observed >= benchmark; else shortfall (benchmark−observed)/benchmark.
+/// - **Some(false)** (e.g. stunting rate): gap = 0 when observed <= benchmark; else excess (observed−benchmark)/observed.
+/// - **None**: symmetric gap |observed−benchmark|/max(observed,benchmark).
+pub fn calculate_performance_gap_directional(
+    observed: f64,
+    benchmark: f64,
+    higher_is_better: Option<bool>,
+) -> FsfiResult<f64> {
     let config = get_config();
 
-    // Both near zero — no meaningful gap
     if observed.abs() < config.tolerance && benchmark.abs() < config.tolerance {
         return Ok(0.0);
     }
-
-    // Both must be non-negative for meaningful food system metrics
     if observed < 0.0 || benchmark < 0.0 {
         return Err(FsfiError::calculation(format!(
             "Observed ({}) and benchmark ({}) must be non-negative",
@@ -51,17 +62,37 @@ pub fn calculate_performance_gap(observed: f64, benchmark: f64) -> FsfiResult<f6
         )));
     }
 
-    let max_val = observed.max(benchmark);
+    let gap = match higher_is_better {
+        Some(true) => {
+            // Higher is better (e.g. crop yield): good when observed >= benchmark
+            if observed >= benchmark {
+                0.0
+            } else {
+                let shortfall = (benchmark - observed) / benchmark;
+                shortfall.clamp(0.0, 1.0)
+            }
+        }
+        Some(false) => {
+            // Lower is better (e.g. stunting rate): good when observed <= benchmark
+            if observed <= benchmark {
+                0.0
+            } else if observed < config.tolerance {
+                0.0
+            } else {
+                let excess = (observed - benchmark) / observed;
+                excess.clamp(0.0, 1.0)
+            }
+        }
+        None => {
+            let max_val = observed.max(benchmark);
+            if max_val < config.tolerance {
+                0.0
+            } else {
+                (observed - benchmark).abs() / max_val
+            }
+        }
+    };
 
-    // Guard against division by zero (shouldn't happen given checks above)
-    if max_val < config.tolerance {
-        return Ok(0.0);
-    }
-
-    // δᵢ = |xᵢ - x̄ᵢ| / max(xᵢ, x̄ᵢ)
-    let gap = (observed - benchmark).abs() / max_val;
-
-    // Clamp to valid range [0, 1]
     Ok(gap.clamp(0.0, 1.0))
 }
 
@@ -409,7 +440,8 @@ pub struct ComponentStressResult {
     pub priority_level: String,
 }
 
-/// Calculate complete FSFSI metrics for a single component
+/// Calculate complete FSFSI metrics for a single component.
+/// When `higher_is_better` is Some, uses directional gap (zero when on the "good" side of benchmark).
 pub fn calculate_component_stress(
     observed_value: f64,
     benchmark_value: f64,
@@ -417,8 +449,13 @@ pub fn calculate_component_stress(
     sensitivity_parameter: f64,
     weight: f64,
     total_budget: f64,
+    higher_is_better: Option<bool>,
 ) -> FsfiResult<ComponentStressResult> {
-    let gap = calculate_performance_gap(observed_value, benchmark_value)?;
+    let gap = calculate_performance_gap_directional(
+        observed_value,
+        benchmark_value,
+        higher_is_better,
+    )?;
     let stress = calculate_stress(gap, financial_allocation, sensitivity_parameter)?;
     let weighted_stress = calculate_weighted_stress(stress, weight)?;
     let priority = determine_priority_level(stress, financial_allocation, weight, total_budget);
@@ -530,7 +567,13 @@ fn py_full_component_stress(
     total_budget: f64,
 ) -> PyResult<String> {
     let result = calculate_component_stress(
-        observed, benchmark, allocation, sensitivity, weight, total_budget,
+        observed,
+        benchmark,
+        allocation,
+        sensitivity,
+        weight,
+        total_budget,
+        None,
     )
     .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
 
@@ -783,8 +826,10 @@ mod tests {
 
     #[test]
     fn test_component_stress_full_calculation() {
-        let result =
-            calculate_component_stress(80.0, 100.0, 10.0, 0.1, 0.5, 100.0).unwrap();
+        let result = calculate_component_stress(
+            80.0, 100.0, 10.0, 0.1, 0.5, 100.0, None,
+        )
+        .unwrap();
 
         assert!(result.performance_gap > 0.0);
         assert!(result.stress > 0.0);

@@ -99,6 +99,28 @@ class AssessmentRequestSerializer(serializers.Serializer):
     )
 
 
+class RunForYearRequestSerializer(serializers.Serializer):
+    """Input for running assessment for a fiscal year (indicators loaded from DB)."""
+
+    fiscal_year = serializers.IntegerField(
+        min_value=2000, max_value=2100, help_text="Fiscal year for assessment"
+    )
+    assessment_name = serializers.CharField(
+        max_length=255, required=False, default="",
+        help_text="Optional name for this assessment",
+    )
+    weighting_method = serializers.ChoiceField(
+        choices=[m[0] for m in WeightingMethod.choices],
+        default="hybrid",
+        required=False,
+    )
+    scenario = serializers.ChoiceField(
+        choices=[s[0] for s in Scenario.choices],
+        default="normal_operations",
+        required=False,
+    )
+
+
 class QuickCheckRequestSerializer(serializers.Serializer):
     """Input for quick FSFSI check (lightweight assessment)."""
 
@@ -349,28 +371,29 @@ class AssessmentHistorySerializer(serializers.ModelSerializer):
 
 
 class ComponentSummarySerializer(serializers.Serializer):
-    """Summary of a component for dashboard display."""
+    """Summary of a component for dashboard display. All values from backend (Rust/DB)."""
 
     component = serializers.CharField()
     component_display = serializers.CharField()
-    stress = serializers.DecimalField(max_digits=8, decimal_places=4)
-    weight = serializers.DecimalField(max_digits=8, decimal_places=4)
-    budget_lcu_bn = serializers.DecimalField(max_digits=15, decimal_places=4)
-    budget_share_percent = serializers.DecimalField(max_digits=8, decimal_places=4)
+    stress = serializers.FloatField()
+    weight = serializers.FloatField()
+    budget_lcu_bn = serializers.FloatField()
+    budget_share_percent = serializers.FloatField()
     indicator_count = serializers.IntegerField()
-    priority_level = serializers.CharField()
+    priority_level = serializers.CharField()  # From Rust: low | medium | high | critical
 
 
 class DashboardSummarySerializer(serializers.Serializer):
-    """Dashboard summary data."""
+    """Dashboard summary data. All fields from backend (stored assessment / Rust engine)."""
 
-    overall_fsfsi = serializers.DecimalField(max_digits=8, decimal_places=4)
-    stress_level = serializers.CharField()
+    assessment_id = serializers.CharField(allow_null=True)
+    overall_fsfsi = serializers.FloatField()
+    stress_level = serializers.CharField()  # From Rust: low | medium | high | critical
     fiscal_year = serializers.IntegerField()
-    total_budget_lcu_bn = serializers.DecimalField(max_digits=15, decimal_places=4)
-    components = ComponentSummarySerializer(many=True)
+    total_budget_lcu_bn = serializers.FloatField()
+    components = ComponentSummarySerializer(many=True)  # priority_level from Rust
     top_priorities = ActionPriorityOutputSerializer(many=True)
-    efficiency_index = serializers.DecimalField(max_digits=8, decimal_places=4)
-    yoy_change_percent = serializers.DecimalField(
-        max_digits=8, decimal_places=4, allow_null=True
-    )
+    efficiency_index = serializers.FloatField()
+    yoy_change_percent = serializers.FloatField(allow_null=True)
+    computed_at = serializers.CharField(allow_null=True)  # ISO datetime from backend
+    empty = serializers.BooleanField(default=False)

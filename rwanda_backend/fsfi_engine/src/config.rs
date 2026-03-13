@@ -236,7 +236,13 @@ pub struct FsfiConfig {
     pub sensitivity_estimation_method: String,
     pub sensitivity_estimation_fallback: String,
 
-    // Stress level thresholds (FSFSI uses stress framing, not vulnerability)
+    /// Stress level thresholds: FSFSI score (0–1) → risk category.
+    /// Higher score = more stress = worse. Used by determine_stress_level().
+    /// - low:      score ≤ 0.05  (5%)
+    /// - medium:   score ≤ 0.15  (15%)
+    /// - high:     score ≤ 0.30  (30%)
+    /// - critical: score > 0.30
+    /// Example: 0.28 → high; 0.51 → critical.
     pub stress_thresholds: HashMap<String, f64>,
     pub alternative_thresholds: HashMap<String, HashMap<String, f64>>,
 
@@ -301,7 +307,8 @@ impl Default for FsfiConfig {
 }
 
 impl FsfiConfig {
-    /// Determine stress level from FSFSI score
+    /// Determine stress level from FSFSI score (Rwanda risk categorization).
+    /// Single source of truth: higher FSFSI = more food system stress = worse outcome.
     pub fn determine_stress_level(&self, fsfsi_score: f64) -> &'static str {
         if fsfsi_score <= self.stress_thresholds["low"] {
             "low"

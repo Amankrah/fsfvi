@@ -3,8 +3,8 @@
  * ==============================
  * Type definitions for Rwanda FSFSI (Food System Financing Stress Index) API
  *
- * CRITICAL: Government-level system for Rwanda's food security.
- * Uses indicator-based structure: 8 components with 37 indicators.
+ * CRITICAL: All assessment data (scores, stress_level, priority_level) must come
+ * from the backend only. Do not derive or compute these in the frontend.
  *
  * Backend: Rwanda Django backend (http://localhost:8000/api/assessments/)
  * Engine: Rust fsfi_engine via PyO3
@@ -164,14 +164,17 @@ export interface IndicatorResult {
   share_weighted_percent: number;
 }
 
+/** From backend (Rust) only; priority_level from engine. */
 export interface ComponentAggregation {
   component: IndicatorComponent;
-  component_display: string;
+  component_display?: string;
   indicator_count: number;
   total_gross_lcu_bn: number;
   total_weighted_lcu_bn: number;
   total_share_weighted_percent: number;
   average_performance_gap: number;
+  /** From Rust: low | medium | high | critical */
+  priority_level?: string;
 }
 
 export interface ActionPriority {
@@ -273,8 +276,8 @@ export interface SavedIndicatorResult {
   indicator_name: string;
   component: IndicatorComponent;
   component_display: string;
-  observed_value: number;
-  benchmark_value: number;
+  observed_value: number | null;
+  benchmark_value: number | null;
   financial_allocation: number;
   sensitivity: number;
   performance_gap: number;
@@ -284,12 +287,13 @@ export interface SavedIndicatorResult {
 }
 
 // ============================================================================
-// Dashboard Summary
+// Dashboard Summary (all fields from backend API only)
 // ============================================================================
 
 export interface DashboardSummary {
   assessment_id?: string | null;
   overall_fsfsi: number;
+  /** From backend (Rust): low | medium | high | critical */
   stress_level: string;
   fiscal_year: number;
   total_budget_lcu_bn: number;
@@ -302,6 +306,7 @@ export interface DashboardSummary {
   empty?: boolean;
 }
 
+/** Per-component summary; stress and priority_level from backend only. */
 export interface ComponentSummary {
   component: IndicatorComponent;
   component_display: string;
@@ -310,6 +315,7 @@ export interface ComponentSummary {
   budget_lcu_bn: number;
   budget_share_percent: number;
   indicator_count: number;
+  /** From backend (Rust): low | medium | high | critical */
   priority_level: string;
 }
 

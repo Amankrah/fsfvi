@@ -3,8 +3,9 @@
  * =====================
  * Presentation-only utilities for Rwanda FSFI.
  *
- * NOTE: Business logic (risk levels, scores, calculations) is handled by the backend.
- * These functions only format backend values for UI display.
+ * NOTE: stress_level and priority_level must come from the backend API only.
+ * These functions only map backend values to UI (colors, labels); they do not
+ * compute or derive risk levels from scores.
  */
 
 // ============================================================================
@@ -47,6 +48,32 @@ export function getRiskBarColor(stressLevel: StressLevel): string {
 }
 
 // ============================================================================
+// Performance gap display (backend provides gap; 0 = on/better than benchmark)
+// ============================================================================
+
+const GAP_GOOD_THRESHOLD = 0.005;
+
+/**
+ * Styling for performance gap from backend.
+ * When gap is 0 (or effectively 0), observed is on or better than benchmark → green.
+ * Otherwise use amber/red by severity. Frontend does not compute gap; it only displays.
+ */
+export function getPerformanceGapDisplay(performanceGap: number | null | undefined): {
+  className: string;
+  isGood: boolean;
+} {
+  const gap = performanceGap != null ? Number(performanceGap) : NaN;
+  const isGood = Number.isFinite(gap) && gap < GAP_GOOD_THRESHOLD;
+  if (isGood) {
+    return { className: 'text-green-700 font-medium', isGood: true };
+  }
+  if (Number.isFinite(gap) && gap >= 0.5) {
+    return { className: 'text-red-700 font-medium', isGood: false };
+  }
+  return { className: 'text-amber-700 font-medium', isGood: false };
+}
+
+// ============================================================================
 // Number Display Formatting
 // ============================================================================
 
@@ -74,9 +101,10 @@ export function formatRWFCompact(amount: number): string {
   return formatRWF(amount);
 }
 
-/** Format score for display (backend provides raw decimal) */
-export function formatScore(score: number, decimals: number = 2): string {
-  return score.toFixed(decimals);
+/** Format score/index for display (backend may send number or string). Uses 4 decimal places for index precision. */
+export function formatScore(score: number | string | null | undefined, decimals: number = 4): string {
+  const n = score == null ? NaN : Number(score);
+  return Number.isFinite(n) ? n.toFixed(decimals) : '—';
 }
 
 /** Format as percentage */

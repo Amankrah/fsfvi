@@ -13,6 +13,7 @@ from .views import (
     DashboardSummaryView,
     QuickCheckView,
     RunAssessmentView,
+    RunForYearView,
     # Optimization
     EfficiencyAnalysisView,
     ReallocationPlanView,
@@ -38,6 +39,8 @@ urlpatterns = [
     # ==========================================================================
     # POST /api/assessments/run/ - Run full assessment
     path("run/", RunAssessmentView.as_view(), name="run-assessment"),
+    # POST /api/assessments/run-for-year/ - Run assessment for a year (indicators from DB)
+    path("run-for-year/", RunForYearView.as_view(), name="run-for-year"),
     # POST /api/assessments/quick-check/ - Quick FSFSI check
     path("quick-check/", QuickCheckView.as_view(), name="quick-check"),
     # GET /api/assessments/ - List assessments

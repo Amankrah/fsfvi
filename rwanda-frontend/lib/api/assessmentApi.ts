@@ -1,13 +1,14 @@
 /**
  * Rwanda FSFSI Assessment API Client
  * ====================================
- * API client for Rwanda FSFSI Assessment endpoints
+ * API client for Rwanda FSFSI Assessment endpoints.
  *
- * CRITICAL: Government-level system for Rwanda's food security.
- * All computation handled by Rust fsfi_engine via PyO3.
+ * CRITICAL: All assessment data must be fetched from the backend only.
+ * Do not compute scores, stress_level, or priority_level in the frontend.
+ * This module only calls backend APIs and returns their responses.
  *
  * Backend: Rwanda Django backend (http://localhost:8000/api/assessments/)
- * Engine: Rust fsfi_engine via RustJWTAuthentication
+ * Engine: Rust fsfi_engine via PyO3
  */
 
 import axios, { AxiosInstance } from 'axios';
@@ -113,6 +114,26 @@ export const assessmentAPI = {
     });
 
     const response = await assessmentClient.post<AssessmentResult>('/run/', request);
+    return response.data;
+  },
+
+  /**
+   * Run assessment for a fiscal year (indicators loaded from backend DB).
+   *
+   * POST /api/assessments/run-for-year/
+   *
+   * @param fiscalYear - Fiscal year to assess
+   * @param assessmentName - Optional name
+   * @returns Full assessment result (saved to DB)
+   */
+  runForYear: async (
+    fiscalYear: number,
+    assessmentName?: string
+  ): Promise<AssessmentResult> => {
+    const response = await assessmentClient.post<AssessmentResult>(
+      '/run-for-year/',
+      { fiscal_year: fiscalYear, assessment_name: assessmentName ?? `FY${fiscalYear} assessment` }
+    );
     return response.data;
   },
 

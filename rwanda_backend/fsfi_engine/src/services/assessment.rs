@@ -12,8 +12,8 @@
 
 use crate::core::calculations::{
     calculate_component_stress, calculate_efficiency_index, calculate_gap_ratio,
-    calculate_optimal_allocation, calculate_system_fsfsi, determine_stress_level,
-    round_to_precision,
+    calculate_optimal_allocation, calculate_system_fsfsi, determine_priority_level,
+    determine_stress_level, round_to_precision,
 };
 use crate::errors::FsfiResult;
 use pyo3::prelude::*;
@@ -91,9 +91,12 @@ pub struct IndicatorInput {
     pub observed_value: Option<f64>, // Performance metric (if available)
     #[serde(default)]
     pub benchmark_value: Option<f64>, // Target/benchmark (if available)
+    /// When true, higher values are better (e.g. yield); when false, lower are better (e.g. stunting).
+    #[serde(default)]
+    pub higher_is_better: Option<bool>,
 }
 
-/// Aggregated component data from indicators
+/// Aggregated component data from indicators (priority_level from Rust engine only)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ComponentAggregation {
     pub component: String,
@@ -102,6 +105,8 @@ pub struct ComponentAggregation {
     pub total_weighted_lcu_bn: f64,
     pub total_share_weighted_percent: f64,
     pub average_performance_gap: f64,
+    /// Stress category: low | medium | high | critical (from determine_priority_level)
+    pub priority_level: String,
 }
 
 /// Assessment result at indicator level
@@ -117,6 +122,10 @@ pub struct IndicatorAssessment {
     pub gross_lcu_bn: f64,
     pub weighted_lcu_bn: f64,
     pub share_weighted_percent: f64,
+    /// Observed value used in the calculation (input or imputed)
+    pub observed_value: f64,
+    /// Benchmark value used in the calculation
+    pub benchmark_value: f64,
 }
 
 /// Full indicator-based assessment result
@@ -284,6 +293,7 @@ pub fn assess_food_system(
             sensitivities[i],
             weights[i],
             total_budget / 1_000_000.0,
+            None, // legacy component flow has no direction
         )?;
 
         gaps.push(result.performance_gap);
@@ -430,6 +440,7 @@ pub fn quick_check(components: &[ComponentInput]) -> FsfiResult<QuickCheckResult
             sensitivity,
             weights[i],
             total_budget / 1_000_000.0,
+            None, // legacy component flow has no direction
         )?;
 
         weighted_sum += result.weighted_stress;
@@ -532,6 +543,7 @@ pub fn assess_indicators(
             sensitivity,
             weights[i],
             total_budget,
+            ind.higher_is_better,
         )?;
 
         gaps.push(result.performance_gap);
@@ -548,10 +560,13 @@ pub fn assess_indicators(
             gross_lcu_bn: ind.gross_lcu_bn,
             weighted_lcu_bn: ind.weighted_lcu_bn,
             share_weighted_percent: ind.share_weighted_percent,
+            observed_value: round_to_precision(observed, Some(4)),
+            benchmark_value: round_to_precision(benchmark, Some(4)),
         });
     }
 
-    // Component aggregations
+    // Component aggregations (priority_level computed in Rust — single source of truth)
+    let component_weight = 1.0 / 8.0; // equal weight per component
     let mut component_aggregations = Vec::new();
     for (component, inds) in &component_map {
         let indicator_count = inds.len();
@@ -559,14 +574,27 @@ pub fn assess_indicators(
         let total_weighted: f64 = inds.iter().map(|i| i.weighted_lcu_bn).sum();
         let total_share: f64 = inds.iter().map(|i| i.share_weighted_percent).sum();
 
-        // Average performance gap for this component
-        let component_gaps: Vec<f64> = inds.iter().map(|ind| {
+        // Average performance gap and average stress for this component
+        let mut component_stresses = Vec::with_capacity(inds.len());
+        let mut component_gaps = Vec::with_capacity(inds.len());
+        for ind in inds.iter() {
             let idx = indicators.iter().position(|i| i.indicator_code == ind.indicator_code).unwrap();
-            gaps[idx]
-        }).collect();
+            component_gaps.push(gaps[idx]);
+            component_stresses.push(stresses[idx]);
+        }
         let avg_gap = if component_gaps.is_empty() { 0.0 } else {
             component_gaps.iter().sum::<f64>() / component_gaps.len() as f64
         };
+        let avg_stress = if component_stresses.is_empty() { 0.0 } else {
+            component_stresses.iter().sum::<f64>() / component_stresses.len() as f64
+        };
+        let priority_level = determine_priority_level(
+            avg_stress,
+            total_weighted,
+            component_weight,
+            total_budget,
+        )
+        .to_string();
 
         component_aggregations.push(ComponentAggregation {
             component: component.clone(),
@@ -575,6 +603,7 @@ pub fn assess_indicators(
             total_weighted_lcu_bn: round_to_precision(total_weighted, Some(4)),
             total_share_weighted_percent: round_to_precision(total_share, Some(4)),
             average_performance_gap: round_to_precision(avg_gap, Some(4)),
+            priority_level,
         });
     }
 

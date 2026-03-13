@@ -2,6 +2,8 @@
 Assessment Views for Rwanda FSFSI API.
 
 All computation is handled by the Rust fsfi_engine via services.
+Views strictly serve data from the backend only: stored assessment results (DB)
+or direct Rust engine responses. No assessment/scoring/stress logic in views.
 """
 
 from rest_framework import status
@@ -19,6 +21,7 @@ from .serializers import (
     DashboardSummarySerializer,
     QuickCheckOutputSerializer,
     QuickCheckRequestSerializer,
+    RunForYearRequestSerializer,
 )
 from .services import (
     get_assessment_service,
@@ -39,6 +42,8 @@ class RunAssessmentView(APIView):
     Run a full FSFSI assessment.
 
     POST /api/assessments/run/
+
+    Passes indicator data to Rust engine; returns engine result only. No view-level logic.
     """
     permission_classes = [IsAuthenticated]
 
@@ -70,6 +75,50 @@ class RunAssessmentView(APIView):
 
             return Response(result, status=status.HTTP_200_OK)
 
+        except Exception as e:
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+
+class RunForYearView(APIView):
+    """
+    Run FSFSI assessment for a fiscal year using indicator data from the database.
+
+    POST /api/assessments/run-for-year/
+
+    Body: { "fiscal_year": 2024, "assessment_name": "FY2024 assessment" (optional) }
+    Loads indicators from DB, runs Rust engine, saves result. No client-provided indicators.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = RunForYearRequestSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        data = serializer.validated_data
+        service = get_assessment_service()
+        fiscal_year = data["fiscal_year"]
+        indicators = service.load_indicators_from_db(fiscal_year)
+
+        if not indicators:
+            return Response(
+                {"error": f"No indicator data for fiscal year {fiscal_year}. Import budget mapping and indicator parameters first."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            result = service.run_and_save_assessment(
+                indicators=indicators,
+                fiscal_year=fiscal_year,
+                assessment_name=data.get("assessment_name") or f"FY{fiscal_year} assessment",
+                weighting_method=data.get("weighting_method", "hybrid"),
+                scenario=data.get("scenario", "normal_operations"),
+                user=request.user,
+            )
+            return Response(result, status=status.HTTP_200_OK)
         except Exception as e:
             return Response(
                 {"error": str(e)},
@@ -121,9 +170,9 @@ class QuickCheckView(APIView):
 
 class AssessmentListView(APIView):
     """
-    List assessments.
+    List assessments. GET /api/assessments/
 
-    GET /api/assessments/
+    Returns stored assessment records only (from DB).
     """
     permission_classes = [IsAuthenticated]
 
@@ -143,9 +192,9 @@ class AssessmentListView(APIView):
 
 class AssessmentDetailView(APIView):
     """
-    Get assessment details.
+    Get assessment details. GET /api/assessments/<id>/
 
-    GET /api/assessments/<id>/
+    Returns stored assessment only; all scores/stress from backend.
     """
     permission_classes = [IsAuthenticated]
 
@@ -168,6 +217,9 @@ class DashboardSummaryView(APIView):
     Get dashboard summary for a fiscal year.
 
     GET /api/assessments/dashboard/
+
+    Returns data from stored assessment only (stress_level, priority_level from Rust).
+    No client-side or view-level computation.
     """
     permission_classes = [IsAuthenticated]
 
@@ -178,7 +230,8 @@ class DashboardSummaryView(APIView):
         summary = service.get_dashboard_summary(
             fiscal_year=int(fiscal_year) if fiscal_year else None
         )
-        return Response(summary)
+        serializer = DashboardSummarySerializer(summary)
+        return Response(serializer.data)
 
 
 class AvailableFiscalYearsView(APIView):
@@ -509,6 +562,8 @@ class StressLevelView(APIView):
     Get stress level for a score.
 
     GET /api/assessments/stress-level/?score=0.25
+
+    Delegates to Rust engine only. Frontend must use this (or stored assessment) for stress level.
     """
     permission_classes = [IsAuthenticated]
 

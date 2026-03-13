@@ -8,14 +8,14 @@ that rule so you can manually compute / fill sample observed values from the tab
 Formulas (same as engine in assessment.rs):
 
   1. If observed_value is not NULL:
-       → use it (no computation).
+       -> use it (no computation).
 
   2. If observed_value is NULL and benchmark_value is not NULL:
-       → imputed_observed = benchmark_value
+       -> imputed_observed = benchmark_value
        (neutral gap: gap = 0 so the indicator does not distort the score).
 
   3. If both observed_value and benchmark_value are NULL:
-       → imputed_observed = share_weighted_percent * 100
+       -> imputed_observed = share_weighted_percent * 100
        (engine's synthetic scale; benchmark is then 10000/n in the engine).
 
 Usage:
@@ -83,8 +83,8 @@ class Command(BaseCommand):
 
         self.stdout.write(
             f"Imputed observed_value (FY{fiscal_year}, n={n})\n"
-            "Formula: if observed NULL and benchmark set → imputed = benchmark; "
-            "if both NULL → imputed = share_weighted_percent * 100.\n"
+            "Formula: if observed NULL and benchmark set -> imputed = benchmark; "
+            "if both NULL -> imputed = share_weighted_percent * 100.\n"
             + "-" * 100
         )
 

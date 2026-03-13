@@ -181,8 +181,11 @@ class AssessmentService:
             computed_by=user,
         )
 
-        # Save component aggregations
+        # Save component aggregations (priority_level from Rust only — no Django logic)
         for comp_agg in result["component_aggregations"]:
+            priority = comp_agg.get("priority_level") or comp_agg.get("risk_level")
+            if not priority:
+                priority = fsfi_engine.get_stress_level(comp_agg["average_performance_gap"])
             ComponentResult.objects.create(
                 assessment=assessment,
                 component=comp_agg["component"],
@@ -190,15 +193,13 @@ class AssessmentService:
                 avg_performance_gap=Decimal(str(comp_agg["average_performance_gap"])),
                 component_stress=Decimal(str(comp_agg["average_performance_gap"])),
                 weighted_stress=Decimal(str(comp_agg["average_performance_gap"] / 8)),
-                priority_level=self._map_stress_level(
-                    fsfi_engine.get_stress_level(comp_agg["average_performance_gap"])
-                ),
+                priority_level=self._map_stress_level(priority),
                 budget_lcu_bn=Decimal(str(comp_agg["total_weighted_lcu_bn"])),
                 budget_share_percent=Decimal(str(comp_agg["total_share_weighted_percent"])),
                 indicators_count=comp_agg["indicator_count"],
             )
 
-        # Save indicator results
+        # Save indicator results (observed_value and benchmark_value from Rust output)
         for ind in result["indicator_results"]:
             IndicatorResult.objects.create(
                 assessment=assessment,
@@ -209,6 +210,8 @@ class AssessmentService:
                 stress_value=Decimal(str(ind["stress"])),
                 weighted_lcu_bn=Decimal(str(ind["weighted_lcu_bn"])),
                 share_weighted_percent=Decimal(str(ind["share_weighted_percent"])),
+                observed_value=Decimal(str(ind["observed_value"])) if ind.get("observed_value") is not None else None,
+                benchmark_value=Decimal(str(ind["benchmark_value"])) if ind.get("benchmark_value") is not None else None,
             )
 
         # Update history
@@ -234,16 +237,25 @@ class AssessmentService:
             for comp in assessment.component_results.all()
         }
 
+        # YoY: prefer previous fiscal year from history, else latest prior assessment
         prev = AssessmentHistory.objects.filter(
             fiscal_year=assessment.fiscal_year - 1
         ).first()
+        prev_score = prev.fsfsi_score if prev and prev.fsfsi_score is not None else None
+        if prev_score is None:
+            prev_assessment = (
+                AssessmentResult.objects.filter(fiscal_year__lt=assessment.fiscal_year)
+                .order_by("-fiscal_year")
+                .first()
+            )
+            if prev_assessment and prev_assessment.fsfsi_score is not None:
+                prev_score = prev_assessment.fsfsi_score
 
         yoy_change = None
         yoy_pct = None
-        if prev and prev.fsfsi_score:
-            yoy_change = assessment.fsfsi_score - prev.fsfsi_score
-            if prev.fsfsi_score != 0:
-                yoy_pct = (yoy_change / prev.fsfsi_score) * 100
+        if prev_score is not None and float(prev_score) != 0:
+            yoy_change = assessment.fsfsi_score - prev_score
+            yoy_pct = (float(yoy_change) / float(prev_score)) * 100
 
         AssessmentHistory.objects.update_or_create(
             fiscal_year=assessment.fiscal_year,
@@ -340,6 +352,23 @@ class AssessmentService:
             fiscal_year=assessment.fiscal_year
         ).first()
 
+        yoy_pct = None
+        if history and history.yoy_change_percent is not None:
+            yoy_pct = float(history.yoy_change_percent)
+        else:
+            # Fallback: compute YoY from latest prior assessment (e.g. 2020 vs 2018)
+            prev = (
+                AssessmentResult.objects.filter(fiscal_year__lt=assessment.fiscal_year)
+                .order_by("-fiscal_year")
+                .first()
+            )
+            if prev and prev.fsfsi_score is not None and float(prev.fsfsi_score) != 0:
+                yoy_pct = (
+                    (float(assessment.fsfsi_score) - float(prev.fsfsi_score))
+                    / float(prev.fsfsi_score)
+                    * 100
+                )
+
         return {
             "assessment_id": str(assessment.id),
             "overall_fsfsi": float(assessment.fsfsi_score),
@@ -349,7 +378,7 @@ class AssessmentService:
             "components": components,
             "top_priorities": assessment.result_json.get("action_priorities", [])[:5],
             "efficiency_index": float(assessment.efficiency_index or 0),
-            "yoy_change_percent": float(history.yoy_change_percent) if history and history.yoy_change_percent else None,
+            "yoy_change_percent": yoy_pct,
             "computed_at": assessment.computed_at.isoformat(),
             "empty": False,
         }
@@ -372,6 +401,7 @@ class AssessmentService:
                     "share_weighted_percent": float(data.share_weighted_percent),
                     "observed_value": float(data.observed_value) if data.observed_value else None,
                     "benchmark_value": float(data.benchmark_value) if data.benchmark_value else None,
+                    "higher_is_better": ind.higher_is_better,
                 })
         return indicators
 
