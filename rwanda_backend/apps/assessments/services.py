@@ -687,6 +687,28 @@ class ConfigService:
         """Get default sensitivity parameter for an indicator component."""
         return fsfi_engine.py_get_indicator_sensitivity(component)
 
+    def get_indicator_component_sensitivities(self) -> list[dict]:
+        """Get sensitivity (α) for each of the 8 indicator components (from engine)."""
+        display_names = {
+            "markets": "Markets",
+            "crop_production": "Crop Production",
+            "nutrition": "Nutrition",
+            "research": "Research",
+            "post_harvest": "Post-Harvest",
+            "environment": "Environment",
+            "animal_systems": "Animal Systems",
+            "finance": "Finance",
+        }
+        components = self.get_indicator_components()
+        return [
+            {
+                "component": c,
+                "component_display": display_names.get(c, c.replace("_", " ").title()),
+                "sensitivity": round(self.get_indicator_sensitivity(c), 6),
+            }
+            for c in components
+        ]
+
 
 # =============================================================================
 # CORE CALCULATIONS SERVICE

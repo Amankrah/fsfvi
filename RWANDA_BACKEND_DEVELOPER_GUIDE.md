@@ -184,7 +184,7 @@ All computation code from `fsfi-backend/src/fsfvi/` must be rewritten as a PyO3 
 | Source File | Lines (approx) | Rewrite As |
 |---|---|---|
 | `fsfvi_core/calculations.rs` | ~300 | `engine/core/calculations.rs` |
-| `fsfvi_core/sensitivity.rs` | ~400 | `engine/core/sensitivity.rs` |
+| `fsfvi_core/sensitivity.rs` | ~400 | `engine/core/sensitivity.rs` ✓ (wired: base lookup + `estimate_sensitivity_parameter`, used in index via assessment/optimization/gap) |
 | `fsfvi_core/metrics.rs` | ~500 | `engine/core/metrics.rs` |
 | `weighting/models.rs` | ~200 | `engine/weighting/models.rs` |
 | `weighting/expert.rs` | ~400 | `engine/weighting/expert.rs` |

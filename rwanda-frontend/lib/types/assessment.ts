@@ -339,6 +339,13 @@ export interface AssessmentHistory {
 // Config Types
 // ============================================================================
 
+/** Sensitivity (α) for one indicator component (from backend engine). */
+export interface IndicatorComponentSensitivity {
+  component: string;
+  component_display: string;
+  sensitivity: number;
+}
+
 export interface FsfsiConfig {
   config: {
     alpha_default: number;
@@ -356,4 +363,6 @@ export interface FsfsiConfig {
     };
   };
   indicator_components: string[];
+  /** Sensitivity parameter α per indicator component (from backend). */
+  indicator_component_sensitivities?: IndicatorComponentSensitivity[];
 }

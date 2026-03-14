@@ -614,6 +614,7 @@ class ConfigView(APIView):
         return Response({
             "config": service.get_config(),
             "indicator_components": service.get_indicator_components(),
+            "indicator_component_sensitivities": service.get_indicator_component_sensitivities(),
         })
 
 

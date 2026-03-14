@@ -7,7 +7,7 @@ use crate::core::calculations::{
     calculate_performance_gap, calculate_stress, round_to_precision, safe_divide,
 };
 use crate::errors::FsfiResult;
-use crate::services::assessment::{get_default_sensitivity, ComponentInput};
+use crate::services::assessment::{resolve_sensitivity, ComponentInput};
 use pyo3::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::time::Instant;
@@ -117,11 +117,7 @@ pub fn analyze_gaps(components: &[ComponentInput]) -> FsfiResult<GapAnalysisResu
 
     for comp in components {
         let gap = calculate_performance_gap(comp.observed_value, comp.benchmark_value)?;
-        let sensitivity = if comp.sensitivity_parameter > 0.0 {
-            comp.sensitivity_parameter
-        } else {
-            get_default_sensitivity(&comp.component_type)
-        };
+        let sensitivity = resolve_sensitivity(comp);
         let alloc_m = comp.financial_allocation_usd / 1_000_000.0;
         let stress = calculate_stress(gap, alloc_m, sensitivity)?;
 
@@ -417,25 +413,25 @@ mod tests {
                 component_type: "agricultural_development".into(),
                 observed_value: 75.0, benchmark_value: 90.0,
                 financial_allocation_usd: 125_000_000.0,
-                sensitivity_parameter: 0.0015, weight: Some(0.35), name: None,
+                sensitivity_parameter: Some(0.0015), weight: Some(0.35), name: None,
             },
             ComponentInput {
                 component_type: "infrastructure".into(),
                 observed_value: 60.0, benchmark_value: 85.0,
                 financial_allocation_usd: 95_000_000.0,
-                sensitivity_parameter: 0.0018, weight: Some(0.30), name: None,
+                sensitivity_parameter: Some(0.0018), weight: Some(0.30), name: None,
             },
             ComponentInput {
                 component_type: "climate_natural_resources".into(),
                 observed_value: 50.0, benchmark_value: 75.0,
                 financial_allocation_usd: 60_000_000.0,
-                sensitivity_parameter: 0.0008, weight: Some(0.20), name: None,
+                sensitivity_parameter: Some(0.0008), weight: Some(0.20), name: None,
             },
             ComponentInput {
                 component_type: "governance_institutions".into(),
                 observed_value: 80.0, benchmark_value: 85.0,
                 financial_allocation_usd: 50_000_000.0,
-                sensitivity_parameter: 0.0006, weight: Some(0.15), name: None,
+                sensitivity_parameter: Some(0.0006), weight: Some(0.15), name: None,
             },
         ]
     }

@@ -31,46 +31,32 @@ pub struct ComponentInput {
     pub observed_value: f64,
     pub benchmark_value: f64,
     pub financial_allocation_usd: f64,
-    #[serde(default = "default_sensitivity")]
-    pub sensitivity_parameter: f64,
+    /// When None or not provided, per-component α is used via get_default_sensitivity(component_type).
+    #[serde(default)]
+    pub sensitivity_parameter: Option<f64>,
     #[serde(default)]
     pub weight: Option<f64>,
     #[serde(default)]
     pub name: Option<String>,
 }
 
-fn default_sensitivity() -> f64 {
-    0.0015
+/// Resolve sensitivity for a component: use provided value if present and positive, else engine default per component type.
+pub fn resolve_sensitivity(comp: &ComponentInput) -> f64 {
+    comp.sensitivity_parameter
+        .filter(|&s| s > 0.0)
+        .unwrap_or_else(|| get_default_sensitivity(&comp.component_type))
 }
 
-/// Sensitivity defaults per component type (legacy 6-component)
+/// Sensitivity defaults per component type (legacy 6-component).
+/// Delegates to core/sensitivity for single source of truth.
 pub fn get_default_sensitivity(component_type: &str) -> f64 {
-    match component_type {
-        "agricultural_development" => 0.0015,
-        "infrastructure" => 0.0018,
-        "nutrition_health" | "nutrition_food_safety" => 0.0020,
-        "climate_natural_resources" | "climate_resilience" => 0.0008,
-        "social_protection_equity" | "financial_services" => 0.0025,
-        "governance_institutions" | "governance_policy" => 0.0006,
-        "market_access" => 0.0012,
-        "research_innovation" => 0.0010,
-        _ => 0.0015,
-    }
+    crate::core::sensitivity::get_base_sensitivity(component_type)
 }
 
-/// Sensitivity defaults per indicator component (8-component structure)
+/// Sensitivity defaults per indicator component (8-component structure).
+/// Delegates to core/sensitivity for single source of truth.
 pub fn get_indicator_component_sensitivity(component: &str) -> f64 {
-    match component {
-        "markets" => 0.0012,
-        "crop_production" => 0.0015,
-        "nutrition" => 0.0020,
-        "research" => 0.0010,
-        "post_harvest" => 0.0014,
-        "environment" => 0.0008,
-        "animal_systems" => 0.0016,
-        "finance" => 0.0018,
-        _ => 0.0015,
-    }
+    crate::core::sensitivity::get_base_sensitivity(component)
 }
 
 // ---------------------------------------------------------------------------
@@ -259,11 +245,7 @@ pub fn assess_food_system(
     let sensitivities: Vec<f64> = components
         .iter()
         .map(|c| {
-            if c.sensitivity_parameter > 0.0 {
-                c.sensitivity_parameter
-            } else {
-                get_default_sensitivity(&c.component_type)
-            }
+            resolve_sensitivity(c)
         })
         .collect();
 
@@ -427,11 +409,7 @@ pub fn quick_check(components: &[ComponentInput]) -> FsfiResult<QuickCheckResult
 
     for (i, comp) in components.iter().enumerate() {
         let alloc_m = comp.financial_allocation_usd / 1_000_000.0;
-        let sensitivity = if comp.sensitivity_parameter > 0.0 {
-            comp.sensitivity_parameter
-        } else {
-            get_default_sensitivity(&comp.component_type)
-        };
+        let sensitivity = resolve_sensitivity(comp);
 
         let result = calculate_component_stress(
             comp.observed_value,
@@ -855,7 +833,7 @@ mod tests {
                 observed_value: 75.0,
                 benchmark_value: 90.0,
                 financial_allocation_usd: 125_000_000.0,
-                sensitivity_parameter: 0.0015,
+                sensitivity_parameter: Some(0.0015),
                 weight: Some(0.25),
                 name: None,
             },
@@ -864,7 +842,7 @@ mod tests {
                 observed_value: 60.0,
                 benchmark_value: 85.0,
                 financial_allocation_usd: 95_000_000.0,
-                sensitivity_parameter: 0.0018,
+                sensitivity_parameter: Some(0.0018),
                 weight: Some(0.20),
                 name: None,
             },
@@ -873,7 +851,7 @@ mod tests {
                 observed_value: 70.0,
                 benchmark_value: 80.0,
                 financial_allocation_usd: 80_000_000.0,
-                sensitivity_parameter: 0.0020,
+                sensitivity_parameter: Some(0.0020),
                 weight: Some(0.20),
                 name: None,
             },
@@ -882,7 +860,7 @@ mod tests {
                 observed_value: 50.0,
                 benchmark_value: 75.0,
                 financial_allocation_usd: 60_000_000.0,
-                sensitivity_parameter: 0.0008,
+                sensitivity_parameter: Some(0.0008),
                 weight: Some(0.15),
                 name: None,
             },
@@ -891,7 +869,7 @@ mod tests {
                 observed_value: 65.0,
                 benchmark_value: 70.0,
                 financial_allocation_usd: 90_000_000.0,
-                sensitivity_parameter: 0.0025,
+                sensitivity_parameter: Some(0.0025),
                 weight: Some(0.10),
                 name: None,
             },
@@ -900,7 +878,7 @@ mod tests {
                 observed_value: 80.0,
                 benchmark_value: 85.0,
                 financial_allocation_usd: 50_000_000.0,
-                sensitivity_parameter: 0.0006,
+                sensitivity_parameter: Some(0.0006),
                 weight: Some(0.10),
                 name: None,
             },
