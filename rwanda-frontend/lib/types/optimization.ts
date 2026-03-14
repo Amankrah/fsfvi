@@ -4,78 +4,81 @@
  * Type definitions for budget optimization and performance gap analysis
  *
  * Backend: Rwanda Django backend (http://localhost:8000/api/assessments/)
+ * Engine: Rust fsfi_engine via PyO3
+ *
+ * IMPORTANT: These types must match the Rust response structures exactly.
  */
 
 import type { IndicatorComponent } from './assessment';
 
 // ============================================================================
-// Efficiency Analysis Types
+// Efficiency Analysis Types (matches Rust EfficiencyAnalysis)
 // ============================================================================
 
 export interface EfficiencyAnalysis {
   current_fsfsi: number;
   optimal_fsfsi: number;
   efficiency_index: number;
-  improvement_potential: number;
-  reallocation_analysis: AllocationAnalysis[];
+  waste_ratio: number;
+  components: ComponentEfficiency[];
+  total_budget_usd: number;
+  computing_time_ms: number;
 }
 
-export interface AllocationAnalysis {
-  component: IndicatorComponent;
-  current_allocation: number;
-  optimal_allocation: number;
-  difference: number;
-  percent_change: number;
-  status: 'over_allocated' | 'under_allocated' | 'optimal';
+export interface ComponentEfficiency {
+  component_type: string;
+  current_allocation_usd: number;
+  optimal_allocation_usd: number;
+  allocation_gap_usd: number;
+  allocation_gap_pct: number;
+  current_stress: number;
+  optimal_stress: number;
+  stress_reduction: number;
+  is_underfunded: boolean;
 }
 
 // ============================================================================
-// Reallocation Plan Types
+// Reallocation Plan Types (matches Rust ReallocationPlan)
 // ============================================================================
 
 export interface ReallocationPlan {
-  baseline_fsfsi: number;
-  estimated_fsfsi_after_reallocation: number;
-  expected_improvement_percent: number;
-  total_budget: number;
-  reallocations: Reallocation[];
-  implementation_phases: ImplementationPhase[];
+  components: ReallocationItem[];
+  current_fsfsi: number;
+  projected_fsfsi: number;
+  projected_improvement: number;
+  projected_improvement_pct: number;
+  total_budget_usd: number;
+  computing_time_ms: number;
 }
 
-export interface Reallocation {
-  component: IndicatorComponent;
-  current_allocation: number;
-  target_allocation: number;
-  change_amount: number;
-  change_percent: number;
+export interface ReallocationItem {
+  component_type: string;
+  current_allocation_usd: number;
+  recommended_allocation_usd: number;
+  change_usd: number;
+  change_pct: number;
   priority: number;
-}
-
-export interface ImplementationPhase {
-  phase: number;
-  description: string;
-  components: IndicatorComponent[];
-  budget_impact: number;
-  timeline_months: number;
+  projected_impact: string;
 }
 
 // ============================================================================
-// ROI Analysis Types
+// ROI Analysis Types (matches Rust RoiAnalysis)
 // ============================================================================
 
 export interface RoiAnalysis {
-  component: IndicatorComponent;
-  current_allocation: number;
-  roi_per_million: number;
-  stress_reduction_potential: number;
-  cost_effectiveness_rank: number;
+  components: ComponentRoi[];
+  best_roi_component: string;
+  worst_roi_component: string;
+  total_budget_usd: number;
+  computing_time_ms: number;
 }
 
-export interface RoiAnalysisReport {
-  components: RoiAnalysis[];
-  best_roi_component: IndicatorComponent;
-  total_budget: number;
-  analysis_timestamp: string;
+export interface ComponentRoi {
+  component_type: string;
+  current_stress: number;
+  marginal_benefit: number;
+  roi_per_million: number;
+  rank: number;
 }
 
 // ============================================================================

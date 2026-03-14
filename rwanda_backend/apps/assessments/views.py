@@ -6,6 +6,8 @@ Views strictly serve data from the backend only: stored assessment results (DB)
 or direct Rust engine responses. No assessment/scoring/stress logic in views.
 """
 
+import logging
+
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
@@ -31,6 +33,50 @@ from .services import (
     get_performance_gap_service,
     get_weighting_service,
 )
+
+logger = logging.getLogger(__name__)
+
+
+def _normalize_optimization_components(components):
+    """Normalize component dicts for Rust: ensure required numeric fields are float. Returns (list, error_msg)."""
+    normalized = []
+    for i, c in enumerate(components):
+        if not isinstance(c, dict):
+            return None, f"Component at index {i} must be an object."
+        try:
+            component_type = str(c.get("component_type") or c.get("component") or "").strip()
+            observed = float(c.get("observed_value", 0))
+            benchmark = float(c.get("benchmark_value", 0))
+            allocation = float(c.get("financial_allocation_usd", 0))
+        except (TypeError, ValueError) as e:
+            return None, f"Component at index {i}: invalid number ({e})."
+        if not component_type:
+            return None, f"Component at index {i}: component_type or component required."
+        if allocation < 0:
+            return None, f"Component at index {i}: financial_allocation_usd must be non-negative."
+        out = {
+            "component_type": component_type,
+            "observed_value": observed,
+            "benchmark_value": benchmark,
+            "financial_allocation_usd": allocation,
+        }
+        if c.get("sensitivity_parameter") is not None:
+            try:
+                out["sensitivity_parameter"] = float(c["sensitivity_parameter"])
+            except (TypeError, ValueError):
+                pass
+        if c.get("weight") is not None:
+            try:
+                out["weight"] = float(c["weight"])
+            except (TypeError, ValueError):
+                pass
+        if c.get("name") is not None:
+            out["name"] = str(c["name"])
+        normalized.append(out)
+    total = sum(c["financial_allocation_usd"] for c in normalized)
+    if total <= 0:
+        return None, "Total financial_allocation_usd across components must be positive."
+    return normalized, None
 
 
 # =============================================================================
@@ -288,15 +334,19 @@ class EfficiencyAnalysisView(APIView):
                 {"error": "Components data required"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        normalized, err = _normalize_optimization_components(components)
+        if err:
+            return Response({"error": err}, status=status.HTTP_400_BAD_REQUEST)
 
         service = get_optimization_service()
-
         try:
-            result = service.analyze_efficiency(components)
+            result = service.analyze_efficiency(normalized)
             return Response(result)
         except Exception as e:
+            logger.exception("Efficiency analysis failed")
+            msg = str(e).strip() or "Efficiency analysis failed."
             return Response(
-                {"error": str(e)},
+                {"error": msg},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
@@ -318,18 +368,24 @@ class ReallocationPlanView(APIView):
                 {"error": "Components data required"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-
-        service = get_optimization_service()
+        normalized, err = _normalize_optimization_components(components)
+        if err:
+            return Response({"error": err}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            result = service.generate_reallocation_plan(
-                components,
-                target_budget=float(target_budget) if target_budget else None,
-            )
+            target = float(target_budget) if target_budget is not None else None
+        except (TypeError, ValueError):
+            target = None
+
+        service = get_optimization_service()
+        try:
+            result = service.generate_reallocation_plan(normalized, target_budget=target)
             return Response(result)
         except Exception as e:
+            logger.exception("Reallocation plan failed")
+            msg = str(e).strip() or "Reallocation plan failed."
             return Response(
-                {"error": str(e)},
+                {"error": msg},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
@@ -349,15 +405,19 @@ class RoiAnalysisView(APIView):
                 {"error": "Components data required"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        normalized, err = _normalize_optimization_components(components)
+        if err:
+            return Response({"error": err}, status=status.HTTP_400_BAD_REQUEST)
 
         service = get_optimization_service()
-
         try:
-            result = service.calculate_roi(components)
+            result = service.calculate_roi(normalized)
             return Response(result)
         except Exception as e:
+            logger.exception("ROI analysis failed")
+            msg = str(e).strip() or "ROI analysis failed."
             return Response(
-                {"error": str(e)},
+                {"error": msg},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 

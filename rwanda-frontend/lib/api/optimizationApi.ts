@@ -63,7 +63,11 @@ optimizationClient.interceptors.response.use(
       localStorage.removeItem('rw_user');
       window.location.href = '/login';
     }
-    console.error('[OptimizationAPI] Error:', error.response?.data || error.message);
+    const msg =
+      (error.response?.data as { error?: string })?.error ||
+      error.message ||
+      (error.response?.status ? `Request failed (${error.response.status})` : 'Request failed');
+    console.error('[OptimizationAPI] Error:', msg, error.response?.data);
     return Promise.reject(error);
   }
 );
@@ -143,10 +147,10 @@ export const optimizationAPI = {
    * @param components - Component data
    * @returns ROI analysis for each component
    */
-  calculateRoi: async (components: ComponentInput[]): Promise<RoiAnalysis[]> => {
+  calculateRoi: async (components: ComponentInput[]): Promise<RoiAnalysis> => {
     console.log('[OptimizationAPI] Calculating ROI:', components.length, 'components');
 
-    const response = await optimizationClient.post<RoiAnalysis[]>('/roi/', {
+    const response = await optimizationClient.post<RoiAnalysis>('/roi/', {
       components,
     });
     return response.data;
