@@ -248,8 +248,15 @@ pub fn calculate_roi(components: &[ComponentInput]) -> FsfiResult<RoiAnalysis> {
 }
 
 // ---------------------------------------------------------------------------
-// Helpers
+// Helpers (prepare_vectors is also used by planning service)
 // ---------------------------------------------------------------------------
+
+/// Public for use by planning service: (gaps, allocations_millions, sensitivities, weights).
+pub fn get_component_vectors(
+    components: &[ComponentInput],
+) -> FsfiResult<(Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>)> {
+    prepare_vectors(components)
+}
 
 fn prepare_vectors(
     components: &[ComponentInput],

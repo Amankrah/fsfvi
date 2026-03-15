@@ -19,6 +19,7 @@ import {
   Shield,
   ChevronRight,
   Sparkles,
+  CalendarRange,
 } from 'lucide-react';
 
 interface NavItem {
@@ -41,6 +42,7 @@ export function RwandaSidebar() {
     { id: 'performance', labelKey: 'nav.performance', icon: BarChart3, href: '/dashboard/performance' },
     { id: 'budget', labelKey: 'nav.budget', icon: DollarSign, href: '/dashboard/budget' },
     { id: 'optimization', labelKey: 'nav.optimization', icon: Sparkles, href: '/dashboard/optimization' },
+    { id: 'planning', labelKey: 'nav.planning', icon: CalendarRange, href: '/dashboard/planning' },
     { id: 'provinces', labelKey: 'nav.provinces', icon: Map, href: '/dashboard/provinces' },
     { id: 'districts', labelKey: 'nav.districts', icon: Building2, href: '/dashboard/districts' },
     { id: 'psta5', labelKey: 'nav.psta5', icon: Target, href: '/dashboard/psta5' },

@@ -111,3 +111,25 @@ export function formatScore(score: number | string | null | undefined, decimals:
 export function formatPercent(value: number, decimals: number = 1): string {
   return `${(value * 100).toFixed(decimals)}%`;
 }
+
+/** Format USD with compact notation (B/M) for large amounts */
+export function formatUSDCompact(amount: number): string {
+  if (amount >= 1_000_000_000_000) {
+    return `$ ${(amount / 1_000_000_000_000).toFixed(1)}T`;
+  }
+  if (amount >= 1_000_000_000) {
+    return `$ ${(amount / 1_000_000_000).toFixed(1)}B`;
+  }
+  if (amount >= 1_000_000) {
+    return `$ ${(amount / 1_000_000_000).toFixed(2)}B`;
+  }
+  if (amount >= 1_000) {
+    return `$ ${(amount / 1_000).toFixed(1)}K`;
+  }
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(amount);
+}

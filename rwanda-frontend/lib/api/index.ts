@@ -9,6 +9,7 @@
 export { authAPI } from './authApi';
 export { assessmentAPI } from './assessmentApi';
 export { optimizationAPI } from './optimizationApi';
+export { planningAPI } from './planningApi';
 export { performanceGapAPI } from './performanceGapApi';
 export { weightingAPI } from './weightingApi';
 
@@ -16,3 +17,4 @@ export { weightingAPI } from './weightingApi';
 export type * from '@/lib/types/auth';
 export type * from '@/lib/types/assessment';
 export type * from '@/lib/types/optimization';
+export type * from '@/lib/types/planning';
