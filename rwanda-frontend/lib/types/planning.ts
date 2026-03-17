@@ -23,6 +23,8 @@ export interface MultiYearPlanRequest {
   planning_years: number;
   target_fsfvi: number;
   yearly_budget_constraints?: Record<string, YearlyBudgetConstraintInput>;
+  /** When no constraint per year: budget = baseline * (1 + rate)^year. Same as MTEF growth rate for consistency. */
+  yearly_budget_growth_rate?: number;
 }
 
 export interface PlanningComponentInput {

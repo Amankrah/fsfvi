@@ -1,5 +1,6 @@
 'use client';
 
+import { useLanguage } from '@/contexts/LanguageContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import type { MtefPlan } from '@/lib/types/planning';
 import { formatScore } from '@/lib/utils/formatters';
@@ -11,10 +12,14 @@ interface MtefSummaryCardsProps {
 }
 
 export function MtefSummaryCards({ plan }: MtefSummaryCardsProps) {
+  const { t } = useLanguage();
   const { year_1_plan, year_2_plan, year_3_plan, target_fsfvi_year_3, fiscal_implications } = plan;
 
   return (
     <div className="space-y-4">
+      <p className="text-sm text-gray-600">
+        {t('planning.mtef_diff_note')}
+      </p>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Card className="bg-gradient-to-br from-[var(--rw-blue)]/5 to-white border-[var(--rw-blue)]/20">
           <CardHeader className="pb-1">
@@ -51,7 +56,7 @@ export function MtefSummaryCards({ plan }: MtefSummaryCardsProps) {
           </CardHeader>
           <CardContent>
             <p className="text-2xl font-bold text-[var(--rw-green)]">{formatScore(year_3_plan.projected_fsfvi)}</p>
-            <p className="text-xs text-gray-500">Target FSFSI: {formatScore(target_fsfvi_year_3)}</p>
+            <p className="text-xs text-gray-500">{t('planning.mtef_year3_target_label')}: {formatScore(target_fsfvi_year_3)}</p>
             <p className="text-sm text-gray-700 mt-1">{formatUSDCompact(year_3_plan.total_budget)}</p>
           </CardContent>
         </Card>

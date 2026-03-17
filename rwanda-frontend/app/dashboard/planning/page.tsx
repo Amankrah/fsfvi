@@ -98,6 +98,7 @@ export default function PlanningPage() {
           current_components: components,
           planning_years: Math.min(Math.max(1, planningYears), 15),
           target_fsfvi: Math.max(0.01, Math.min(1, targetFsfvi)),
+          yearly_budget_growth_rate: mtefGrowthRate,
         }),
         planningAPI.generateMtef(components, mtefImprovementPercent, mtefGrowthRate),
       ]);
@@ -250,37 +251,46 @@ export default function PlanningPage() {
 
           {hasPlans && (
             <>
-              {/* KPI cards */}
+              {/* ---------- Multi-year strategic plan (clearly separate section) ---------- */}
               {multiYearPlan && (
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                  <Card>
-                    <CardContent className="pt-4">
-                      <p className="text-xs text-gray-500 uppercase tracking-wide">{t('planning.baseline_fsfvi')}</p>
-                      <p className="text-xl font-bold text-gray-900">{formatScore(multiYearPlan.baseline_fsfvi)}</p>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardContent className="pt-4">
-                      <p className="text-xs text-gray-500 uppercase tracking-wide">{t('planning.target_fsfvi')}</p>
-                      <p className="text-xl font-bold text-[var(--rw-green)]">{formatScore(multiYearPlan.target_fsfvi)}</p>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardContent className="pt-4">
-                      <p className="text-xs text-gray-500 uppercase tracking-wide">{t('planning.years_to_target')}</p>
-                      <p className="text-xl font-bold text-[var(--rw-blue)]">{multiYearPlan.planning_years}</p>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardContent className="pt-4">
-                      <p className="text-xs text-gray-500 uppercase tracking-wide">{t('planning.additional_investment')}</p>
-                      <p className="text-xl font-bold text-gray-900">{formatUSDCompact(multiYearPlan.total_additional_investment_needed)}</p>
-                    </CardContent>
-                  </Card>
-                </div>
-              )}
+                <section className="space-y-6" aria-labelledby="planning-multiyear-heading">
+                  <div>
+                    <h2 id="planning-multiyear-heading" className="text-lg font-semibold text-gray-900">
+                      {t('planning.section_multiyear_title')} — {multiYearPlan.planning_years} {t('planning.years_unit')}
+                    </h2>
+                    <p className="text-sm text-gray-600 mt-0.5">{t('planning.section_multiyear_desc')}</p>
+                  </div>
 
-              {multiYearPlan && !multiYearPlan.target_already_achieved && multiYearPlan.yearly_plans.length > 0 && (
+                  {/* KPI cards */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                    <Card>
+                      <CardContent className="pt-4">
+                        <p className="text-xs text-gray-500 uppercase tracking-wide">{t('planning.baseline_fsfvi')}</p>
+                        <p className="text-xl font-bold text-gray-900">{formatScore(multiYearPlan.baseline_fsfvi)}</p>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardContent className="pt-4">
+                        <p className="text-xs text-gray-500 uppercase tracking-wide">{t('planning.target_fsfvi')}</p>
+                        <p className="text-xl font-bold text-[var(--rw-green)]">{formatScore(multiYearPlan.target_fsfvi)}</p>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardContent className="pt-4">
+                        <p className="text-xs text-gray-500 uppercase tracking-wide">{t('planning.years_to_target')}</p>
+                        <p className="text-xl font-bold text-[var(--rw-blue)]">{multiYearPlan.planning_years}</p>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardContent className="pt-4">
+                        <p className="text-xs text-gray-500 uppercase tracking-wide">{t('planning.budget_increase_over_plan')}</p>
+                        <p className="text-xl font-bold text-gray-900">{formatUSDCompact(multiYearPlan.total_additional_investment_needed)}</p>
+                        <p className="text-xs text-gray-500 mt-1">{t('planning.budget_increase_hint')}</p>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {!multiYearPlan.target_already_achieved && multiYearPlan.yearly_plans.length > 0 && (
                 <>
                   <Card>
                     <CardHeader>
@@ -341,9 +351,9 @@ export default function PlanningPage() {
                     </CardContent>
                   </Card>
                 </>
-              )}
+                  )}
 
-              {multiYearPlan?.target_already_achieved && (
+                  {multiYearPlan.target_already_achieved && (
                 <Card className="border-[var(--rw-green)]/30 bg-green-50/30">
                   <CardContent className="py-8 text-center">
                     <Target className="h-12 w-12 text-[var(--rw-green)] mx-auto mb-3" />
@@ -351,21 +361,26 @@ export default function PlanningPage() {
                     <p className="text-gray-600 mt-1">{multiYearPlan.expected_outcomes[0] ?? t('planning.target_achieved_message')}</p>
                   </CardContent>
                 </Card>
+                  )}
+                </section>
               )}
 
+              {/* ---------- MTEF (clearly separate from multi-year plan) ---------- */}
               {mtefPlan && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
+                <section className="pt-8 border-t-2 border-gray-200" aria-labelledby="planning-mtef-heading">
+                  <div className="mb-4">
+                    <h2 id="planning-mtef-heading" className="text-lg font-semibold text-gray-900 flex items-center gap-2">
                       <CalendarRange className="h-5 w-5 text-[var(--rw-blue)]" />
-                      {t('planning.mtef_title')}
-                    </CardTitle>
-                    <p className="text-sm text-gray-500 font-normal">{t('planning.mtef_help')}</p>
-                  </CardHeader>
-                  <CardContent>
-                    <MtefSummaryCards plan={mtefPlan} />
-                  </CardContent>
-                </Card>
+                      {t('planning.section_mtef_title')}
+                    </h2>
+                    <p className="text-sm text-gray-600 mt-0.5">{t('planning.section_mtef_desc')}</p>
+                  </div>
+                  <Card className="border-[var(--rw-blue)]/20">
+                    <CardContent className="pt-6">
+                      <MtefSummaryCards plan={mtefPlan} />
+                    </CardContent>
+                  </Card>
+                </section>
               )}
 
               <div className="flex justify-end">

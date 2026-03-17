@@ -57,6 +57,8 @@ class MultiYearPlanView(APIView):
 
         # yearly_budget_constraints: optional map year -> constraint (keys as string "1","2" for JSON)
         constraints = data.get("yearly_budget_constraints") or {}
+        # yearly_budget_growth_rate: optional (e.g. 0.05, 0.1); used when no constraint per year
+        growth_rate = data.get("yearly_budget_growth_rate")
 
         payload = {
             "current_components": components,
@@ -66,6 +68,8 @@ class MultiYearPlanView(APIView):
             "target_fsfvi": float(target_fsfvi),
             "yearly_budget_constraints": constraints,
         }
+        if growth_rate is not None:
+            payload["yearly_budget_growth_rate"] = float(growth_rate)
 
         try:
             result = generate_multi_year_plan(payload)

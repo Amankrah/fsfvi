@@ -58,7 +58,7 @@
     "no_assessment_title": "No Assessment Data",
     "no_assessment_message": "Run an FSFI assessment for the selected fiscal year to enable strategic planning and MTEF.",
     "parameters": "Planning parameters",
-    "parameters_help": "Set target and horizon; both multi-year and 3-year MTEF are generated.",
+    "parameters_help": "Set target and horizon; both multi-year and 3-year MTEF are generated. Budget growth rate applies to both the trajectory and MTEF.",
     "planning_years": "Planning years (1–15)",
     "target_fsfvi": "Target FSFSI (0–1)",
     "mtef_improvement_pct": "MTEF target improvement %",
@@ -69,6 +69,13 @@
     "target_fsfvi": "Target FSFSI",
     "years_to_target": "Years to target",
     "additional_investment": "Additional investment needed",
+    "budget_increase_over_plan": "Planned budget increase (by end of plan)",
+    "budget_increase_hint": "Extra budget allocated over the plan to reach target — not a funding gap.",
+    "years_unit": "years",
+    "section_multiyear_title": "Multi-year strategic plan",
+    "section_multiyear_desc": "Trajectory, budget evolution and outcomes for your chosen planning horizon.",
+    "section_mtef_title": "Medium-Term Expenditure Framework (3 years)",
+    "section_mtef_desc": "Separate rolling 3-year plan with its own target (improvement %) and budget growth.",
     "trajectory_title": "FSFSI trajectory to target",
     "trajectory_help": "Projected vs year target; green line is final target.",
     "budget_evolution": "Budget evolution",
@@ -78,7 +85,9 @@
     "target_achieved_title": "Target already achieved",
     "target_achieved_message": "Maintain current trajectory.",
     "mtef_title": "Medium-Term Expenditure Framework (3 years)",
-    "mtef_help": "Rolling 3-year plan with target improvement and budget growth."
+    "mtef_help": "Rolling 3-year plan with target improvement and budget growth.",
+    "mtef_diff_note": "MTEF is a separate 3-year plan: it uses the improvement % and budget growth rate above. Its Year 3 target is baseline × (1 − improvement %), not the absolute target used in the trajectory chart. Projected FSFSI can be better than that target when budget growth is high.",
+    "mtef_year3_target_label": "MTEF 3-year target (from improvement %)"
   },
   "common": {
     "loading": "Loading...",

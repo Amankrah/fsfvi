@@ -34,6 +34,9 @@ pub struct MultiYearPlanRequest {
     /// Year -> constraint; keys are strings in JSON ("1", "2", ...).
     #[serde(default)]
     pub yearly_budget_constraints: HashMap<String, YearlyBudgetConstraint>,
+    /// When no constraint per year: year_budget = baseline_budget * (1 + rate)^year. Default 0.05 (5%).
+    #[serde(default)]
+    pub yearly_budget_growth_rate: Option<f64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -140,13 +143,14 @@ pub fn generate_multi_year_plan(request: MultiYearPlanRequest) -> FsfiResult<Mul
     let mut current_components = request.current_components.clone();
     let mut cumulative_fsfvi = baseline_fsfvi;
 
+    let growth_rate = request.yearly_budget_growth_rate.unwrap_or(0.05);
     for year in 1..=request.planning_years {
         let year_target_fsfvi = baseline_fsfvi - (annual_reduction * year as f64);
         let year_budget = request
             .yearly_budget_constraints
             .get(&year.to_string())
             .map(|c| c.total_budget_ceiling)
-            .unwrap_or_else(|| baseline_budget * 1.05_f64.powi(year as i32));
+            .unwrap_or_else(|| baseline_budget * (1.0 + growth_rate).powi(year as i32));
 
         let plan = plan_single_year(
             &current_components,

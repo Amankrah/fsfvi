@@ -69,6 +69,13 @@
     "target_fsfvi": "FSFSI cible",
     "years_to_target": "Années jusqu'à la cible",
     "additional_investment": "Investissement additionnel requis",
+    "budget_increase_over_plan": "Augmentation budgétaire prévue (fin de plan)",
+    "budget_increase_hint": "Budget supplémentaire alloué sur la période pour atteindre la cible — pas un déficit de financement.",
+    "years_unit": "ans",
+    "section_multiyear_title": "Plan stratégique pluriannuel",
+    "section_multiyear_desc": "Trajectoire, évolution du budget et résultats pour l'horizon choisi.",
+    "section_mtef_title": "Cadre des dépenses à moyen terme (3 ans)",
+    "section_mtef_desc": "Plan glissant 3 ans distinct, avec sa propre cible (% d'amélioration) et croissance budgétaire.",
     "trajectory_title": "Trajectoire FSFSI vers la cible",
     "trajectory_help": "Projeté vs cible annuelle ; ligne verte = cible finale.",
     "budget_evolution": "Évolution du budget",
@@ -78,7 +85,9 @@
     "target_achieved_title": "Cible déjà atteinte",
     "target_achieved_message": "Maintenir la trajectoire actuelle.",
     "mtef_title": "Cadre des dépenses à moyen terme (3 ans)",
-    "mtef_help": "Plan glissant 3 ans avec amélioration cible et croissance budgétaire."
+    "mtef_help": "Plan glissant 3 ans avec amélioration cible et croissance budgétaire.",
+    "mtef_diff_note": "Le MTEF est un plan 3 ans distinct : il utilise le % d'amélioration et le taux de croissance budgétaire ci-dessus. Sa cible année 3 = référence × (1 − %), pas la cible absolue du graphique de trajectoire. Le FSFSI projeté peut être meilleur que cette cible si la croissance budgétaire est forte.",
+    "mtef_year3_target_label": "Cible MTEF 3 ans (du % d'amélioration)"
   },
   "common": {
     "loading": "Chargement...",

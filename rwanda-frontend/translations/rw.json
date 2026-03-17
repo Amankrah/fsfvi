@@ -69,6 +69,13 @@
     "target_fsfvi": "FSFSI y'ingongo",
     "years_to_target": "Imyaka kugeza k'ingongo",
     "additional_investment": "Amafaranga yo kwiyongera",
+    "budget_increase_over_plan": "Iyongera y'ingengo y'imari (bya plan)",
+    "budget_increase_hint": "Ingengo y'imari yongewe kugira ngo ugeze k'ingongo — si ngaruka y'imari.",
+    "years_unit": "imyaka",
+    "section_multiyear_title": "Gahunda y'imyaka myinshi",
+    "section_multiyear_desc": "Intambwe, impinduka y'ingengo n'ibyagezweho k'igihe cyatoranijwe.",
+    "section_mtef_title": "Gahunda y'imari y'imyaka 3",
+    "section_mtef_desc": "Gahunda y'imyaka 3 itandukanye, ingongo yayo (% ijanisha) n'iyongera y'ingengo.",
     "trajectory_title": "Intambwe ya FSFSI kugeza k'ingongo",
     "trajectory_help": "Biteganijwe n'ingongo y'umwaka; urwego rw'icyatsi ni ingongo y'urwego.",
     "budget_evolution": "Impinduka y'ingengo y'imari",
@@ -78,7 +85,9 @@
     "target_achieved_title": "Ingongo yashyizweho",
     "target_achieved_message": "Komeza intambwe ufite.",
     "mtef_title": "Gahunda y'imari y'imyaka 3",
-    "mtef_help": "Gahunda y'imyaka 3 hamwe n'ijanisha n'iyongera y'ingengo."
+    "mtef_help": "Gahunda y'imyaka 3 hamwe n'ijanisha n'iyongera y'ingengo.",
+    "mtef_diff_note": "MTEF ni gahunda y'imyaka 3 itandukanye: ikoresha ijanisha ry'igipimo n'iyongera y'ingengo. Ingongo y'umwaka 3 = intangiriro × (1 − %), si ingongo y'umwaka 5 y'igirabi. FSFSI biteganijwe bishobora kuba byiza kuruta iyo ingongo niba iyongera y'ingengo ni nini.",
+    "mtef_year3_target_label": "Ingongo MTEF imyaka 3 (kuva kujanisha %)"
   },
   "common": {
     "loading": "Gutegereza...",
