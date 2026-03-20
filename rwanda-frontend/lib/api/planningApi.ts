@@ -52,10 +52,50 @@ planningClient.interceptors.response.use(
 );
 
 export const planningAPI = {
+  // ==========================================================================
+  // Assessment-based (preferred — cumulative stress as baseline)
+  // ==========================================================================
+
   /**
-   * Generate multi-year strategic plan to reach target FSFSI.
-   * POST /api/planning/multi-year/
+   * Generate multi-year plan using a saved assessment.
+   * Uses cumulative FSFSI as baseline. All insights are data-driven.
+   *
+   * GET /api/planning/<assessment_id>/multi-year/
    */
+  planForAssessment: async (
+    assessmentId: string,
+    planningYears: number = 5,
+    targetFsfvi: number = 0.30,
+    growthRate: number = 0.05,
+  ): Promise<MultiYearStrategicPlan> => {
+    const response = await planningClient.get<MultiYearStrategicPlan>(
+      `/${assessmentId}/multi-year/`,
+      { params: { planning_years: planningYears, target_fsfvi: targetFsfvi, growth_rate: growthRate } }
+    );
+    return response.data;
+  },
+
+  /**
+   * Generate 3-year MTEF using a saved assessment.
+   *
+   * GET /api/planning/<assessment_id>/mtef/
+   */
+  mtefForAssessment: async (
+    assessmentId: string,
+    improvementPercent: number = 20,
+    growthRate: number = 0.05,
+  ): Promise<MtefPlan> => {
+    const response = await planningClient.get<MtefPlan>(
+      `/${assessmentId}/mtef/`,
+      { params: { improvement_percent: improvementPercent, growth_rate: growthRate } }
+    );
+    return response.data;
+  },
+
+  // ==========================================================================
+  // Legacy (raw component inputs)
+  // ==========================================================================
+
   generateMultiYearPlan: async (
     request: MultiYearPlanRequest
   ): Promise<MultiYearStrategicPlan> => {
@@ -66,10 +106,6 @@ export const planningAPI = {
     return response.data;
   },
 
-  /**
-   * Generate 3-year MTEF plan with target improvement % and budget growth.
-   * POST /api/planning/mtef/
-   */
   generateMtef: async (
     components: PlanningComponentInput[],
     targetFsfviImprovementPercent: number = 20,

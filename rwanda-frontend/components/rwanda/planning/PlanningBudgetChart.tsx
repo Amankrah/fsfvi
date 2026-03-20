@@ -11,7 +11,7 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import type { YearlyPlanOutput } from '@/lib/types/planning';
-import { formatUSDCompact } from '@/lib/utils/formatters';
+import { formatRWFCompact } from '@/lib/utils/formatters';
 
 interface PlanningBudgetChartProps {
   yearlyPlans: YearlyPlanOutput[];
@@ -26,13 +26,13 @@ export function PlanningBudgetChart({
 }: PlanningBudgetChartProps) {
   const chartData = useMemo(() => {
     const points: { year: string; budget: number; label: string }[] = [
-      { year: 'Baseline', budget: baselineBudget, label: formatUSDCompact(baselineBudget) },
+      { year: 'Baseline', budget: baselineBudget, label: formatRWFCompact(baselineBudget) },
     ];
     yearlyPlans.forEach((p) => {
       points.push({
         year: `Y${p.year}`,
         budget: p.total_budget,
-        label: formatUSDCompact(p.total_budget),
+        label: formatRWFCompact(p.total_budget),
       });
     });
     return points;
@@ -67,7 +67,7 @@ export function PlanningBudgetChart({
         <XAxis dataKey="year" tick={{ fontSize: 12 }} tickLine={{ stroke: '#e5e7eb' }} />
         <YAxis
           tick={{ fontSize: 12 }}
-          tickFormatter={(v) => formatUSDCompact(v)}
+          tickFormatter={(v) => formatRWFCompact(v)}
           domain={[0, maxBudget * 1.05]}
           tickLine={{ stroke: '#e5e7eb' }}
         />

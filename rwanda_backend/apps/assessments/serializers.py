@@ -282,6 +282,8 @@ class ComponentResultSerializer(serializers.ModelSerializer):
             "budget_share_percent",
             "optimal_allocation_usd",
             "allocation_gap_usd",
+            "cumulative_stress",
+            "cumulative_weighted_stress",
             "indicators_count",
         ]
         read_only_fields = fields
@@ -316,6 +318,8 @@ class AssessmentResultSerializer(serializers.ModelSerializer):
             "total_budget_usd",
             "indicators_count",
             "components_count",
+            "cumulative_fsfsi",
+            "cumulative_stress_level",
             "result_json",
             "computed_at",
             "computing_time_ms",
@@ -360,6 +364,8 @@ class AssessmentHistorySerializer(serializers.ModelSerializer):
             "total_budget_lcu_bn",
             "yoy_change",
             "yoy_change_percent",
+            "cumulative_fsfsi",
+            "cumulative_component_scores",
             "created_at",
         ]
         read_only_fields = fields
@@ -381,6 +387,7 @@ class ComponentSummarySerializer(serializers.Serializer):
     budget_share_percent = serializers.FloatField()
     indicator_count = serializers.IntegerField()
     priority_level = serializers.CharField()  # From Rust: low | medium | high | critical
+    cumulative_stress = serializers.FloatField(required=False, allow_null=True)
 
 
 class DashboardSummarySerializer(serializers.Serializer):
@@ -395,5 +402,7 @@ class DashboardSummarySerializer(serializers.Serializer):
     top_priorities = ActionPriorityOutputSerializer(many=True)
     efficiency_index = serializers.FloatField()
     yoy_change_percent = serializers.FloatField(allow_null=True)
+    cumulative_fsfsi = serializers.FloatField(required=False, allow_null=True)
+    cumulative_stress_level = serializers.CharField(required=False, allow_null=True)
     computed_at = serializers.CharField(allow_null=True)  # ISO datetime from backend
     empty = serializers.BooleanField(default=False)

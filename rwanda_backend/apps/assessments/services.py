@@ -193,7 +193,10 @@ class AssessmentService:
                 avg_performance_gap=Decimal(str(comp_agg["average_performance_gap"])),
                 component_stress=Decimal(str(comp_agg["average_performance_gap"])),
                 weighted_stress=Decimal(str(comp_agg["average_performance_gap"] / 8)),
-                priority_level=self._map_stress_level(priority),
+                # Classify based on average_performance_gap (the value shown as
+                # "stress" on the dashboard), not the Rust-computed avg_stress,
+                # so the badge color matches the displayed number.
+                priority_level=self._classify_stress(comp_agg["average_performance_gap"]),
                 budget_lcu_bn=Decimal(str(comp_agg["total_weighted_lcu_bn"])),
                 budget_share_percent=Decimal(str(comp_agg["total_share_weighted_percent"])),
                 indicators_count=comp_agg["indicator_count"],
@@ -214,11 +217,141 @@ class AssessmentService:
                 benchmark_value=Decimal(str(ind["benchmark_value"])) if ind.get("benchmark_value") is not None else None,
             )
 
+        # Compute cumulative stress (asymmetric EMA)
+        self._compute_cumulative_stress(assessment)
+
         # Update history
         self._update_history(assessment)
 
         result["assessment_id"] = str(assessment.id)
+        result["cumulative_fsfsi"] = float(assessment.cumulative_fsfsi) if assessment.cumulative_fsfsi else None
         return result
+
+    def _compute_cumulative_stress(self, assessment: AssessmentResult):
+        """
+        Apply asymmetric EMA at the INDICATOR level (33 indicators), then
+        aggregate to components and system level using the same weights as the
+        Rust engine.
+
+        For each indicator i:
+          CS_i(t) = CS_i(t-1) + ρ · (v_i(t) - CS_i(t-1))
+          where ρ = ρ_up if worsening, ρ_down if improving
+
+        System cumulative FSFSI = Σ ωᵢ · CS_i(t)
+        where ωᵢ = share_weighted_percent (same weights the Rust engine uses)
+
+        Component cumulative = average of indicator cumulative stresses within
+        that component (for dashboard display).
+        """
+        from apps.assessments.models import ComponentPersistenceConfig, IndicatorResult
+
+        # Load persistence configs per component
+        configs = {}
+        for cfg in ComponentPersistenceConfig.objects.all():
+            configs[cfg.component] = (float(cfg.rho_up), float(cfg.rho_down))
+        defaults = ComponentPersistenceConfig.DEFAULTS
+
+        # Find previous year's indicator-level cumulative stress
+        prev_assessment = (
+            AssessmentResult.objects
+            .filter(
+                fiscal_year__lt=assessment.fiscal_year,
+                cumulative_fsfsi__isnull=False,
+            )
+            .order_by("-fiscal_year")
+            .first()
+        )
+
+        # Build lookup: indicator_code -> previous cumulative stress
+        prev_indicator_cs = {}
+        if prev_assessment:
+            for ind in prev_assessment.indicator_results.all():
+                if ind.cumulative_stress is not None:
+                    prev_indicator_cs[ind.indicator_code] = float(ind.cumulative_stress)
+
+        is_bootstrap = not prev_assessment
+
+        # --- Step 1: Compute cumulative stress per indicator ---
+        indicator_results = list(assessment.indicator_results.all())
+
+        n = len(indicator_results)
+
+        cumulative_fsfsi = 0.0
+        # Track per-component cumulative stresses for aggregation
+        from collections import defaultdict
+        component_cumulative = defaultdict(list)
+
+        for ind in indicator_results:
+            v = float(ind.stress_value)
+            cs_prev = prev_indicator_cs.get(ind.indicator_code, v)  # bootstrap
+
+            # Get persistence parameters from the indicator's component
+            comp = ind.component
+            if comp in configs:
+                rho_up, rho_down = configs[comp]
+            elif comp in defaults:
+                d = defaults[comp]
+                rho_up, rho_down = float(d["rho_up"]), float(d["rho_down"])
+            else:
+                rho_up, rho_down = 0.40, 0.15
+
+            # Asymmetric EMA
+            if is_bootstrap:
+                cs_new = v
+            else:
+                rho = rho_up if v > cs_prev else rho_down
+                cs_new = cs_prev + rho * (v - cs_prev)
+
+            # Save indicator cumulative
+            ind.cumulative_stress = Decimal(str(round(cs_new, 6)))
+            ind.save(update_fields=["cumulative_stress"])
+
+            # Track for component aggregation
+            component_cumulative[comp].append((v, cs_new))
+
+        # --- Step 2: Aggregate to component level (average for display) ---
+        for comp_result in assessment.component_results.all():
+            pairs = component_cumulative.get(comp_result.component, [])
+            if pairs:
+                avg_cum = sum(cs for _, cs in pairs) / len(pairs)
+            else:
+                avg_cum = float(comp_result.component_stress)
+
+            comp_weight = float(comp_result.weight)
+            comp_result.cumulative_stress = Decimal(str(round(avg_cum, 6)))
+            comp_result.cumulative_weighted_stress = Decimal(str(round(comp_weight * avg_cum, 6)))
+            comp_result.save(update_fields=["cumulative_stress", "cumulative_weighted_stress"])
+
+        # --- Step 3: Compute system-level cumulative FSFSI ---
+        # Instead of re-weighting indicators (which requires matching Rust's exact
+        # weighting logic), we scale the Rust FSFSI by the aggregate cumulative/current
+        # ratio across all indicators. This ensures consistency.
+        rust_fsfsi = float(assessment.fsfsi_score)
+
+        if is_bootstrap:
+            cumulative_fsfsi = rust_fsfsi
+        else:
+            # Collect all (current_stress, cumulative_stress) pairs
+            all_current = []
+            all_cumulative = []
+            for pairs in component_cumulative.values():
+                for v, cs in pairs:
+                    all_current.append(v)
+                    all_cumulative.append(cs)
+
+            sum_current = sum(all_current)
+            sum_cumulative = sum(all_cumulative)
+
+            if sum_current > 0:
+                # Scale Rust's FSFSI by the ratio of cumulative to current stress
+                ratio = sum_cumulative / sum_current
+                cumulative_fsfsi = rust_fsfsi * ratio
+            else:
+                cumulative_fsfsi = rust_fsfsi
+
+        assessment.cumulative_fsfsi = Decimal(str(round(cumulative_fsfsi, 6)))
+        assessment.cumulative_stress_level = self._classify_stress(cumulative_fsfsi)
+        assessment.save(update_fields=["cumulative_fsfsi", "cumulative_stress_level"])
 
     def _map_stress_level(self, level: str) -> str:
         """Map Rust stress level string to Django enum."""
@@ -229,6 +362,25 @@ class AssessmentService:
             "critical": StressLevel.CRITICAL,
         }
         return mapping.get(level.lower(), StressLevel.MEDIUM)
+
+    @staticmethod
+    def _classify_stress(score: float) -> str:
+        """Classify a stress/gap score using the same thresholds as the Rust engine config.
+
+        Thresholds (from fsfi_engine config.rs):
+          low    <= 0.050
+          medium <= 0.150
+          high   <= 0.300
+          critical > 0.300
+        """
+        if score <= 0.050:
+            return StressLevel.LOW
+        elif score <= 0.150:
+            return StressLevel.MEDIUM
+        elif score <= 0.300:
+            return StressLevel.HIGH
+        else:
+            return StressLevel.CRITICAL
 
     def _update_history(self, assessment: AssessmentResult):
         """Update or create history record for trend analysis."""
@@ -266,6 +418,12 @@ class AssessmentService:
                 "total_budget_lcu_bn": assessment.total_budget_lcu_bn,
                 "yoy_change": yoy_change,
                 "yoy_change_percent": yoy_pct,
+                "cumulative_fsfsi": assessment.cumulative_fsfsi,
+                "cumulative_component_scores": {
+                    comp.component: float(comp.cumulative_stress)
+                    for comp in assessment.component_results.all()
+                    if comp.cumulative_stress is not None
+                },
             },
         )
 
@@ -344,6 +502,7 @@ class AssessmentService:
                 "budget_share_percent": float(comp.budget_share_percent or 0),
                 "indicator_count": comp.indicators_count,
                 "priority_level": comp.priority_level,
+                "cumulative_stress": float(comp.cumulative_stress) if comp.cumulative_stress else None,
             }
             for comp in assessment.component_results.all()
         ]
@@ -379,29 +538,66 @@ class AssessmentService:
             "top_priorities": assessment.result_json.get("action_priorities", [])[:5],
             "efficiency_index": float(assessment.efficiency_index or 0),
             "yoy_change_percent": yoy_pct,
+            "cumulative_fsfsi": float(assessment.cumulative_fsfsi) if assessment.cumulative_fsfsi else None,
+            "cumulative_stress_level": assessment.cumulative_stress_level,
             "computed_at": assessment.computed_at.isoformat(),
             "empty": False,
         }
 
     def load_indicators_from_db(self, fiscal_year: int) -> list[dict]:
-        """Load indicator data from database for assessment."""
+        """Load indicator data from database for assessment.
+
+        For indicators where the target fiscal year has no budget data (gross_lcu_bn=0),
+        falls back to the nearest fiscal year that has budget data for that indicator.
+        This allows assessments for years where only observed/benchmark values were
+        interpolated but no budget mapping was imported.
+        """
         indicators = []
         for ind in Indicator.objects.all():
             data = IndicatorData.objects.filter(
                 indicator=ind, fiscal_year=fiscal_year
             ).first()
             if data:
+                gross = float(data.gross_lcu_bn)
+                weighted = float(data.weighted_lcu_bn)
+                share = float(data.share_weighted_percent)
+
+                # If budget data is zero, fall back to nearest year with budget
+                if gross == 0 and weighted == 0:
+                    budget_fallback = (
+                        IndicatorData.objects.filter(indicator=ind, gross_lcu_bn__gt=0)
+                        .order_by(
+                            # Prefer closest year
+                        )
+                        .extra(select={"year_diff": f"ABS(fiscal_year - {int(fiscal_year)})"})
+                        .order_by("year_diff")
+                        .first()
+                    )
+                    if budget_fallback:
+                        gross = float(budget_fallback.gross_lcu_bn)
+                        weighted = float(budget_fallback.weighted_lcu_bn)
+                        share = float(budget_fallback.share_weighted_percent)
+
+                # Resolve sensitivity: prefer IndicatorData.sensitivity_parameter (from Excel),
+                # then Indicator.default_sensitivity, then let Rust fall back to its default.
+                alpha = (
+                    float(data.sensitivity_parameter) if data.sensitivity_parameter else
+                    float(ind.default_sensitivity) if ind.default_sensitivity else
+                    None
+                )
+
                 indicators.append({
                     "indicator_code": ind.code,
                     "indicator_component": ind.component,
                     "name": ind.name,
                     "records_count": data.records_count,
-                    "gross_lcu_bn": float(data.gross_lcu_bn),
-                    "weighted_lcu_bn": float(data.weighted_lcu_bn),
-                    "share_weighted_percent": float(data.share_weighted_percent),
+                    "gross_lcu_bn": gross,
+                    "weighted_lcu_bn": weighted,
+                    "share_weighted_percent": share,
                     "observed_value": float(data.observed_value) if data.observed_value else None,
                     "benchmark_value": float(data.benchmark_value) if data.benchmark_value else None,
                     "higher_is_better": ind.higher_is_better,
+                    "sensitivity_parameter": alpha,
                 })
         return indicators
 

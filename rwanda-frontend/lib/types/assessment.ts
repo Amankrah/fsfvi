@@ -243,13 +243,15 @@ export interface SavedAssessment {
   efficiency_index?: number;
   gap_ratio?: number;
   total_budget_lcu_bn: number;
-  total_budget_usd?: number;
+  total_budget_lcu?: number;
   indicators_count: number;
   components_count: number;
   result_json?: Record<string, unknown>;
   computed_at: string;
   computing_time_ms: number;
   computed_by_username?: string;
+  cumulative_fsfsi?: number;
+  cumulative_stress_level?: string;
   component_results?: ComponentResult[];
   indicator_results?: SavedIndicatorResult[];
 }
@@ -265,8 +267,10 @@ export interface ComponentResult {
   priority_level: string;
   budget_lcu_bn: number;
   budget_share_percent: number;
-  optimal_allocation_usd?: number;
-  allocation_gap_usd?: number;
+  cumulative_stress?: number;
+  cumulative_weighted_stress?: number;
+  optimal_allocation_lcu?: number;
+  allocation_gap_lcu?: number;
   indicators_count: number;
 }
 
@@ -301,6 +305,9 @@ export interface DashboardSummary {
   top_priorities: ActionPriority[];
   efficiency_index: number;
   yoy_change_percent?: number | null;
+  /** Cumulative FSFSI: accounts for damage persistence and slow recovery */
+  cumulative_fsfsi?: number | null;
+  cumulative_stress_level?: string | null;
   computed_at?: string | null;
   /** True when no assessment has been run yet for this fiscal year. */
   empty?: boolean;
@@ -317,6 +324,8 @@ export interface ComponentSummary {
   indicator_count: number;
   /** From backend (Rust): low | medium | high | critical */
   priority_level: string;
+  /** Cumulative stress: accounts for accumulated damage from prior years */
+  cumulative_stress?: number | null;
 }
 
 // ============================================================================
@@ -332,6 +341,8 @@ export interface AssessmentHistory {
   total_budget_lcu_bn: number;
   yoy_change?: number;
   yoy_change_percent?: number;
+  cumulative_fsfsi?: number;
+  cumulative_component_scores?: Record<string, number>;
   created_at: string;
 }
 

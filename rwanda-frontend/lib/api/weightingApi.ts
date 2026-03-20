@@ -76,7 +76,7 @@ interface ComponentInput {
   component_type: IndicatorComponent;
   observed_value: number;
   benchmark_value: number;
-  financial_allocation_usd: number;
+  financial_allocation_lcu: number;
   weight?: number;
 }
 

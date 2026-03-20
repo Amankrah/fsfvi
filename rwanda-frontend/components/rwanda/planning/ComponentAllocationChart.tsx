@@ -12,7 +12,7 @@ import {
   Legend,
 } from 'recharts';
 import type { YearlyPlanOutput } from '@/lib/types/planning';
-import { formatUSDCompact } from '@/lib/utils/formatters';
+import { formatRWFCompact } from '@/lib/utils/formatters';
 import { COMPONENT_DISPLAY_NAMES } from '@/lib/types/assessment';
 import type { IndicatorComponent } from '@/lib/types/assessment';
 

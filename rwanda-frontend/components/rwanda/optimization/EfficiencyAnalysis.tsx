@@ -3,7 +3,7 @@
 import { useMemo } from 'react';
 import type { EfficiencyAnalysis as EfficiencyAnalysisType, ComponentEfficiency } from '@/lib/types/optimization';
 import { COMPONENT_DISPLAY_NAMES, type IndicatorComponent } from '@/lib/types/assessment';
-import { formatScore } from '@/lib/utils/formatters';
+import { formatScore, formatRWFCompact } from '@/lib/utils/formatters';
 import {
   TrendingUp,
   TrendingDown,
@@ -15,19 +15,6 @@ interface EfficiencyAnalysisProps {
   data: EfficiencyAnalysisType;
 }
 
-function formatUSD(amount: number): string {
-  if (Math.abs(amount) >= 1_000_000_000) {
-    return `$${(amount / 1_000_000_000).toFixed(2)}B`;
-  }
-  if (Math.abs(amount) >= 1_000_000) {
-    return `$${(amount / 1_000_000).toFixed(2)}M`;
-  }
-  if (Math.abs(amount) >= 1_000) {
-    return `$${(amount / 1_000).toFixed(2)}K`;
-  }
-  return `$${amount.toFixed(0)}`;
-}
-
 export function EfficiencyAnalysis({ data }: EfficiencyAnalysisProps) {
   const efficiencyPercent = data.efficiency_index * 100;
 
@@ -37,7 +24,7 @@ export function EfficiencyAnalysis({ data }: EfficiencyAnalysisProps) {
       if (a.is_underfunded !== b.is_underfunded) {
         return a.is_underfunded ? -1 : 1;
       }
-      return Math.abs(b.allocation_gap_usd) - Math.abs(a.allocation_gap_usd);
+      return Math.abs(b.allocation_gap_lcu) - Math.abs(a.allocation_gap_lcu);
     });
   }, [data.components]);
 
@@ -87,7 +74,7 @@ export function EfficiencyAnalysis({ data }: EfficiencyAnalysisProps) {
             Total Budget
           </p>
           <p className="text-2xl font-bold text-blue-700 mt-1">
-            {formatUSD(data.total_budget_usd)}
+            {formatRWFCompact(data.total_budget_lcu)}
           </p>
           <p className="text-xs text-blue-600 mt-1">
             Computed in {data.computing_time_ms}ms
@@ -175,23 +162,23 @@ export function EfficiencyAnalysis({ data }: EfficiencyAnalysisProps) {
                     {COMPONENT_DISPLAY_NAMES[item.component_type as IndicatorComponent] || item.component_type}
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-600 text-right">
-                    {formatUSD(item.current_allocation_usd)}
+                    {formatRWFCompact(item.current_allocation_lcu)}
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-600 text-right">
-                    {formatUSD(item.optimal_allocation_usd)}
+                    {formatRWFCompact(item.optimal_allocation_lcu)}
                   </td>
                   <td className="px-4 py-3 text-right">
                     <span
                       className={`text-sm font-medium ${
-                        item.allocation_gap_usd > 0
+                        item.allocation_gap_lcu > 0
                           ? 'text-red-600'
-                          : item.allocation_gap_usd < 0
+                          : item.allocation_gap_lcu < 0
                           ? 'text-green-600'
                           : 'text-gray-600'
                       }`}
                     >
-                      {item.allocation_gap_usd > 0 ? '+' : ''}
-                      {formatUSD(item.allocation_gap_usd)}
+                      {item.allocation_gap_lcu > 0 ? '+' : ''}
+                      {formatRWFCompact(item.allocation_gap_lcu)}
                       <span className="text-xs ml-1">
                         ({item.allocation_gap_pct > 0 ? '+' : ''}
                         {item.allocation_gap_pct.toFixed(1)}%)
@@ -204,7 +191,7 @@ export function EfficiencyAnalysis({ data }: EfficiencyAnalysisProps) {
                         <TrendingDown className="h-3 w-3" />
                         Underfunded
                       </span>
-                    ) : item.allocation_gap_usd < -1000 ? (
+                    ) : item.allocation_gap_lcu < -1000 ? (
                       <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
                         <TrendingUp className="h-3 w-3" />
                         Over-funded

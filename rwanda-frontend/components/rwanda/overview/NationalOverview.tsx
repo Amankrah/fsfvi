@@ -95,8 +95,9 @@ export function NationalOverview() {
   const stressLevel = dashboardData.stress_level as StressLevel;
   const yoyChange = dashboardData.yoy_change_percent ?? 0;
   const improving = yoyChange < 0;
+  // Count critical components based on cumulative stress (> 0.30 threshold)
   const criticalComponents = dashboardData.components.filter(
-    (c) => c.priority_level === 'critical'
+    (c) => (c.cumulative_stress ?? c.stress) > 0.30
   ).length;
 
   return (
@@ -114,18 +115,24 @@ export function NationalOverview() {
 
       {/* Key Metrics Row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* FSFSI Score */}
+        {/* FSFSI Score — Cumulative is the headline */}
         <Card className="border-l-4 border-l-[var(--rw-blue)]">
           <CardContent className="p-5">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">FSFSI Score</p>
                 <p className="text-3xl font-bold text-gray-900 mt-1">
-                  {formatScore(dashboardData.overall_fsfsi)}
+                  {formatScore(dashboardData.cumulative_fsfsi ?? dashboardData.overall_fsfsi)}
+                </p>
+                <p className="text-xs text-gray-400 mt-1">
+                  This year: {formatScore(dashboardData.overall_fsfsi)}
                 </p>
               </div>
-              <div className={`px-3 py-1.5 rounded-full text-xs font-bold ${getRiskBgColor(stressLevel)}`}>
-                {stressLevel.charAt(0).toUpperCase() + stressLevel.slice(1)} Risk
+              <div className={`px-3 py-1.5 rounded-full text-xs font-bold ${getRiskBgColor(
+                (dashboardData.cumulative_stress_level || stressLevel) as StressLevel
+              )}`}>
+                {(dashboardData.cumulative_stress_level || stressLevel).charAt(0).toUpperCase() +
+                 (dashboardData.cumulative_stress_level || stressLevel).slice(1)} Risk
               </div>
             </div>
           </CardContent>
@@ -276,7 +283,15 @@ export function NationalOverview() {
 }
 
 function ComponentCard({ component }: { component: ComponentSummary }) {
-  const stressLevel = (component.priority_level || 'medium') as StressLevel;
+  // Use cumulative stress as the primary display value
+  const displayStress = component.cumulative_stress ?? component.stress;
+  const classifyLevel = (score: number): StressLevel => {
+    if (score <= 0.05) return 'low';
+    if (score <= 0.15) return 'medium';
+    if (score <= 0.30) return 'high';
+    return 'critical';
+  };
+  const level = classifyLevel(displayStress);
 
   return (
     <div className="bg-gray-50 rounded-lg p-4 border border-gray-200 hover:shadow-md hover:border-[var(--rw-blue)]/30 transition-all">
@@ -284,20 +299,25 @@ function ComponentCard({ component }: { component: ComponentSummary }) {
         <h3 className="text-sm font-semibold text-gray-900 truncate">
           {component.component_display}
         </h3>
-        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${getRiskBgColor(stressLevel)}`}>
-          {formatScore(component.stress)}
+        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${getRiskBgColor(level)}`}>
+          {formatScore(displayStress)}
         </span>
       </div>
       <p className="text-xs text-gray-500">
         {component.indicator_count} indicators · {component.budget_share_percent.toFixed(1)}% budget
       </p>
-      {/* Stress bar */}
+      {component.cumulative_stress != null && Math.abs(component.cumulative_stress - component.stress) > 0.01 && (
+        <p className="text-xs text-gray-400 mt-0.5">
+          This year: {formatScore(component.stress)}
+        </p>
+      )}
+      {/* Stress bar — shows cumulative */}
       <div className="mt-2 h-2 bg-gray-200 rounded-full overflow-hidden">
         <div
           className="h-full rounded-full transition-all"
           style={{
-            width: `${Math.min(component.stress * 100, 100)}%`,
-            backgroundColor: getRiskBarColor(stressLevel),
+            width: `${Math.min(displayStress * 100, 100)}%`,
+            backgroundColor: getRiskBarColor(level),
           }}
         />
       </div>

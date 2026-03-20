@@ -72,7 +72,7 @@ export function PlanningTrajectoryChart({
 
   return (
     <ResponsiveContainer width="100%" height={height}>
-      <LineChart data={chartData} margin={{ top: 10, right: 20, left: 0, bottom: 5 }}>
+      <LineChart data={chartData} margin={{ top: 10, right: 40, left: 0, bottom: 5 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
         <XAxis dataKey="year" tick={{ fontSize: 12 }} tickLine={{ stroke: '#e5e7eb' }} />
         <YAxis domain={[0, 1]} tick={{ fontSize: 12 }} tickFormatter={(v) => v.toFixed(2)} tickLine={{ stroke: '#e5e7eb' }} />
@@ -80,8 +80,9 @@ export function PlanningTrajectoryChart({
         <ReferenceLine
           y={targetFsfvi}
           stroke="var(--rw-green)"
-          strokeDasharray="5 5"
-          label={{ value: 'Target', position: 'right', fontSize: 10, fill: 'var(--rw-green)' }}
+          strokeDasharray="8 4"
+          strokeWidth={1.5}
+          label={{ value: `Goal: ${targetFsfvi.toFixed(2)}`, position: 'insideTopLeft', fontSize: 11, fill: 'var(--rw-green)', fontWeight: 600 }}
         />
         <Line type="monotone" dataKey="projected" name="Projected FSFSI" stroke="var(--rw-blue)" strokeWidth={3} dot={{ r: 5, fill: 'var(--rw-blue)', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 7 }} />
         <Line type="monotone" dataKey="target" name="Year target" stroke="var(--rw-green)" strokeDasharray="4 4" strokeWidth={2} dot={{ r: 4 }} />

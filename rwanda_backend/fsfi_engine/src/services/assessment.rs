@@ -30,7 +30,7 @@ pub struct ComponentInput {
     pub component_type: String,
     pub observed_value: f64,
     pub benchmark_value: f64,
-    pub financial_allocation_usd: f64,
+    pub financial_allocation_lcu: f64,
     /// When None or not provided, per-component α is used via get_default_sensitivity(component_type).
     #[serde(default)]
     pub sensitivity_parameter: Option<f64>,
@@ -80,6 +80,10 @@ pub struct IndicatorInput {
     /// When true, higher values are better (e.g. yield); when false, lower are better (e.g. stunting).
     #[serde(default)]
     pub higher_is_better: Option<bool>,
+    /// Sensitivity parameter α (from Excel alpha_per_bnLCU). When provided, overrides the
+    /// engine's hardcoded default. Must be calibrated for the same units as weighted_lcu_bn.
+    #[serde(default)]
+    pub sensitivity_parameter: Option<f64>,
 }
 
 /// Aggregated component data from indicators (priority_level from Rust engine only)
@@ -159,7 +163,7 @@ pub struct ComponentAssessment {
     pub performance_gap: f64,
     pub stress: f64,
     pub weighted_stress: f64,
-    pub financial_allocation_usd: f64,
+    pub financial_allocation_lcu: f64,
     pub trend: String,
     pub year_over_year_change: f64,
     pub sub_indicators: Vec<SubIndicator>,
@@ -200,7 +204,7 @@ pub struct AssessmentMetadata {
     pub calculated_at: String,
     pub computing_time_ms: u64,
     pub component_count: usize,
-    pub total_budget_usd: f64,
+    pub total_budget_lcu: f64,
 }
 
 /// Quick check result (lightweight assessment)
@@ -233,12 +237,12 @@ pub fn assess_food_system(
     }
 
     // Total budget for priority calculations
-    let total_budget: f64 = components.iter().map(|c| c.financial_allocation_usd).sum();
+    let total_budget: f64 = components.iter().map(|c| c.financial_allocation_lcu).sum();
 
     // Convert allocations to millions for the stress model
     let allocations_m: Vec<f64> = components
         .iter()
-        .map(|c| c.financial_allocation_usd / 1_000_000.0)
+        .map(|c| c.financial_allocation_lcu / 1_000_000.0)
         .collect();
 
     // Resolve sensitivity parameters
@@ -295,7 +299,7 @@ pub fn assess_food_system(
             performance_gap: round_to_precision(result.performance_gap, Some(4)),
             stress: round_to_precision(result.stress, Some(4)),
             weighted_stress: round_to_precision(result.weighted_stress, Some(6)),
-            financial_allocation_usd: comp.financial_allocation_usd,
+            financial_allocation_lcu: comp.financial_allocation_lcu,
             trend: "stable".to_string(), // historical data needed for real trend
             year_over_year_change: 0.0,
             sub_indicators: vec![SubIndicator {
@@ -384,7 +388,7 @@ pub fn assess_food_system(
             calculated_at: chrono::Utc::now().to_rfc3339(),
             computing_time_ms: elapsed,
             component_count: n,
-            total_budget_usd: total_budget,
+            total_budget_lcu: total_budget,
         },
     })
 }
@@ -399,7 +403,7 @@ pub fn quick_check(components: &[ComponentInput]) -> FsfiResult<QuickCheckResult
         ));
     }
 
-    let total_budget: f64 = components.iter().map(|c| c.financial_allocation_usd).sum();
+    let total_budget: f64 = components.iter().map(|c| c.financial_allocation_lcu).sum();
     let weights = vec![1.0 / n as f64; n];
 
     let mut critical_count = 0;
@@ -408,7 +412,7 @@ pub fn quick_check(components: &[ComponentInput]) -> FsfiResult<QuickCheckResult
     let mut weighted_sum = 0.0;
 
     for (i, comp) in components.iter().enumerate() {
-        let alloc_m = comp.financial_allocation_usd / 1_000_000.0;
+        let alloc_m = comp.financial_allocation_lcu / 1_000_000.0;
         let sensitivity = resolve_sensitivity(comp);
 
         let result = calculate_component_stress(
@@ -496,22 +500,30 @@ pub fn assess_indicators(
     let mut gaps = Vec::with_capacity(n);
 
     for (i, ind) in indicators.iter().enumerate() {
-        // Option A: when observed is missing, use neutral gap (don't substitute budget share).
-        // - If benchmark is set: use observed = benchmark so gap = 0 (no distortion from missing data).
-        // - If both missing: keep synthetic pair (share*100, 10000/n) for backward compatibility.
+        // When observed data is missing, assume moderate underperformance (50% gap)
+        // rather than zero gap. This prevents data-poor indicators from appearing
+        // stress-free in a national policy tool.
+        //
+        // For higher_is_better: observed = 0.5 × benchmark (gap ≈ 0.33)
+        // For lower_is_better:  observed = 1.5 × benchmark (gap ≈ 0.33)
         let benchmark = ind.benchmark_value.unwrap_or(100.0 / n as f64 * 100.0);
+        let higher = ind.higher_is_better.unwrap_or(true);
         let observed = match ind.observed_value {
             Some(o) => o,
             None => {
                 if ind.benchmark_value.is_some() {
-                    benchmark
+                    if higher { benchmark * 0.5 } else { benchmark * 1.5 }
                 } else {
                     ind.share_weighted_percent * 100.0
                 }
             }
         };
 
-        let sensitivity = get_indicator_component_sensitivity(&ind.indicator_component);
+        // Use provided sensitivity (from Excel alpha_per_bnLCU) if available,
+        // otherwise fall back to engine default for the component type.
+        let sensitivity = ind.sensitivity_parameter
+            .filter(|&s| s > 0.0)
+            .unwrap_or_else(|| get_indicator_component_sensitivity(&ind.indicator_component));
         let allocation = ind.weighted_lcu_bn;
 
         let result = calculate_component_stress(
@@ -832,7 +844,7 @@ mod tests {
                 component_type: "agricultural_development".to_string(),
                 observed_value: 75.0,
                 benchmark_value: 90.0,
-                financial_allocation_usd: 125_000_000.0,
+                financial_allocation_lcu: 125_000_000.0,
                 sensitivity_parameter: Some(0.0015),
                 weight: Some(0.25),
                 name: None,
@@ -841,7 +853,7 @@ mod tests {
                 component_type: "infrastructure".to_string(),
                 observed_value: 60.0,
                 benchmark_value: 85.0,
-                financial_allocation_usd: 95_000_000.0,
+                financial_allocation_lcu: 95_000_000.0,
                 sensitivity_parameter: Some(0.0018),
                 weight: Some(0.20),
                 name: None,
@@ -850,7 +862,7 @@ mod tests {
                 component_type: "nutrition_health".to_string(),
                 observed_value: 70.0,
                 benchmark_value: 80.0,
-                financial_allocation_usd: 80_000_000.0,
+                financial_allocation_lcu: 80_000_000.0,
                 sensitivity_parameter: Some(0.0020),
                 weight: Some(0.20),
                 name: None,
@@ -859,7 +871,7 @@ mod tests {
                 component_type: "climate_natural_resources".to_string(),
                 observed_value: 50.0,
                 benchmark_value: 75.0,
-                financial_allocation_usd: 60_000_000.0,
+                financial_allocation_lcu: 60_000_000.0,
                 sensitivity_parameter: Some(0.0008),
                 weight: Some(0.15),
                 name: None,
@@ -868,7 +880,7 @@ mod tests {
                 component_type: "social_protection_equity".to_string(),
                 observed_value: 65.0,
                 benchmark_value: 70.0,
-                financial_allocation_usd: 90_000_000.0,
+                financial_allocation_lcu: 90_000_000.0,
                 sensitivity_parameter: Some(0.0025),
                 weight: Some(0.10),
                 name: None,
@@ -877,7 +889,7 @@ mod tests {
                 component_type: "governance_institutions".to_string(),
                 observed_value: 80.0,
                 benchmark_value: 85.0,
-                financial_allocation_usd: 50_000_000.0,
+                financial_allocation_lcu: 50_000_000.0,
                 sensitivity_parameter: Some(0.0006),
                 weight: Some(0.10),
                 name: None,

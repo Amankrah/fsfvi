@@ -53,7 +53,7 @@ pub struct PeerComparisonInput {
     pub component_type: String,
     pub observed_value: f64,
     pub benchmark_value: f64,
-    pub financial_allocation_usd: f64,
+    pub financial_allocation_lcu: f64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -118,7 +118,7 @@ pub fn analyze_gaps(components: &[ComponentInput]) -> FsfiResult<GapAnalysisResu
     for comp in components {
         let gap = calculate_performance_gap(comp.observed_value, comp.benchmark_value)?;
         let sensitivity = resolve_sensitivity(comp);
-        let alloc_m = comp.financial_allocation_usd / 1_000_000.0;
+        let alloc_m = comp.financial_allocation_lcu / 1_000_000.0;
         let stress = calculate_stress(gap, alloc_m, sensitivity)?;
 
         let status = if gap < 0.10 {
@@ -412,25 +412,25 @@ mod tests {
             ComponentInput {
                 component_type: "agricultural_development".into(),
                 observed_value: 75.0, benchmark_value: 90.0,
-                financial_allocation_usd: 125_000_000.0,
+                financial_allocation_lcu: 125_000_000.0,
                 sensitivity_parameter: Some(0.0015), weight: Some(0.35), name: None,
             },
             ComponentInput {
                 component_type: "infrastructure".into(),
                 observed_value: 60.0, benchmark_value: 85.0,
-                financial_allocation_usd: 95_000_000.0,
+                financial_allocation_lcu: 95_000_000.0,
                 sensitivity_parameter: Some(0.0018), weight: Some(0.30), name: None,
             },
             ComponentInput {
                 component_type: "climate_natural_resources".into(),
                 observed_value: 50.0, benchmark_value: 75.0,
-                financial_allocation_usd: 60_000_000.0,
+                financial_allocation_lcu: 60_000_000.0,
                 sensitivity_parameter: Some(0.0008), weight: Some(0.20), name: None,
             },
             ComponentInput {
                 component_type: "governance_institutions".into(),
                 observed_value: 80.0, benchmark_value: 85.0,
-                financial_allocation_usd: 50_000_000.0,
+                financial_allocation_lcu: 50_000_000.0,
                 sensitivity_parameter: Some(0.0006), weight: Some(0.15), name: None,
             },
         ]
@@ -462,13 +462,13 @@ mod tests {
                 country_code: "UG".into(), country_name: "Uganda".into(),
                 component_type: "agricultural_development".into(),
                 observed_value: 70.0, benchmark_value: 90.0,
-                financial_allocation_usd: 100_000_000.0,
+                financial_allocation_lcu: 100_000_000.0,
             },
             PeerComparisonInput {
                 country_code: "KE".into(), country_name: "Kenya".into(),
                 component_type: "agricultural_development".into(),
                 observed_value: 80.0, benchmark_value: 90.0,
-                financial_allocation_usd: 150_000_000.0,
+                financial_allocation_lcu: 150_000_000.0,
             },
         ];
 

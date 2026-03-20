@@ -73,7 +73,7 @@ export function RoiAnalysis({ data }: RoiAnalysisProps) {
       <div className="bg-white border border-gray-200 rounded-lg shadow-lg p-3">
         <p className="font-semibold text-gray-900">{item.name}</p>
         <p className="text-sm text-gray-600 mt-1">
-          ROI per $1M: <span className="font-bold text-green-600">{item.roi.toFixed(4)}</span>
+          ROI per bn LCU: <span className="font-bold text-green-600">{item.roi.toFixed(4)}</span>
         </p>
         <p className="text-sm text-gray-600">
           Marginal Benefit: <span className="font-medium">{item.marginal_benefit.toFixed(6)}</span>
@@ -107,7 +107,7 @@ export function RoiAnalysis({ data }: RoiAnalysisProps) {
                 {COMPONENT_DISPLAY_NAMES[data.best_roi_component as IndicatorComponent] || data.best_roi_component}
               </p>
               <p className="text-sm text-green-600 mt-1">
-                {bestRoi.roi_per_million.toFixed(4)} stress reduction per $1M
+                {bestRoi.roi_per_million.toFixed(4)} stress reduction per bn LCU
               </p>
             </div>
             <div className="bg-green-100 px-3 py-1 rounded-full">
@@ -132,7 +132,7 @@ export function RoiAnalysis({ data }: RoiAnalysisProps) {
                 {COMPONENT_DISPLAY_NAMES[data.worst_roi_component as IndicatorComponent] || data.worst_roi_component}
               </p>
               <p className="text-sm text-amber-600 mt-1">
-                {worstRoi.roi_per_million.toFixed(4)} stress reduction per $1M
+                {worstRoi.roi_per_million.toFixed(4)} stress reduction per bn LCU
               </p>
             </div>
             <div className="bg-amber-100 px-3 py-1 rounded-full">
@@ -149,7 +149,7 @@ export function RoiAnalysis({ data }: RoiAnalysisProps) {
       {/* ROI Bar Chart */}
       <div className="bg-white rounded-lg border border-gray-200 p-4">
         <h3 className="text-sm font-semibold text-gray-900 mb-4">
-          ROI per Million USD by Component
+          ROI per bn LCU by Component
         </h3>
         <ResponsiveContainer width="100%" height={300}>
           <BarChart
@@ -189,7 +189,7 @@ export function RoiAnalysis({ data }: RoiAnalysisProps) {
             Component ROI Rankings
           </h3>
           <p className="text-xs text-gray-500 mt-1">
-            Total budget: ${(data.total_budget_usd / 1_000_000).toFixed(2)}M · Computed in {data.computing_time_ms}ms
+            Total budget: RWF {(data.total_budget_lcu / 1_000_000_000).toFixed(1)}B · Computed in {data.computing_time_ms}ms
           </p>
         </div>
         <div className="overflow-x-auto">
@@ -209,7 +209,7 @@ export function RoiAnalysis({ data }: RoiAnalysisProps) {
                   Marginal Benefit
                 </th>
                 <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wide">
-                  ROI per $1M
+                  ROI per bn LCU
                 </th>
               </tr>
             </thead>

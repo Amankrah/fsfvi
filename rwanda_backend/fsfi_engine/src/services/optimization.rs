@@ -30,16 +30,16 @@ pub struct EfficiencyAnalysis {
     pub efficiency_index: f64,
     pub waste_ratio: f64,
     pub components: Vec<ComponentEfficiency>,
-    pub total_budget_usd: f64,
+    pub total_budget_lcu: f64,
     pub computing_time_ms: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ComponentEfficiency {
     pub component_type: String,
-    pub current_allocation_usd: f64,
-    pub optimal_allocation_usd: f64,
-    pub allocation_gap_usd: f64,
+    pub current_allocation_lcu: f64,
+    pub optimal_allocation_lcu: f64,
+    pub allocation_gap_lcu: f64,
     pub allocation_gap_pct: f64,
     pub current_stress: f64,
     pub optimal_stress: f64,
@@ -54,16 +54,16 @@ pub struct ReallocationPlan {
     pub projected_fsfsi: f64,
     pub projected_improvement: f64,
     pub projected_improvement_pct: f64,
-    pub total_budget_usd: f64,
+    pub total_budget_lcu: f64,
     pub computing_time_ms: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ReallocationItem {
     pub component_type: String,
-    pub current_allocation_usd: f64,
-    pub recommended_allocation_usd: f64,
-    pub change_usd: f64,
+    pub current_allocation_lcu: f64,
+    pub recommended_allocation_lcu: f64,
+    pub change_lcu: f64,
     pub change_pct: f64,
     pub priority: usize,
     pub projected_impact: String,
@@ -74,7 +74,7 @@ pub struct RoiAnalysis {
     pub components: Vec<ComponentRoi>,
     pub best_roi_component: String,
     pub worst_roi_component: String,
-    pub total_budget_usd: f64,
+    pub total_budget_lcu: f64,
     pub computing_time_ms: u64,
 }
 
@@ -94,7 +94,7 @@ pub struct ComponentRoi {
 pub fn analyze_efficiency(components: &[ComponentInput]) -> FsfiResult<EfficiencyAnalysis> {
     let start = Instant::now();
     let n = components.len();
-    let total_budget: f64 = components.iter().map(|c| c.financial_allocation_usd).sum();
+    let total_budget: f64 = components.iter().map(|c| c.financial_allocation_lcu).sum();
 
     let (gaps, allocs_m, sensitivities, weights) = prepare_vectors(components)?;
 
@@ -113,23 +113,23 @@ pub fn analyze_efficiency(components: &[ComponentInput]) -> FsfiResult<Efficienc
     for i in 0..n {
         let current_stress = calculate_stress(gaps[i], allocs_m[i], sensitivities[i])?;
         let optimal_stress = calculate_stress(gaps[i], optimal_allocs[i], sensitivities[i])?;
-        let optimal_usd = optimal_allocs[i] * 1_000_000.0;
-        let current_usd = components[i].financial_allocation_usd;
-        let gap_usd = optimal_usd - current_usd;
+        let optimal_lcu = optimal_allocs[i] * 1_000_000.0;
+        let current_lcu = components[i].financial_allocation_lcu;
+        let gap_lcu = optimal_lcu - current_lcu;
 
         comp_results.push(ComponentEfficiency {
             component_type: components[i].component_type.clone(),
-            current_allocation_usd: current_usd,
-            optimal_allocation_usd: round_to_precision(optimal_usd, Some(0)),
-            allocation_gap_usd: round_to_precision(gap_usd, Some(0)),
+            current_allocation_lcu: current_lcu,
+            optimal_allocation_lcu: round_to_precision(optimal_lcu, Some(0)),
+            allocation_gap_lcu: round_to_precision(gap_lcu, Some(0)),
             allocation_gap_pct: round_to_precision(
-                safe_divide(gap_usd, current_usd, 0.0) * 100.0,
+                safe_divide(gap_lcu, current_lcu, 0.0) * 100.0,
                 Some(1),
             ),
             current_stress: round_to_precision(current_stress, Some(4)),
             optimal_stress: round_to_precision(optimal_stress, Some(4)),
             stress_reduction: round_to_precision(current_stress - optimal_stress, Some(4)),
-            is_underfunded: gap_usd > 0.0,
+            is_underfunded: gap_lcu > 0.0,
         });
     }
 
@@ -139,7 +139,7 @@ pub fn analyze_efficiency(components: &[ComponentInput]) -> FsfiResult<Efficienc
         efficiency_index: round_to_precision(efficiency_index, Some(4)),
         waste_ratio: round_to_precision(1.0 - efficiency_index, Some(4)),
         components: comp_results,
-        total_budget_usd: total_budget,
+        total_budget_lcu: total_budget,
         computing_time_ms: start.elapsed().as_millis() as u64,
     })
 }
@@ -150,7 +150,7 @@ pub fn generate_reallocation_plan(
 ) -> FsfiResult<ReallocationPlan> {
     let start = Instant::now();
     let total_budget = target_budget
-        .unwrap_or_else(|| components.iter().map(|c| c.financial_allocation_usd).sum());
+        .unwrap_or_else(|| components.iter().map(|c| c.financial_allocation_lcu).sum());
 
     let (gaps, allocs_m, sensitivities, weights) = prepare_vectors(components)?;
 
@@ -166,7 +166,7 @@ pub fn generate_reallocation_plan(
     // Sort by absolute change descending for priority
     let mut indexed: Vec<(usize, f64)> = (0..components.len())
         .map(|i| {
-            let change = (optimal_allocs[i] * 1_000_000.0) - components[i].financial_allocation_usd;
+            let change = (optimal_allocs[i] * 1_000_000.0) - components[i].financial_allocation_lcu;
             (i, change.abs())
         })
         .collect();
@@ -176,16 +176,16 @@ pub fn generate_reallocation_plan(
         .iter()
         .enumerate()
         .map(|(rank, &(idx, _))| {
-            let current_usd = components[idx].financial_allocation_usd;
-            let recommended_usd = optimal_allocs[idx] * 1_000_000.0;
-            let change = recommended_usd - current_usd;
+            let current_lcu = components[idx].financial_allocation_lcu;
+            let recommended_lcu = optimal_allocs[idx] * 1_000_000.0;
+            let change = recommended_lcu - current_lcu;
 
             ReallocationItem {
                 component_type: components[idx].component_type.clone(),
-                current_allocation_usd: current_usd,
-                recommended_allocation_usd: round_to_precision(recommended_usd, Some(0)),
-                change_usd: round_to_precision(change, Some(0)),
-                change_pct: round_to_precision(safe_divide(change, current_usd, 0.0) * 100.0, Some(1)),
+                current_allocation_lcu: current_lcu,
+                recommended_allocation_lcu: round_to_precision(recommended_lcu, Some(0)),
+                change_lcu: round_to_precision(change, Some(0)),
+                change_pct: round_to_precision(safe_divide(change, current_lcu, 0.0) * 100.0, Some(1)),
                 priority: rank + 1,
                 projected_impact: if change > 0.0 {
                     "Increase funding to reduce stress".to_string()
@@ -202,14 +202,14 @@ pub fn generate_reallocation_plan(
         projected_fsfsi: round_to_precision(projected_fsfsi, Some(4)),
         projected_improvement: round_to_precision(improvement, Some(4)),
         projected_improvement_pct: round_to_precision(improvement_pct, Some(1)),
-        total_budget_usd: total_budget,
+        total_budget_lcu: total_budget,
         computing_time_ms: start.elapsed().as_millis() as u64,
     })
 }
 
 pub fn calculate_roi(components: &[ComponentInput]) -> FsfiResult<RoiAnalysis> {
     let start = Instant::now();
-    let total_budget: f64 = components.iter().map(|c| c.financial_allocation_usd).sum();
+    let total_budget: f64 = components.iter().map(|c| c.financial_allocation_lcu).sum();
     let (gaps, allocs_m, sensitivities, weights) = prepare_vectors(components)?;
 
     // Marginal benefit = -∂FSFSI/∂fᵢ = ωᵢ · δᵢ · αᵢ · e^(-αᵢfᵢ)
@@ -242,7 +242,7 @@ pub fn calculate_roi(components: &[ComponentInput]) -> FsfiResult<RoiAnalysis> {
         components: roi_items,
         best_roi_component: best,
         worst_roi_component: worst,
-        total_budget_usd: total_budget,
+        total_budget_lcu: total_budget,
         computing_time_ms: start.elapsed().as_millis() as u64,
     })
 }
@@ -269,7 +269,7 @@ fn prepare_vectors(
     for comp in components {
         let gap = calculate_performance_gap(comp.observed_value, comp.benchmark_value)?;
         gaps.push(gap);
-        allocs.push(comp.financial_allocation_usd / 1_000_000.0);
+        allocs.push(comp.financial_allocation_lcu / 1_000_000.0);
         sensitivities.push(resolve_sensitivity(comp));
     }
 
@@ -348,25 +348,25 @@ mod tests {
             ComponentInput {
                 component_type: "agricultural_development".into(),
                 observed_value: 75.0, benchmark_value: 90.0,
-                financial_allocation_usd: 125_000_000.0,
+                financial_allocation_lcu: 125_000_000.0,
                 sensitivity_parameter: Some(0.0015), weight: Some(0.35), name: None,
             },
             ComponentInput {
                 component_type: "infrastructure".into(),
                 observed_value: 60.0, benchmark_value: 85.0,
-                financial_allocation_usd: 95_000_000.0,
+                financial_allocation_lcu: 95_000_000.0,
                 sensitivity_parameter: Some(0.0018), weight: Some(0.30), name: None,
             },
             ComponentInput {
                 component_type: "nutrition_health".into(),
                 observed_value: 70.0, benchmark_value: 80.0,
-                financial_allocation_usd: 80_000_000.0,
+                financial_allocation_lcu: 80_000_000.0,
                 sensitivity_parameter: Some(0.0020), weight: Some(0.20), name: None,
             },
             ComponentInput {
                 component_type: "climate_natural_resources".into(),
                 observed_value: 50.0, benchmark_value: 75.0,
-                financial_allocation_usd: 60_000_000.0,
+                financial_allocation_lcu: 60_000_000.0,
                 sensitivity_parameter: Some(0.0008), weight: Some(0.15), name: None,
             },
         ]

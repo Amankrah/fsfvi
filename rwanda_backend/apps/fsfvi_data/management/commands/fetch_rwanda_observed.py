@@ -177,33 +177,50 @@ class Command(BaseCommand):
 
             time.sleep(0.3)  # Rate limiting
 
+        # Build indicator lookup for creating new records
+        all_indicators = {ind.code: ind for ind in Indicator.objects.all()}
+
+        # Collect all indicator codes that have start or end data
+        all_codes = sorted(set(start_data.keys()) | set(end_data.keys()))
+
         # Process each fiscal year
         to_update = []
-        stats = {"wb_filled": 0, "interpolated": 0, "already_set": 0, "no_data": 0}
+        to_create = []
+        stats = {"wb_filled": 0, "interpolated": 0, "already_set": 0, "no_data": 0, "created": 0}
 
         for fy in fiscal_years:
             self.stdout.write(f"\n--- FY{fy} ---")
+
+            # Load existing records for this year
+            existing = {}
             records = IndicatorData.objects.filter(
                 fiscal_year=fy
             ).select_related("indicator").order_by("indicator__code")
-
             for rec in records:
-                code = rec.indicator.code
+                existing[rec.indicator.code] = rec
 
-                # Skip if already has observed value
-                if rec.observed_value is not None:
-                    stats["already_set"] += 1
-                    continue
+            # Process all known indicators (not just existing rows)
+            for code in all_codes:
+                if code in existing:
+                    rec = existing[code]
+                    # Skip if already has observed value
+                    if rec.observed_value is not None:
+                        stats["already_set"] += 1
+                        continue
+                else:
+                    rec = None  # Will need to create
 
-                # Try World Bank data first
+                # Determine value: World Bank first, then interpolation
+                new_value = None
+                source = ""
+
                 if code in wb_data and fy in wb_data[code]:
                     new_value = wb_data[code][fy]
                     source = "World Bank"
                     stats["wb_filled"] += 1
-                # Use linear interpolation between start and end years
                 elif code in start_data:
                     start_val = start_data[code]
-                    end_val = end_data.get(code, start_val)  # Use start if end not available
+                    end_val = end_data.get(code, start_val)
                     new_value = linear_interpolate(start_val, end_val, start_year, end_year, fy)
                     if abs(end_val - start_val) < 0.001:
                         source = f"FY{start_year} (constant)"
@@ -212,14 +229,34 @@ class Command(BaseCommand):
                     stats["interpolated"] += 1
                 else:
                     stats["no_data"] += 1
-                    self.stdout.write(f"  {code}: No data available")
                     continue
 
                 self.stdout.write(f"  {code}: {new_value:.4f} ({source})")
 
                 if apply:
-                    rec.observed_value = Decimal(str(round(new_value, 6)))
-                    to_update.append(rec)
+                    if rec is not None:
+                        rec.observed_value = Decimal(str(round(new_value, 6)))
+                        to_update.append(rec)
+                    elif code in all_indicators:
+                        # Also copy benchmark and sensitivity from the end-year record
+                        ref_rec = IndicatorData.objects.filter(
+                            indicator=all_indicators[code], fiscal_year=end_year
+                        ).first() or IndicatorData.objects.filter(
+                            indicator=all_indicators[code], fiscal_year=start_year
+                        ).first()
+
+                        new_rec = IndicatorData(
+                            indicator=all_indicators[code],
+                            fiscal_year=fy,
+                            observed_value=Decimal(str(round(new_value, 6))),
+                            benchmark_value=ref_rec.benchmark_value if ref_rec else None,
+                            sensitivity_parameter=ref_rec.sensitivity_parameter if ref_rec else None,
+                            gross_lcu_bn=Decimal("0"),
+                            weighted_lcu_bn=Decimal("0"),
+                            share_weighted_percent=Decimal("0"),
+                        )
+                        to_create.append(new_rec)
+                        stats["created"] += 1
 
         # Summary
         self.stdout.write("\n" + "=" * 80)
@@ -228,12 +265,17 @@ class Command(BaseCommand):
         self.stdout.write(f"  Interpolated (FY{start_year}->FY{end_year}): {stats['interpolated']}")
         self.stdout.write(f"  Already had data: {stats['already_set']}")
         self.stdout.write(f"  No data available: {stats['no_data']}")
+        self.stdout.write(f"  New records created: {stats['created']}")
 
-        if to_update:
+        if to_update or to_create:
             if apply:
-                IndicatorData.objects.bulk_update(to_update, ["observed_value"], batch_size=50)
-                self.stdout.write(self.style.SUCCESS(f"\nUpdated {len(to_update)} records."))
+                if to_update:
+                    IndicatorData.objects.bulk_update(to_update, ["observed_value"], batch_size=50)
+                if to_create:
+                    IndicatorData.objects.bulk_create(to_create, batch_size=50)
+                total = len(to_update) + len(to_create)
+                self.stdout.write(self.style.SUCCESS(f"\nUpdated {len(to_update)}, created {len(to_create)} records ({total} total)."))
             else:
-                self.stdout.write(f"\nWould update {len(to_update)} records. Run with --apply to save.")
+                self.stdout.write(f"\nWould update {len(to_update)}, create {len(to_create)} records. Run with --apply to save.")
         else:
             self.stdout.write("\nNo records to update.")

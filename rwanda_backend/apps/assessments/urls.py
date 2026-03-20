@@ -4,6 +4,11 @@ Assessment URL Routes for Rwanda FSFSI API.
 
 from django.urls import path
 
+from apps.optimization.views import (
+    AssessmentEfficiencyView,
+    AssessmentReallocationView,
+    AssessmentRoiView,
+)
 from .views import (
     # Assessment
     AssessmentDetailView,
@@ -14,7 +19,7 @@ from .views import (
     QuickCheckView,
     RunAssessmentView,
     RunForYearView,
-    # Optimization
+    # Optimization (legacy)
     EfficiencyAnalysisView,
     ReallocationPlanView,
     RoiAnalysisView,
@@ -55,13 +60,15 @@ urlpatterns = [
     path("history/", AssessmentHistoryView.as_view(), name="assessment-history"),
 
     # ==========================================================================
-    # OPTIMIZATION ENDPOINTS
+    # ASSESSMENT-BASED OPTIMIZATION (assessment is source of truth for FSFSI)
     # ==========================================================================
-    # POST /api/assessments/optimization/efficiency/ - Efficiency analysis
+    path("optimization/<uuid:assessment_id>/efficiency/", AssessmentEfficiencyView.as_view(), name="assessment-efficiency"),
+    path("optimization/<uuid:assessment_id>/reallocation/", AssessmentReallocationView.as_view(), name="assessment-reallocation"),
+    path("optimization/<uuid:assessment_id>/roi/", AssessmentRoiView.as_view(), name="assessment-roi"),
+
+    # Legacy optimization (raw component inputs)
     path("optimization/efficiency/", EfficiencyAnalysisView.as_view(), name="efficiency-analysis"),
-    # POST /api/assessments/optimization/reallocation/ - Reallocation plan
     path("optimization/reallocation/", ReallocationPlanView.as_view(), name="reallocation-plan"),
-    # POST /api/assessments/optimization/roi/ - ROI analysis
     path("optimization/roi/", RoiAnalysisView.as_view(), name="roi-analysis"),
 
     # ==========================================================================

@@ -11,7 +11,7 @@ import { useFiscalYear } from '@/contexts/FiscalYearContext';
 import { FiscalYearSelector } from '@/components/rwanda/shared/FiscalYearSelector';
 import { assessmentAPI } from '@/lib/api/assessmentApi';
 import { optimizationAPI } from '@/lib/api/optimizationApi';
-import type { SavedAssessment, IndicatorComponent } from '@/lib/types/assessment';
+import type { SavedAssessment } from '@/lib/types/assessment';
 import type {
   EfficiencyAnalysis as EfficiencyAnalysisType,
   ReallocationPlan as ReallocationPlanType,
@@ -31,14 +31,6 @@ import {
 
 type OptimizationTab = 'efficiency' | 'reallocation' | 'roi';
 
-interface ComponentInput {
-  component_type: IndicatorComponent;
-  observed_value: number;
-  benchmark_value: number;
-  financial_allocation_usd: number;
-  weight?: number;
-}
-
 export default function OptimizationPage() {
   const { t } = useLanguage();
   const { fiscalYear } = useFiscalYear();
@@ -51,26 +43,6 @@ export default function OptimizationPage() {
   const [analyzing, setAnalyzing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<OptimizationTab>('efficiency');
-
-  // Transform assessment component data to optimization input format (backend expects floats and component_type)
-  const transformToComponentInput = useCallback((assessment: SavedAssessment): ComponentInput[] => {
-    if (!assessment.component_results) return [];
-
-    const RWF_TO_USD = 1 / 1300;
-    return assessment.component_results.map((comp) => {
-      const budgetLcuBn = Number(comp.budget_lcu_bn) || 0;
-      const allocationUsd = budgetLcuBn * 1_000_000_000 * RWF_TO_USD;
-      const stress = Number(comp.component_stress);
-      const weight = comp.weight != null ? Number(comp.weight) : undefined;
-      return {
-        component_type: comp.component,
-        observed_value: Number.isFinite(stress) ? stress : 0,
-        benchmark_value: 0.25,
-        financial_allocation_usd: Number.isFinite(allocationUsd) ? allocationUsd : 0,
-        ...(Number.isFinite(weight) ? { weight } : {}),
-      };
-    });
-  }, []);
 
   // Fetch assessment data
   const fetchAssessment = useCallback(async () => {
@@ -96,7 +68,8 @@ export default function OptimizationPage() {
     }
   }, [fiscalYear.start_year]);
 
-  // Run optimization analysis
+  // Run optimization analysis — delegates to the backend which uses the
+  // assessment as the single source of truth for FSFSI scores.
   const runOptimization = useCallback(async () => {
     if (!assessment) return;
 
@@ -104,18 +77,13 @@ export default function OptimizationPage() {
     setError(null);
 
     try {
-      const componentInputs = transformToComponentInput(assessment);
-
-      if (componentInputs.length === 0) {
-        setError('No component data available for optimization analysis.');
-        return;
-      }
-
-      // Run all three optimization analyses in parallel
+      // All three analyses use the assessment_id — the backend loads the
+      // assessment's FSFSI and component data, runs the Rust optimizer,
+      // then stamps the assessment's FSFSI as the authoritative current score.
       const [efficiency, reallocation, roi] = await Promise.all([
-        optimizationAPI.analyzeEfficiency(componentInputs),
-        optimizationAPI.generateReallocationPlan(componentInputs),
-        optimizationAPI.calculateRoi(componentInputs),
+        optimizationAPI.efficiencyForAssessment(assessment.id),
+        optimizationAPI.reallocationForAssessment(assessment.id),
+        optimizationAPI.roiForAssessment(assessment.id),
       ]);
 
       setEfficiencyData(efficiency);
@@ -130,7 +98,7 @@ export default function OptimizationPage() {
     } finally {
       setAnalyzing(false);
     }
-  }, [assessment, transformToComponentInput]);
+  }, [assessment]);
 
   useEffect(() => {
     fetchAssessment();

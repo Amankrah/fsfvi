@@ -119,7 +119,7 @@ pub fn generate_multi_year_plan(request: MultiYearPlanRequest) -> FsfiResult<Mul
     let baseline_budget: f64 = request
         .current_components
         .iter()
-        .map(|c| c.financial_allocation_usd)
+        .map(|c| c.financial_allocation_lcu)
         .sum();
 
     if baseline_fsfvi <= request.target_fsfvi {
@@ -204,7 +204,7 @@ pub fn generate_mtef(
 ) -> FsfiResult<MtefPlan> {
     let (gaps, allocs_m, sensitivities, weights) = get_component_vectors(&current_components)?;
     let baseline_fsfvi = calculate_system_fsfsi(&gaps, &allocs_m, &sensitivities, &weights)?;
-    let baseline_budget: f64 = current_components.iter().map(|c| c.financial_allocation_usd).sum();
+    let baseline_budget: f64 = current_components.iter().map(|c| c.financial_allocation_lcu).sum();
     let target_fsfvi = baseline_fsfvi * (1.0 - target_fsfvi_improvement_percent / 100.0);
 
     let mut year_plans = Vec::with_capacity(3);
@@ -276,10 +276,10 @@ fn plan_single_year(
     year: usize,
     year_target_fsfvi: f64,
     current_fsfvi: f64,
-    total_budget_usd: f64,
+    total_budget_lcu: f64,
 ) -> FsfiResult<PlanSingleYearResult> {
     let (gaps, _allocs_m, sensitivities, weights) = get_component_vectors(current)?;
-    let total_budget_m = total_budget_usd / 1_000_000.0;
+    let total_budget_m = total_budget_lcu / 1_000_000.0;
 
     let optimal_allocs =
         calculate_optimal_allocation(&gaps, &sensitivities, &weights, total_budget_m)?;
@@ -302,7 +302,7 @@ fn plan_single_year(
         .iter()
         .enumerate()
         .map(|(i, c)| ComponentInput {
-            financial_allocation_usd: optimal_allocs[i] * 1_000_000.0,
+            financial_allocation_lcu: optimal_allocs[i] * 1_000_000.0,
             ..c.clone()
         })
         .collect();
@@ -326,7 +326,7 @@ fn plan_single_year(
         fsfvi_reduction_from_previous: reduction,
         on_track,
         recommended_allocations,
-        total_budget: total_budget_usd,
+        total_budget: total_budget_lcu,
         key_interventions,
         milestones: vec![
             "Q2: Mid-year review and budget adjustment".to_string(),

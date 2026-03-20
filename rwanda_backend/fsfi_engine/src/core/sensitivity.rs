@@ -17,7 +17,7 @@ use pyo3::prelude::*;
 /// Maximum sensitivity for clamping (from empirical range in literature).
 const MAX_SENSITIVITY: f64 = 0.005;
 
-/// Minimum allocation (millions USD) for applying estimation adjustments; below this use base only.
+/// Minimum allocation (millions LCU) for applying estimation adjustments; below this use base only.
 const MIN_ALLOCATION_FOR_ADJUSTMENT: f64 = 5.0;
 
 // ---------------------------------------------------------------------------
@@ -26,7 +26,7 @@ const MIN_ALLOCATION_FOR_ADJUSTMENT: f64 = 5.0;
 
 /// Base sensitivity values for legacy 6-component and indicator 8-component types.
 /// Used when no component-level sensitivity_parameter is provided.
-/// Values chosen for allocations in millions USD; α ∈ [0.0005, 0.005].
+/// Values chosen for allocations in millions LCU; α ∈ [0.0005, 0.005].
 fn base_sensitivity_table(component_type: &str) -> f64 {
     match component_type {
         // Legacy 6-component (and aliases)
@@ -62,17 +62,17 @@ pub fn get_base_sensitivity(component_type: &str) -> f64 {
 /// - Uses base value for the component type.
 /// - If allocation is above threshold, applies small adjustments for performance
 ///   gap and scale, then clamps to [min_sensitivity_parameter, MAX_SENSITIVITY].
-/// - Allocation should be in **millions USD** (same as used in stress formula).
+/// - Allocation should be in **millions LCU** (same as used in stress formula).
 pub fn estimate_sensitivity_parameter(
     component_type: &str,
     observed_value: f64,
     benchmark_value: f64,
-    allocation_millions_usd: f64,
+    allocation_millions_lcu: f64,
 ) -> FsfiResult<f64> {
     let val = get_validation_config();
     let mut alpha = get_base_sensitivity(component_type);
 
-    if allocation_millions_usd >= MIN_ALLOCATION_FOR_ADJUSTMENT
+    if allocation_millions_lcu >= MIN_ALLOCATION_FOR_ADJUSTMENT
         && observed_value >= 0.0
         && benchmark_value >= 0.0
     {
@@ -83,8 +83,8 @@ pub fn estimate_sensitivity_parameter(
             alpha = alpha - penalty;
         }
         // Slight scale economy for large allocations
-        if allocation_millions_usd > 100.0 {
-            let bonus = (allocation_millions_usd / 1000.0).min(0.5) * 0.0002;
+        if allocation_millions_lcu > 100.0 {
+            let bonus = (allocation_millions_lcu / 1000.0).min(0.5) * 0.0002;
             alpha = alpha + bonus;
         }
     }
@@ -99,20 +99,20 @@ pub fn estimate_sensitivity_parameter(
 // ---------------------------------------------------------------------------
 
 /// Python: estimate sensitivity parameter α for a component.
-/// Allocation in millions USD. Returns float.
+/// Allocation in millions LCU. Returns float.
 #[pyfunction]
-#[pyo3(signature = (component_type, observed_value, benchmark_value, allocation_millions_usd))]
+#[pyo3(signature = (component_type, observed_value, benchmark_value, allocation_millions_lcu))]
 pub fn py_estimate_sensitivity(
     component_type: &str,
     observed_value: f64,
     benchmark_value: f64,
-    allocation_millions_usd: f64,
+    allocation_millions_lcu: f64,
 ) -> PyResult<f64> {
     estimate_sensitivity_parameter(
         component_type,
         observed_value,
         benchmark_value,
-        allocation_millions_usd,
+        allocation_millions_lcu,
     )
     .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))
 }

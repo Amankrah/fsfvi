@@ -21,15 +21,15 @@ export interface EfficiencyAnalysis {
   efficiency_index: number;
   waste_ratio: number;
   components: ComponentEfficiency[];
-  total_budget_usd: number;
+  total_budget_lcu: number;
   computing_time_ms: number;
 }
 
 export interface ComponentEfficiency {
   component_type: string;
-  current_allocation_usd: number;
-  optimal_allocation_usd: number;
-  allocation_gap_usd: number;
+  current_allocation_lcu: number;
+  optimal_allocation_lcu: number;
+  allocation_gap_lcu: number;
   allocation_gap_pct: number;
   current_stress: number;
   optimal_stress: number;
@@ -47,15 +47,15 @@ export interface ReallocationPlan {
   projected_fsfsi: number;
   projected_improvement: number;
   projected_improvement_pct: number;
-  total_budget_usd: number;
+  total_budget_lcu: number;
   computing_time_ms: number;
 }
 
 export interface ReallocationItem {
   component_type: string;
-  current_allocation_usd: number;
-  recommended_allocation_usd: number;
-  change_usd: number;
+  current_allocation_lcu: number;
+  recommended_allocation_lcu: number;
+  change_lcu: number;
   change_pct: number;
   priority: number;
   projected_impact: string;
@@ -69,7 +69,7 @@ export interface RoiAnalysis {
   components: ComponentRoi[];
   best_roi_component: string;
   worst_roi_component: string;
-  total_budget_usd: number;
+  total_budget_lcu: number;
   computing_time_ms: number;
 }
 

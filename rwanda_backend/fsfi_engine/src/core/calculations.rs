@@ -112,7 +112,7 @@ pub fn calculate_performance_gap_directional(
 ///
 /// Arguments:
 /// - `gap`: Performance gap δᵢ ∈ [0, 1]
-/// - `allocation`: Financial allocation fᵢ > 0 (in millions USD)
+/// - `allocation`: Financial allocation fᵢ > 0 (in millions LCU)
 /// - `sensitivity`: Sensitivity parameter αᵢ > 0
 pub fn calculate_stress(gap: f64, allocation: f64, sensitivity: f64) -> FsfiResult<f64> {
     if allocation < 0.0 {
@@ -396,30 +396,13 @@ pub fn calculate_gap_ratio(fsfsi_actual: f64, fsfsi_optimal: f64) -> FsfiResult<
 /// - System importance (component weight)
 pub fn determine_priority_level(
     stress: f64,
-    financial_allocation: f64,
-    weight: f64,
-    total_budget: f64,
+    _financial_allocation: f64,
+    _weight: f64,
+    _total_budget: f64,
 ) -> &'static str {
-    let allocation_share = if total_budget > 0.0 {
-        safe_divide(financial_allocation, total_budget, 0.0)
-    } else {
-        0.0
-    };
-    let financial_multiplier = allocation_share.sqrt();
-    let importance_multiplier = weight.powf(0.3);
-
-    let composite_stress =
-        stress * (1.0 + 0.3 * financial_multiplier + 0.2 * importance_multiplier);
-
-    if composite_stress >= 0.6 {
-        "critical"
-    } else if composite_stress >= 0.4 {
-        "high"
-    } else if composite_stress >= 0.25 {
-        "medium"
-    } else {
-        "low"
-    }
+    // Use the same thresholds as the overall FSFSI classification
+    // so that component and system-level categories are consistent.
+    determine_stress_level(stress)
 }
 
 /// Determine overall stress level based on system FSFSI score

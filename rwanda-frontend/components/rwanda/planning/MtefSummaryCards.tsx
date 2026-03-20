@@ -4,7 +4,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import type { MtefPlan } from '@/lib/types/planning';
 import { formatScore } from '@/lib/utils/formatters';
-import { formatUSDCompact } from '@/lib/utils/formatters';
+import { formatRWFCompact } from '@/lib/utils/formatters';
 import { Calendar, TrendingDown, DollarSign } from 'lucide-react';
 
 interface MtefSummaryCardsProps {
@@ -31,7 +31,7 @@ export function MtefSummaryCards({ plan }: MtefSummaryCardsProps) {
           <CardContent>
             <p className="text-2xl font-bold text-[var(--rw-blue)]">{formatScore(year_1_plan.projected_fsfvi)}</p>
             <p className="text-xs text-gray-500">Projected FSFSI</p>
-            <p className="text-sm text-gray-700 mt-1">{formatUSDCompact(year_1_plan.total_budget)}</p>
+            <p className="text-sm text-gray-700 mt-1">{formatRWFCompact(year_1_plan.total_budget)}</p>
           </CardContent>
         </Card>
         <Card className="bg-gradient-to-br from-[var(--rw-blue)]/5 to-white border-[var(--rw-blue)]/20">
@@ -44,7 +44,7 @@ export function MtefSummaryCards({ plan }: MtefSummaryCardsProps) {
           <CardContent>
             <p className="text-2xl font-bold text-[var(--rw-blue)]">{formatScore(year_2_plan.projected_fsfvi)}</p>
             <p className="text-xs text-gray-500">Projected FSFSI</p>
-            <p className="text-sm text-gray-700 mt-1">{formatUSDCompact(year_2_plan.total_budget)}</p>
+            <p className="text-sm text-gray-700 mt-1">{formatRWFCompact(year_2_plan.total_budget)}</p>
           </CardContent>
         </Card>
         <Card className="bg-gradient-to-br from-[var(--rw-green)]/10 to-white border-[var(--rw-green)]/30">
@@ -57,7 +57,7 @@ export function MtefSummaryCards({ plan }: MtefSummaryCardsProps) {
           <CardContent>
             <p className="text-2xl font-bold text-[var(--rw-green)]">{formatScore(year_3_plan.projected_fsfvi)}</p>
             <p className="text-xs text-gray-500">{t('planning.mtef_year3_target_label')}: {formatScore(target_fsfvi_year_3)}</p>
-            <p className="text-sm text-gray-700 mt-1">{formatUSDCompact(year_3_plan.total_budget)}</p>
+            <p className="text-sm text-gray-700 mt-1">{formatRWFCompact(year_3_plan.total_budget)}</p>
           </CardContent>
         </Card>
       </div>

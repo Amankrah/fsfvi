@@ -9,14 +9,14 @@ interface StressHeatmapProps {
 }
 
 const getStressColor = (score: number): string => {
-  if (score >= 0.75) return 'bg-red-500';
-  if (score >= 0.50) return 'bg-orange-400';
-  if (score >= 0.25) return 'bg-yellow-400';
+  if (score > 0.30) return 'bg-red-500';
+  if (score > 0.15) return 'bg-orange-400';
+  if (score > 0.05) return 'bg-yellow-400';
   return 'bg-green-400';
 };
 
 const getStressTextColor = (score: number): string => {
-  if (score >= 0.50) return 'text-white';
+  if (score > 0.15) return 'text-white';
   return 'text-gray-900';
 };
 
@@ -107,19 +107,19 @@ export function StressHeatmap({ data }: StressHeatmapProps) {
       <div className="flex items-center justify-center gap-4 mt-4 text-xs">
         <div className="flex items-center gap-1">
           <div className="w-4 h-4 rounded bg-green-400" />
-          <span>Low (&lt;0.25)</span>
+          <span>Low (&le;0.05)</span>
         </div>
         <div className="flex items-center gap-1">
           <div className="w-4 h-4 rounded bg-yellow-400" />
-          <span>Medium (0.25-0.50)</span>
+          <span>Medium (0.05-0.15)</span>
         </div>
         <div className="flex items-center gap-1">
           <div className="w-4 h-4 rounded bg-orange-400" />
-          <span>High (0.50-0.75)</span>
+          <span>High (0.15-0.30)</span>
         </div>
         <div className="flex items-center gap-1">
           <div className="w-4 h-4 rounded bg-red-500" />
-          <span>Critical (&ge;0.75)</span>
+          <span>Critical (&gt;0.30)</span>
         </div>
       </div>
     </div>

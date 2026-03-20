@@ -33,14 +33,28 @@ def imputed_observed(rec, n_indicators: int):
     """
     Return (imputed_observed, formula_used).
     rec: IndicatorData with share_weighted_percent, observed_value, benchmark_value.
+
+    Policy decision: when observed data is missing, we assume a **moderate
+    performance gap** (50% of benchmark) rather than zero gap. This prevents
+    data-poor components from appearing stress-free in a national policy tool.
+
+    - δ = |obs - bench| / max(obs, bench) = |0.5B - B| / B = 0.5
+    - This means "assume the country is at 50% of the benchmark" when no data exists.
     """
     if rec.observed_value is not None:
         return float(rec.observed_value), "actual"
-    share = float(rec.share_weighted_percent or 0)
     bench = rec.benchmark_value
     if bench is not None:
-        return float(bench), "benchmark (neutral gap)"
+        bench_f = float(bench)
+        higher = rec.indicator.higher_is_better if hasattr(rec, 'indicator') else True
+        if higher:
+            # Higher is better: observed = 50% of benchmark (underperforming)
+            return bench_f * 0.5, "imputed (50% of benchmark — no observed data)"
+        else:
+            # Lower is better: observed = 150% of benchmark (worse than target)
+            return bench_f * 1.5, "imputed (150% of benchmark — no observed data)"
     # Both null: synthetic
+    share = float(rec.share_weighted_percent or 0)
     return share * 100.0, "share_weighted_percent * 100"
 
 

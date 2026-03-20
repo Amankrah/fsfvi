@@ -47,18 +47,18 @@ def _normalize_optimization_components(components):
             component_type = str(c.get("component_type") or c.get("component") or "").strip()
             observed = float(c.get("observed_value", 0))
             benchmark = float(c.get("benchmark_value", 0))
-            allocation = float(c.get("financial_allocation_usd", 0))
+            allocation = float(c.get("financial_allocation_lcu", 0))
         except (TypeError, ValueError) as e:
             return None, f"Component at index {i}: invalid number ({e})."
         if not component_type:
             return None, f"Component at index {i}: component_type or component required."
         if allocation < 0:
-            return None, f"Component at index {i}: financial_allocation_usd must be non-negative."
+            return None, f"Component at index {i}: financial_allocation_lcu must be non-negative."
         out = {
             "component_type": component_type,
             "observed_value": observed,
             "benchmark_value": benchmark,
-            "financial_allocation_usd": allocation,
+            "financial_allocation_lcu": allocation,
         }
         if c.get("sensitivity_parameter") is not None:
             try:
@@ -73,9 +73,9 @@ def _normalize_optimization_components(components):
         if c.get("name") is not None:
             out["name"] = str(c["name"])
         normalized.append(out)
-    total = sum(c["financial_allocation_usd"] for c in normalized)
+    total = sum(c["financial_allocation_lcu"] for c in normalized)
     if total <= 0:
-        return None, "Total financial_allocation_usd across components must be positive."
+        return None, "Total financial_allocation_lcu across components must be positive."
     return normalized, None
 
 
@@ -201,7 +201,7 @@ class QuickCheckView(APIView):
                     "component_type": ind["indicator_component"],
                     "observed_value": obs_val,
                     "benchmark_value": bench_val,
-                    "financial_allocation_usd": float(ind["weighted_lcu_bn"]) * 1_000_000,
+                    "financial_allocation_lcu": float(ind["weighted_lcu_bn"]) * 1_000_000,
                 })
 
             result = service.quick_check(components)

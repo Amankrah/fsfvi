@@ -26,23 +26,22 @@ import {
   BarChart3,
   RefreshCw,
 } from 'lucide-react';
-import { formatScore } from '@/lib/utils/formatters';
-import { formatUSDCompact } from '@/lib/utils/formatters';
-
-const RWF_TO_USD = 1 / 1300;
+import { formatScore, formatRWFCompact } from '@/lib/utils/formatters';
 
 function toPlanningInput(assessment: SavedAssessment): PlanningComponentInput[] {
   if (!assessment.component_results) return [];
   return assessment.component_results.map((comp) => {
     const budgetLcuBn = Number(comp.budget_lcu_bn) || 0;
-    const allocationUsd = budgetLcuBn * 1_000_000_000 * RWF_TO_USD;
-    const stress = Number(comp.component_stress);
+    const allocationLcu = budgetLcuBn * 1_000_000;
+    // Use CUMULATIVE stress for planning — this reflects the real accumulated
+    // damage that future budgets need to address, not just the current snapshot.
+    const cumulativeGap = Number(comp.cumulative_stress) || Number(comp.avg_performance_gap) || 0;
     const weight = comp.weight != null ? Number(comp.weight) : undefined;
     return {
       component_type: comp.component,
-      observed_value: Number.isFinite(stress) ? stress : 0,
-      benchmark_value: 0.25,
-      financial_allocation_usd: Number.isFinite(allocationUsd) ? allocationUsd : 0,
+      observed_value: Math.max(0, 1 - cumulativeGap),
+      benchmark_value: 1,
+      financial_allocation_lcu: Number.isFinite(allocationLcu) ? allocationLcu : 0,
       ...(Number.isFinite(weight) ? { weight } : {}),
     };
   });
@@ -57,10 +56,18 @@ export default function PlanningPage() {
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Rwanda-specific defaults:
+  // - 5 years = aligned with PSTA-5 (2024-2029)
+  // - 40% reduction target = ambitious but realistic given slow recovery
+  // - 8% budget growth = aligned with Rwanda's recent agriculture budget trends
   const [planningYears, setPlanningYears] = useState(5);
-  const [targetFsfvi, setTargetFsfvi] = useState(0.35);
-  const [mtefImprovementPercent, setMtefImprovementPercent] = useState(20);
-  const [mtefGrowthRate, setMtefGrowthRate] = useState(0.05);
+  const [targetReductionPct, setTargetReductionPct] = useState(40);
+  const [mtefImprovementPercent, setMtefImprovementPercent] = useState(15);
+  const [mtefGrowthRate, setMtefGrowthRate] = useState(0.08);
+
+  // Compute target FSFSI from reduction percentage and cumulative baseline
+  const cumulativeBaseline = Number(assessment?.cumulative_fsfsi) || Number(assessment?.fsfsi_score) || 0.50;
+  const targetFsfvi = cumulativeBaseline * (1 - targetReductionPct / 100);
 
   const fetchAssessment = useCallback(async () => {
     setLoading(true);
@@ -93,15 +100,22 @@ export default function PlanningPage() {
     setGenerating(true);
     setError(null);
     try {
+      // Use assessment-based endpoints — backend handles cumulative baseline,
+      // data-driven insights, and accurate numbers. No frontend patching needed.
       const [multiYear, mtef] = await Promise.all([
-        planningAPI.generateMultiYearPlan({
-          current_components: components,
-          planning_years: Math.min(Math.max(1, planningYears), 15),
-          target_fsfvi: Math.max(0.01, Math.min(1, targetFsfvi)),
-          yearly_budget_growth_rate: mtefGrowthRate,
-        }),
-        planningAPI.generateMtef(components, mtefImprovementPercent, mtefGrowthRate),
+        planningAPI.planForAssessment(
+          assessment.id,
+          Math.min(Math.max(1, planningYears), 15),
+          Math.max(0.01, Math.min(1, targetFsfvi)),
+          mtefGrowthRate,
+        ),
+        planningAPI.mtefForAssessment(
+          assessment.id,
+          mtefImprovementPercent,
+          mtefGrowthRate,
+        ),
       ]);
+
       setMultiYearPlan(multiYear);
       setMtefPlan(mtef);
     } catch (err: unknown) {
@@ -120,7 +134,7 @@ export default function PlanningPage() {
   }, [fetchAssessment]);
 
   const baselineBudget = assessment
-    ? toPlanningInput(assessment).reduce((s, c) => s + c.financial_allocation_usd, 0)
+    ? toPlanningInput(assessment).reduce((s, c) => s + c.financial_allocation_lcu, 0)
     : 0;
   const hasPlans = multiYearPlan || mtefPlan;
 
@@ -171,60 +185,88 @@ export default function PlanningPage() {
               <CardTitle className="text-lg">{t('planning.parameters')}</CardTitle>
               <p className="text-sm text-gray-500 font-normal">{t('planning.parameters_help')}</p>
             </CardHeader>
-            <CardContent className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">{t('planning.planning_years')}</label>
-                <input
-                  type="number"
-                  min={1}
-                  max={15}
-                  value={planningYears}
-                  onChange={(e) => setPlanningYears(Number(e.target.value) || 5)}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                  aria-label={t('planning.planning_years')}
-                  title={t('planning.planning_years')}
-                />
+            <CardContent>
+              {/* Context banner */}
+              <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800">
+                <p>
+                  Current cumulative stress: <strong>{cumulativeBaseline.toFixed(4)}</strong> (critical).
+                  {' '}Recovery is slow due to accumulated damage from prior years.
+                  {' '}A {targetReductionPct}% reduction over {planningYears} years targets <strong>{targetFsfvi.toFixed(4)}</strong>.
+                </p>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">{t('planning.target_fsfvi')}</label>
-                <input
-                  type="number"
-                  min={0.01}
-                  max={1}
-                  step={0.01}
-                  value={targetFsfvi}
-                  onChange={(e) => setTargetFsfvi(Number(e.target.value) || 0.35)}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                  aria-label={t('planning.target_fsfvi')}
-                  title={t('planning.target_fsfvi')}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">{t('planning.mtef_improvement_pct')}</label>
-                <input
-                  type="number"
-                  min={1}
-                  max={50}
-                  value={mtefImprovementPercent}
-                  onChange={(e) => setMtefImprovementPercent(Number(e.target.value) || 20)}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                  aria-label={t('planning.mtef_improvement_pct')}
-                  title={t('planning.mtef_improvement_pct')}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">{t('planning.mtef_growth_rate')}</label>
-                <input
-                  type="number"
-                  min={0}
-                  max={0.5}
-                  step={0.01}
-                  value={mtefGrowthRate}
-                  onChange={(e) => setMtefGrowthRate(Number(e.target.value) || 0.05)}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                  aria-label={t('planning.mtef_growth_rate')}
-                  title={t('planning.mtef_growth_rate')}
-                />
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Planning horizon (years)
+                  </label>
+                  <select
+                    value={planningYears}
+                    onChange={(e) => setPlanningYears(Number(e.target.value))}
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                    aria-label="Planning horizon"
+                    title="Planning horizon"
+                  >
+                    <option value={3}>3 years (MTEF cycle)</option>
+                    <option value={5}>5 years (PSTA-5: 2024-2029)</option>
+                    <option value={7}>7 years (NST-2 aligned)</option>
+                    <option value={10}>10 years (Vision 2035)</option>
+                  </select>
+                  <p className="text-xs text-gray-400 mt-1">Aligned with Rwanda planning cycles</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Stress reduction target (%)
+                  </label>
+                  <input
+                    type="number"
+                    min={5}
+                    max={80}
+                    step={5}
+                    value={targetReductionPct}
+                    onChange={(e) => setTargetReductionPct(Number(e.target.value) || 40)}
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                    aria-label="Stress reduction target"
+                    title="Stress reduction target"
+                  />
+                  <p className="text-xs text-gray-400 mt-1">
+                    = FSFSI from {cumulativeBaseline.toFixed(2)} to {targetFsfvi.toFixed(2)}
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    MTEF 3-year improvement (%)
+                  </label>
+                  <input
+                    type="number"
+                    min={5}
+                    max={50}
+                    step={5}
+                    value={mtefImprovementPercent}
+                    onChange={(e) => setMtefImprovementPercent(Number(e.target.value) || 15)}
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                    aria-label="MTEF improvement target"
+                    title="MTEF improvement target"
+                  />
+                  <p className="text-xs text-gray-400 mt-1">Rolling 3-year expenditure target</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Annual budget growth rate (%)
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={25}
+                    step={1}
+                    value={Math.round(mtefGrowthRate * 100)}
+                    onChange={(e) => setMtefGrowthRate((Number(e.target.value) || 8) / 100)}
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                    aria-label="Annual budget growth"
+                    title="Annual budget growth"
+                  />
+                  <p className="text-xs text-gray-400 mt-1">Rwanda avg: 8-10% for agriculture</p>
+                </div>
               </div>
             </CardContent>
             <CardContent className="pt-0">
@@ -284,7 +326,7 @@ export default function PlanningPage() {
                     <Card>
                       <CardContent className="pt-4">
                         <p className="text-xs text-gray-500 uppercase tracking-wide">{t('planning.budget_increase_over_plan')}</p>
-                        <p className="text-xl font-bold text-gray-900">{formatUSDCompact(multiYearPlan.total_additional_investment_needed)}</p>
+                        <p className="text-xl font-bold text-gray-900">{formatRWFCompact(multiYearPlan.total_additional_investment_needed)}</p>
                         <p className="text-xs text-gray-500 mt-1">{t('planning.budget_increase_hint')}</p>
                       </CardContent>
                     </Card>

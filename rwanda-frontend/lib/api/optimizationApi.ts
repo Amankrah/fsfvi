@@ -80,7 +80,7 @@ interface ComponentInput {
   component_type: IndicatorComponent;
   observed_value: number;
   benchmark_value: number;
-  financial_allocation_usd: number;
+  financial_allocation_lcu: number;
   weight?: number;
 }
 
@@ -89,46 +89,71 @@ interface ComponentInput {
 // ============================================================================
 
 export const optimizationAPI = {
+  // ==========================================================================
+  // Assessment-based methods (preferred — assessment is source of truth)
+  // ==========================================================================
+
   /**
-   * Analyze allocation efficiency
+   * Analyze efficiency using a saved assessment.
+   * The assessment's FSFSI is the authoritative current score.
    *
-   * POST /api/assessments/optimization/efficiency/
-   *
-   * Identifies over/under-allocated components relative to
-   * their vulnerability and impact on food system resilience.
-   *
-   * @param components - Component data for analysis
-   * @returns Efficiency analysis with reallocation recommendations
+   * GET /api/assessments/optimization/<assessment_id>/efficiency/
    */
+  efficiencyForAssessment: async (
+    assessmentId: string
+  ): Promise<EfficiencyAnalysis> => {
+    const response = await optimizationClient.get<EfficiencyAnalysis>(
+      `/${assessmentId}/efficiency/`
+    );
+    return response.data;
+  },
+
+  /**
+   * Generate reallocation plan using a saved assessment.
+   *
+   * GET /api/assessments/optimization/<assessment_id>/reallocation/
+   */
+  reallocationForAssessment: async (
+    assessmentId: string,
+    targetBudget?: number
+  ): Promise<ReallocationPlan> => {
+    const params = targetBudget ? { target_budget: targetBudget } : {};
+    const response = await optimizationClient.get<ReallocationPlan>(
+      `/${assessmentId}/reallocation/`,
+      { params }
+    );
+    return response.data;
+  },
+
+  /**
+   * Calculate ROI using a saved assessment.
+   *
+   * GET /api/assessments/optimization/<assessment_id>/roi/
+   */
+  roiForAssessment: async (assessmentId: string): Promise<RoiAnalysis> => {
+    const response = await optimizationClient.get<RoiAnalysis>(
+      `/${assessmentId}/roi/`
+    );
+    return response.data;
+  },
+
+  // ==========================================================================
+  // Legacy methods (raw component inputs)
+  // ==========================================================================
+
   analyzeEfficiency: async (
     components: ComponentInput[]
   ): Promise<EfficiencyAnalysis> => {
-    console.log('[OptimizationAPI] Analyzing efficiency:', components.length, 'components');
-
     const response = await optimizationClient.post<EfficiencyAnalysis>('/efficiency/', {
       components,
     });
     return response.data;
   },
 
-  /**
-   * Generate reallocation plan
-   *
-   * POST /api/assessments/optimization/reallocation/
-   *
-   * Creates step-by-step implementation plan to transition
-   * from current allocations to optimized allocations.
-   *
-   * @param components - Component data
-   * @param targetBudget - Optional target total budget
-   * @returns Reallocation plan with implementation phases
-   */
   generateReallocationPlan: async (
     components: ComponentInput[],
     targetBudget?: number
   ): Promise<ReallocationPlan> => {
-    console.log('[OptimizationAPI] Generating reallocation plan');
-
     const response = await optimizationClient.post<ReallocationPlan>('/reallocation/', {
       components,
       target_budget: targetBudget,
@@ -136,20 +161,7 @@ export const optimizationAPI = {
     return response.data;
   },
 
-  /**
-   * Calculate ROI per component
-   *
-   * POST /api/assessments/optimization/roi/
-   *
-   * Analyzes return on investment for budget allocations
-   * to identify highest-impact investment opportunities.
-   *
-   * @param components - Component data
-   * @returns ROI analysis for each component
-   */
   calculateRoi: async (components: ComponentInput[]): Promise<RoiAnalysis> => {
-    console.log('[OptimizationAPI] Calculating ROI:', components.length, 'components');
-
     const response = await optimizationClient.post<RoiAnalysis>('/roi/', {
       components,
     });

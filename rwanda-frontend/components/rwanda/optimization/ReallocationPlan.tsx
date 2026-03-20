@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 import type { ReallocationPlan as ReallocationPlanType, ReallocationItem } from '@/lib/types/optimization';
 import type { IndicatorComponent } from '@/lib/types/assessment';
 import { COMPONENT_DISPLAY_NAMES } from '@/lib/types/assessment';
-import { formatScore } from '@/lib/utils/formatters';
+import { formatScore, formatRWFCompact } from '@/lib/utils/formatters';
 import {
   ArrowRight,
   TrendingDown,
@@ -16,26 +16,15 @@ interface ReallocationPlanProps {
   data: ReallocationPlanType;
 }
 
-function formatUSD(amount: number): string {
-  if (Math.abs(amount) >= 1_000_000_000) {
-    return `$${(amount / 1_000_000_000).toFixed(2)}B`;
-  }
-  if (Math.abs(amount) >= 1_000_000) {
-    return `$${(amount / 1_000_000).toFixed(2)}M`;
-  }
-  if (Math.abs(amount) >= 1_000) {
-    return `$${(amount / 1_000).toFixed(2)}K`;
-  }
-  return `$${amount.toFixed(0)}`;
-}
+
 
 export function ReallocationPlan({ data }: ReallocationPlanProps) {
   const sortedComponents = useMemo(() => {
     return [...data.components].sort((a, b) => a.priority - b.priority);
   }, [data.components]);
 
-  const increases = data.components.filter((r) => r.change_usd > 0);
-  const decreases = data.components.filter((r) => r.change_usd < 0);
+  const increases = data.components.filter((r) => r.change_lcu > 0);
+  const decreases = data.components.filter((r) => r.change_lcu < 0);
 
   return (
     <div className="space-y-6">
@@ -69,7 +58,7 @@ export function ReallocationPlan({ data }: ReallocationPlanProps) {
           </div>
         </div>
         <p className="text-sm text-gray-600 mt-3">
-          Total Budget: {formatUSD(data.total_budget_usd)} · Computed in {data.computing_time_ms}ms
+          Total Budget: {formatRWFCompact(data.total_budget_lcu)} · Computed in {data.computing_time_ms}ms
         </p>
       </div>
 
@@ -126,7 +115,7 @@ export function ReallocationPlan({ data }: ReallocationPlanProps) {
             </thead>
             <tbody className="divide-y divide-gray-100">
               {sortedComponents.map((item) => {
-                const isIncrease = item.change_usd > 0;
+                const isIncrease = item.change_lcu > 0;
                 return (
                   <tr key={item.component_type} className="hover:bg-gray-50">
                     <td className="px-4 py-3">
@@ -138,10 +127,10 @@ export function ReallocationPlan({ data }: ReallocationPlanProps) {
                       {COMPONENT_DISPLAY_NAMES[item.component_type as IndicatorComponent] || item.component_type}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-600 text-right">
-                      {formatUSD(item.current_allocation_usd)}
+                      {formatRWFCompact(item.current_allocation_lcu)}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-600 text-right">
-                      {formatUSD(item.recommended_allocation_usd)}
+                      {formatRWFCompact(item.recommended_allocation_lcu)}
                     </td>
                     <td className="px-4 py-3 text-right">
                       <div className="flex items-center justify-end gap-1">
@@ -156,7 +145,7 @@ export function ReallocationPlan({ data }: ReallocationPlanProps) {
                           }`}
                         >
                           {isIncrease ? '+' : ''}
-                          {formatUSD(item.change_usd)}
+                          {formatRWFCompact(item.change_lcu)}
                         </span>
                         <span className="text-xs text-gray-500">
                           ({isIncrease ? '+' : ''}

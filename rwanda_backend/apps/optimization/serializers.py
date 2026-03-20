@@ -36,7 +36,7 @@ class ComponentInputSerializer(serializers.Serializer):
         min_value=0,
         help_text="Target benchmark value",
     )
-    financial_allocation_usd = serializers.FloatField(
+    financial_allocation_lcu = serializers.FloatField(
         min_value=0,
         help_text="Current financial allocation in USD",
     )
@@ -97,7 +97,7 @@ class PeerInputSerializer(serializers.Serializer):
     )
     observed_value = serializers.FloatField(min_value=0)
     benchmark_value = serializers.FloatField(min_value=0)
-    financial_allocation_usd = serializers.FloatField(min_value=0)
+    financial_allocation_lcu = serializers.FloatField(min_value=0)
 
 
 class PeerComparisonRequestSerializer(serializers.Serializer):
