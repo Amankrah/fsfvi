@@ -31,6 +31,7 @@ export function NationalOverview() {
 
   const [dashboardData, setDashboardData] = useState<DashboardSummary | null>(null);
   const [historyData, setHistoryData] = useState<AssessmentHistory[]>([]);
+  const [activePlan, setActivePlan] = useState<{ plan_name: string; baseline_fsfsi: number; final_projected_fsfsi: number | null; target_reduction_pct: number; planning_years: number; total_additional_investment: number | null } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [trendView, setTrendView] = useState<TrendView>('fsfsi');
@@ -40,13 +41,23 @@ export function NationalOverview() {
       setLoading(true);
       setError(null);
       try {
-        // Fetch both dashboard summary and history in parallel
+        // Fetch dashboard summary, history, and active plan in parallel
         const [dashboard, history] = await Promise.all([
           assessmentAPI.getDashboardSummary(fiscalYear.start_year),
           assessmentAPI.getHistory(),
         ]);
         setDashboardData(dashboard);
         setHistoryData(history);
+
+        // Fetch active strategic plan (non-blocking)
+        try {
+          const { planningAPI } = await import('@/lib/api/planningApi');
+          const plan = await planningAPI.getActivePlan(fiscalYear.start_year);
+          setActivePlan(plan);
+        } catch {
+          // No plan saved — that's fine
+          setActivePlan(null);
+        }
       } catch (err) {
         console.error('Failed to fetch dashboard:', err);
         setError('Unable to load dashboard data. Please try again.');
@@ -278,6 +289,47 @@ export function NationalOverview() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Strategic Plan Excerpt */}
+      {activePlan && (
+        <Card className="border-[var(--rw-green)]/30 bg-gradient-to-r from-green-50 to-emerald-50/50">
+          <CardContent className="p-5">
+            <div className="flex items-start justify-between">
+              <div className="flex items-start space-x-3">
+                <BarChart3 className="h-6 w-6 text-[var(--rw-green)] mt-0.5 flex-shrink-0" />
+                <div>
+                  <p className="text-sm font-semibold text-gray-900">
+                    {activePlan.plan_name || `Strategic Plan FY${fiscalYear.start_year}`}
+                  </p>
+                  <div className="flex items-center gap-4 mt-1.5">
+                    <div className="text-xs text-gray-600">
+                      <span className="font-medium text-red-600">{Number(activePlan.baseline_fsfsi).toFixed(2)}</span>
+                      <span className="mx-1">→</span>
+                      <span className="font-medium text-green-600">{activePlan.final_projected_fsfsi != null ? Number(activePlan.final_projected_fsfsi).toFixed(2) : '?'}</span>
+                    </div>
+                    <span className="text-xs text-gray-400">|</span>
+                    <span className="text-xs text-gray-600">{activePlan.planning_years} years</span>
+                    <span className="text-xs text-gray-400">|</span>
+                    <span className="text-xs font-medium text-green-700">-{Number(activePlan.target_reduction_pct).toFixed(0)}% target</span>
+                    {activePlan.total_additional_investment != null && (
+                      <>
+                        <span className="text-xs text-gray-400">|</span>
+                        <span className="text-xs text-gray-600">{formatRWFCompact(Number(activePlan.total_additional_investment))}</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <a
+                href="/dashboard/planning"
+                className="text-xs text-[var(--rw-blue)] hover:underline whitespace-nowrap"
+              >
+                View full plan →
+              </a>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

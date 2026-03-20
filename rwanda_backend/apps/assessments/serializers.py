@@ -13,6 +13,7 @@ from apps.fsfvi_data.models import IndicatorComponent
 from .models import (
     AssessmentHistory,
     AssessmentResult,
+    ComponentPersistenceConfig,
     ComponentResult,
     IndicatorResult,
     Scenario,
@@ -406,3 +407,36 @@ class DashboardSummarySerializer(serializers.Serializer):
     cumulative_stress_level = serializers.CharField(required=False, allow_null=True)
     computed_at = serializers.CharField(allow_null=True)  # ISO datetime from backend
     empty = serializers.BooleanField(default=False)
+
+
+class ComponentPersistenceConfigSerializer(serializers.ModelSerializer):
+    """Serializer for cumulative stress persistence parameters."""
+
+    component_display = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ComponentPersistenceConfig
+        fields = [
+            "id",
+            "component",
+            "component_display",
+            "rho_up",
+            "rho_down",
+        ]
+        read_only_fields = ["id", "component", "component_display"]
+
+    def get_component_display(self, obj):
+        return obj.get_component_display()
+
+    def validate(self, data):
+        rho_up = float(data.get("rho_up", 0))
+        rho_down = float(data.get("rho_down", 0))
+        if not (0 < rho_up <= 1):
+            raise serializers.ValidationError({"rho_up": "Must be between 0 and 1"})
+        if not (0 < rho_down <= 1):
+            raise serializers.ValidationError({"rho_down": "Must be between 0 and 1"})
+        if rho_down >= rho_up:
+            raise serializers.ValidationError(
+                {"rho_down": "Recovery speed must be lower than damage speed (systems degrade faster than they recover)"}
+            )
+        return data

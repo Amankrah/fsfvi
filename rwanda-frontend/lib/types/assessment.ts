@@ -347,6 +347,24 @@ export interface AssessmentHistory {
 }
 
 // ============================================================================
+// Persistence Config Types
+// ============================================================================
+
+export interface PersistenceConfig {
+  id: number;
+  component: IndicatorComponent;
+  component_display: string;
+  rho_up: number;
+  rho_down: number;
+}
+
+export interface PersistenceConfigUpdateResponse {
+  updated: PersistenceConfig[];
+  errors: Array<{ component?: string; error?: string; errors?: Record<string, string[]> }>;
+  recalculated_assessments: number;
+}
+
+// ============================================================================
 // Config Types
 // ============================================================================
 

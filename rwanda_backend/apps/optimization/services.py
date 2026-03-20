@@ -45,13 +45,16 @@ def _build_component_inputs_from_assessment(assessment) -> list[dict]:
     benchmark_value = 1, so the Rust gap formula δ = |obs - bench| / max(obs, bench)
     reproduces the assessment's gap exactly.
     """
+    from django.db.models import Avg
     from apps.fsfvi_data.models import Indicator
 
-    # Get component-level alpha (alpha_per_bnLCU) from the Indicator model
-    component_alphas = {}
-    for ind in Indicator.objects.all():
-        if ind.default_sensitivity and ind.component not in component_alphas:
-            component_alphas[ind.component] = float(ind.default_sensitivity)
+    # Component-level alpha = mean of per-indicator alphas (proper aggregation from 33 indicators)
+    component_alphas = {
+        r["component"]: float(r["alpha"])
+        for r in Indicator.objects.filter(default_sensitivity__isnull=False)
+        .values("component")
+        .annotate(alpha=Avg("default_sensitivity"))
+    }
 
     components = []
     for comp in assessment.component_results.all().order_by("component"):
@@ -83,6 +86,9 @@ def _stamp_assessment_fsfsi(result: dict, assessment) -> dict:
     Uses the assessment's own FSFSI and efficiency metrics rather than the
     optimizer's component-level approximation.
     """
+    # Optimization uses THIS YEAR's FSFSI (not cumulative) because you can only
+    # reallocate this year's budget — you can't optimize away past damage.
+    # Cumulative belongs on National Overview and Strategic Planning.
     fsfsi = float(assessment.fsfsi_score)
     fsfsi_optimal = float(assessment.fsfsi_optimal) if assessment.fsfsi_optimal else None
     efficiency = float(assessment.efficiency_index) if assessment.efficiency_index else None

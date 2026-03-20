@@ -5,7 +5,7 @@
 
 use crate::config::get_weighting_config;
 use crate::errors::{FsfiError, FsfiResult};
-use crate::weighting::models::{get_expert_matrix, normalize_weights, COMPONENT_ORDER};
+use crate::weighting::models::{get_indicator_expert_matrix, normalize_weights, INDICATOR_COMPONENT_ORDER};
 use pyo3::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -28,7 +28,7 @@ pub struct AhpResult {
 
 /// Calculate AHP weights from a pairwise comparison matrix using the power method
 pub fn calculate_ahp_weights(scenario: &str) -> FsfiResult<AhpResult> {
-    let matrix = get_expert_matrix(scenario);
+    let matrix = get_indicator_expert_matrix(scenario);
     let n = matrix.len();
 
     // Validate matrix
@@ -56,7 +56,7 @@ pub fn calculate_ahp_weights(scenario: &str) -> FsfiResult<AhpResult> {
 
     // Map eigenvector to component names
     let mut weights = HashMap::new();
-    for (i, &component) in COMPONENT_ORDER.iter().enumerate() {
+    for (i, &component) in INDICATOR_COMPONENT_ORDER.iter().enumerate() {
         if i < eigenvector.len() {
             weights.insert(component.to_string(), eigenvector[i]);
         }
@@ -203,7 +203,7 @@ mod tests {
     fn test_ahp_baseline_weights() {
         let result = calculate_ahp_weights("normal_operations").unwrap();
         assert!(result.is_consistent, "AHP baseline should be consistent");
-        assert_eq!(result.weights.len(), 6);
+        assert_eq!(result.weights.len(), 8);
 
         let sum: f64 = result.weights.values().sum();
         assert!((sum - 1.0).abs() < 1e-6);
@@ -212,11 +212,11 @@ mod tests {
     #[test]
     fn test_ahp_climate_shock() {
         let result = calculate_ahp_weights("climate_shock").unwrap();
-        assert_eq!(result.weights.len(), 6);
+        assert_eq!(result.weights.len(), 8);
 
-        // Climate component should be high in climate shock
-        let climate_w = result.weights["climate_natural_resources"];
-        assert!(climate_w > 0.1, "Climate weight should be elevated in climate shock");
+        // Environment component should be high in climate shock
+        let env_w = result.weights["environment"];
+        assert!(env_w > 0.05, "Environment weight should be elevated in climate shock");
     }
 
     #[test]

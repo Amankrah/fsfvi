@@ -14,22 +14,26 @@ use crate::core::calculations::calculate_performance_gap;
 use crate::errors::FsfiResult;
 use pyo3::prelude::*;
 
-/// Maximum sensitivity for clamping (from empirical range in literature).
-const MAX_SENSITIVITY: f64 = 0.005;
+/// Maximum sensitivity for clamping.
+/// Set high enough to accommodate Excel-calibrated alpha_per_bnLCU values (0.02-0.04).
+const MAX_SENSITIVITY: f64 = 0.10;
 
-/// Minimum allocation (millions LCU) for applying estimation adjustments; below this use base only.
-const MIN_ALLOCATION_FOR_ADJUSTMENT: f64 = 5.0;
+/// Minimum allocation (bn LCU) for applying estimation adjustments; below this use base only.
+const MIN_ALLOCATION_FOR_ADJUSTMENT: f64 = 0.5;
 
 // ---------------------------------------------------------------------------
 // Base sensitivity by component type (legacy + indicator names)
 // ---------------------------------------------------------------------------
 
 /// Base sensitivity values for legacy 6-component and indicator 8-component types.
-/// Used when no component-level sensitivity_parameter is provided.
-/// Values chosen for allocations in millions LCU; α ∈ [0.0005, 0.005].
+/// Used ONLY when no component-level sensitivity_parameter is provided.
+///
+/// Indicator 8-component values are calibrated for allocations in **billions LCU**
+/// (alpha_per_bnLCU), matching the Excel parameters file from IFPRI.
+/// Legacy 6-component values retained for backward compatibility.
 fn base_sensitivity_table(component_type: &str) -> f64 {
     match component_type {
-        // Legacy 6-component (and aliases)
+        // Legacy 6-component (and aliases) — calibrated for millions USD (historical)
         "agricultural_development" => 0.0015,
         "infrastructure" => 0.0018,
         "nutrition_health" | "nutrition_food_safety" => 0.0020,
@@ -38,16 +42,16 @@ fn base_sensitivity_table(component_type: &str) -> f64 {
         "governance_institutions" | "governance_policy" => 0.0006,
         "market_access" => 0.0012,
         "research_innovation" => 0.0010,
-        // Indicator 8-component
-        "markets" => 0.0012,
-        "crop_production" => 0.0015,
-        "nutrition" => 0.0020,
-        "research" => 0.0010,
-        "post_harvest" => 0.0014,
-        "environment" => 0.0008,
-        "animal_systems" => 0.0016,
-        "finance" => 0.0018,
-        _ => 0.0015,
+        // Indicator 8-component — calibrated for billions LCU (from IFPRI Excel alpha_per_bnLCU)
+        "markets" => 0.020,
+        "crop_production" => 0.035,
+        "nutrition" => 0.040,
+        "research" => 0.015,
+        "post_harvest" => 0.025,
+        "environment" => 0.020,
+        "animal_systems" => 0.030,
+        "finance" => 0.030,
+        _ => 0.020,
     }
 }
 
@@ -62,30 +66,30 @@ pub fn get_base_sensitivity(component_type: &str) -> f64 {
 /// - Uses base value for the component type.
 /// - If allocation is above threshold, applies small adjustments for performance
 ///   gap and scale, then clamps to [min_sensitivity_parameter, MAX_SENSITIVITY].
-/// - Allocation should be in **millions LCU** (same as used in stress formula).
+/// - Allocation should be in **billions LCU** for indicator 8-component types.
 pub fn estimate_sensitivity_parameter(
     component_type: &str,
     observed_value: f64,
     benchmark_value: f64,
-    allocation_millions_lcu: f64,
+    allocation_bn_lcu: f64,
 ) -> FsfiResult<f64> {
     let val = get_validation_config();
     let mut alpha = get_base_sensitivity(component_type);
 
-    if allocation_millions_lcu >= MIN_ALLOCATION_FOR_ADJUSTMENT
+    if allocation_bn_lcu >= MIN_ALLOCATION_FOR_ADJUSTMENT
         && observed_value >= 0.0
         && benchmark_value >= 0.0
     {
         let gap = calculate_performance_gap(observed_value, benchmark_value)?;
-        // Slight reduction for high gap (structural issues)
+        // Slight reduction for high gap (structural issues — harder to move the needle)
         if gap > 0.5 {
-            let penalty = (gap.min(1.0) - 0.5) * 0.0003;
-            alpha = alpha - penalty;
+            let penalty = (gap.min(1.0) - 0.5) * 0.003;
+            alpha -= penalty;
         }
-        // Slight scale economy for large allocations
-        if allocation_millions_lcu > 100.0 {
-            let bonus = (allocation_millions_lcu / 1000.0).min(0.5) * 0.0002;
-            alpha = alpha + bonus;
+        // Slight scale economy for large allocations (diminishing returns at scale)
+        if allocation_bn_lcu > 100.0 {
+            let bonus = (allocation_bn_lcu / 1000.0).min(0.5) * 0.002;
+            alpha += bonus;
         }
     }
 
@@ -99,20 +103,20 @@ pub fn estimate_sensitivity_parameter(
 // ---------------------------------------------------------------------------
 
 /// Python: estimate sensitivity parameter α for a component.
-/// Allocation in millions LCU. Returns float.
+/// Allocation in billions LCU. Returns float.
 #[pyfunction]
-#[pyo3(signature = (component_type, observed_value, benchmark_value, allocation_millions_lcu))]
+#[pyo3(signature = (component_type, observed_value, benchmark_value, allocation_bn_lcu))]
 pub fn py_estimate_sensitivity(
     component_type: &str,
     observed_value: f64,
     benchmark_value: f64,
-    allocation_millions_lcu: f64,
+    allocation_bn_lcu: f64,
 ) -> PyResult<f64> {
     estimate_sensitivity_parameter(
         component_type,
         observed_value,
         benchmark_value,
-        allocation_millions_lcu,
+        allocation_bn_lcu,
     )
     .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))
 }
@@ -128,11 +132,13 @@ mod tests {
 
     #[test]
     fn test_base_sensitivity() {
-        assert_eq!(get_base_sensitivity("markets"), 0.0012);
-        assert_eq!(get_base_sensitivity("crop_production"), 0.0015);
-        assert_eq!(get_base_sensitivity("nutrition"), 0.0020);
+        // Indicator 8-component (calibrated for bn LCU)
+        assert_eq!(get_base_sensitivity("markets"), 0.020);
+        assert_eq!(get_base_sensitivity("crop_production"), 0.035);
+        assert_eq!(get_base_sensitivity("nutrition"), 0.040);
+        // Legacy 6-component (calibrated for millions USD)
         assert_eq!(get_base_sensitivity("agricultural_development"), 0.0015);
-        assert_eq!(get_base_sensitivity("unknown"), 0.0015);
+        assert_eq!(get_base_sensitivity("unknown"), 0.020);
     }
 
     #[test]

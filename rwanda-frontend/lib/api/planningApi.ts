@@ -67,10 +67,20 @@ export const planningAPI = {
     planningYears: number = 5,
     targetFsfvi: number = 0.30,
     growthRate: number = 0.05,
+    targetCurve: string = 'smoothstep',
+    weightingMethod: string = 'hybrid',
+    scenario: string = 'normal_operations',
   ): Promise<MultiYearStrategicPlan> => {
     const response = await planningClient.get<MultiYearStrategicPlan>(
       `/${assessmentId}/multi-year/`,
-      { params: { planning_years: planningYears, target_fsfvi: targetFsfvi, growth_rate: growthRate } }
+      { params: {
+        planning_years: planningYears,
+        target_fsfvi: targetFsfvi,
+        growth_rate: growthRate,
+        target_curve: targetCurve,
+        weighting_method: weightingMethod,
+        scenario,
+      } }
     );
     return response.data;
   },
@@ -89,6 +99,36 @@ export const planningAPI = {
       `/${assessmentId}/mtef/`,
       { params: { improvement_percent: improvementPercent, growth_rate: growthRate } }
     );
+    return response.data;
+  },
+
+  // ==========================================================================
+  // Legacy (raw component inputs)
+  // ==========================================================================
+
+  // ==========================================================================
+  // Saved plans
+  // ==========================================================================
+
+  savePlan: async (request: {
+    assessment_id: string;
+    plan_name?: string;
+    planning_years: number;
+    target_fsfvi: number;
+    target_reduction_pct: number;
+    yearly_budget_growth_rate: number;
+    target_curve: string;
+  }) => {
+    const response = await planningClient.post('/saved-plans/', request);
+    return response.data;
+  },
+
+  getActivePlan: async (fiscalYear: number) => {
+    const response = await planningClient.get('/active-plan/', {
+      params: { fiscal_year: fiscalYear },
+      validateStatus: (s: number) => s === 200 || s === 204,
+    });
+    if (response.status === 204) return null;
     return response.data;
   },
 

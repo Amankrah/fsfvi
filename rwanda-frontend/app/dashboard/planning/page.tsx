@@ -15,6 +15,8 @@ import {
   PlanningInsightsCards,
   MtefSummaryCards,
 } from '@/components/rwanda/planning';
+import { PersistenceConfigPanel } from '@/components/rwanda/planning/PersistenceConfigPanel';
+import { ComponentTrajectoryTable } from '@/components/rwanda/planning/ComponentTrajectoryTable';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Loader2,
@@ -25,6 +27,7 @@ import {
   DollarSign,
   BarChart3,
   RefreshCw,
+  Sparkles,
 } from 'lucide-react';
 import { formatScore, formatRWFCompact } from '@/lib/utils/formatters';
 
@@ -64,6 +67,12 @@ export default function PlanningPage() {
   const [targetReductionPct, setTargetReductionPct] = useState(40);
   const [mtefImprovementPercent, setMtefImprovementPercent] = useState(15);
   const [mtefGrowthRate, setMtefGrowthRate] = useState(0.08);
+  const [targetCurve, setTargetCurve] = useState<'smoothstep' | 'linear' | 'frontloaded'>('smoothstep');
+  const [weightingMethod, setWeightingMethod] = useState('hybrid');
+  const [scenario, setScenario] = useState('normal_operations');
+  const [savingPlan, setSavingPlan] = useState(false);
+  const [planSaved, setPlanSaved] = useState(false);
+  const [planName, setPlanName] = useState('');
 
   // Compute target FSFSI from reduction percentage and cumulative baseline
   const cumulativeBaseline = Number(assessment?.cumulative_fsfsi) || Number(assessment?.fsfsi_score) || 0.50;
@@ -108,6 +117,9 @@ export default function PlanningPage() {
           Math.min(Math.max(1, planningYears), 15),
           Math.max(0.01, Math.min(1, targetFsfvi)),
           mtefGrowthRate,
+          targetCurve,
+          weightingMethod,
+          scenario,
         ),
         planningAPI.mtefForAssessment(
           assessment.id,
@@ -127,7 +139,7 @@ export default function PlanningPage() {
     } finally {
       setGenerating(false);
     }
-  }, [assessment, planningYears, targetFsfvi, mtefImprovementPercent, mtefGrowthRate]);
+  }, [assessment, planningYears, targetFsfvi, mtefImprovementPercent, mtefGrowthRate, targetCurve, weightingMethod, scenario]);
 
   useEffect(() => {
     fetchAssessment();
@@ -186,86 +198,163 @@ export default function PlanningPage() {
               <p className="text-sm text-gray-500 font-normal">{t('planning.parameters_help')}</p>
             </CardHeader>
             <CardContent>
-              {/* Context banner */}
-              <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800">
-                <p>
-                  Current cumulative stress: <strong>{cumulativeBaseline.toFixed(4)}</strong> (critical).
-                  {' '}Recovery is slow due to accumulated damage from prior years.
-                  {' '}A {targetReductionPct}% reduction over {planningYears} years targets <strong>{targetFsfvi.toFixed(4)}</strong>.
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Planning horizon (years)
-                  </label>
-                  <select
-                    value={planningYears}
-                    onChange={(e) => setPlanningYears(Number(e.target.value))}
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                    aria-label="Planning horizon"
-                    title="Planning horizon"
-                  >
-                    <option value={3}>3 years (MTEF cycle)</option>
-                    <option value={5}>5 years (PSTA-5: 2024-2029)</option>
-                    <option value={7}>7 years (NST-2 aligned)</option>
-                    <option value={10}>10 years (Vision 2035)</option>
-                  </select>
-                  <p className="text-xs text-gray-400 mt-1">Aligned with Rwanda planning cycles</p>
+              {/* Current situation summary */}
+              <div className="mb-5 flex items-center gap-3 p-4 bg-gradient-to-r from-blue-50 to-blue-100/50 border border-blue-200 rounded-xl">
+                <div className="flex-shrink-0 w-14 h-14 rounded-full bg-blue-600 text-white flex items-center justify-center">
+                  <span className="text-lg font-bold">{cumulativeBaseline.toFixed(2)}</span>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Stress reduction target (%)
-                  </label>
-                  <input
-                    type="number"
-                    min={5}
-                    max={80}
-                    step={5}
-                    value={targetReductionPct}
-                    onChange={(e) => setTargetReductionPct(Number(e.target.value) || 40)}
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                    aria-label="Stress reduction target"
-                    title="Stress reduction target"
-                  />
-                  <p className="text-xs text-gray-400 mt-1">
-                    = FSFSI from {cumulativeBaseline.toFixed(2)} to {targetFsfvi.toFixed(2)}
+                  <p className="text-sm font-semibold text-blue-900">Current Cumulative Stress (Critical)</p>
+                  <p className="text-xs text-blue-700 mt-0.5">
+                    A <strong>{targetReductionPct}%</strong> reduction over <strong>{planningYears} years</strong> targets <strong>{targetFsfvi.toFixed(2)}</strong>.
+                    Recovery is slow due to accumulated damage from prior years.
                   </p>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    MTEF 3-year improvement (%)
-                  </label>
-                  <input
-                    type="number"
-                    min={5}
-                    max={50}
-                    step={5}
-                    value={mtefImprovementPercent}
-                    onChange={(e) => setMtefImprovementPercent(Number(e.target.value) || 15)}
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                    aria-label="MTEF improvement target"
-                    title="MTEF improvement target"
-                  />
-                  <p className="text-xs text-gray-400 mt-1">Rolling 3-year expenditure target</p>
+              </div>
+
+              {/* Two-row parameter layout */}
+              <div className="space-y-4">
+                {/* Row 1: Strategic targets */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                      Planning Horizon
+                    </label>
+                    <select
+                      value={planningYears}
+                      onChange={(e) => setPlanningYears(Number(e.target.value))}
+                      className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm font-medium"
+                      aria-label="Planning horizon"
+                      title="Planning horizon"
+                    >
+                      <option value={3}>3 years — MTEF cycle</option>
+                      <option value={5}>5 years — PSTA-5 (2024-2029)</option>
+                      <option value={7}>7 years — NST-2 aligned</option>
+                      <option value={10}>10 years — Vision 2035</option>
+                    </select>
+                  </div>
+                  <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                      Stress Reduction Target
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        min={5}
+                        max={80}
+                        step={5}
+                        value={targetReductionPct}
+                        onChange={(e) => setTargetReductionPct(Number(e.target.value) || 40)}
+                        className="w-20 rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm font-medium text-center"
+                        aria-label="Stress reduction target"
+                        title="Stress reduction target"
+                      />
+                      <span className="text-sm text-gray-500">%</span>
+                      <span className="text-xs text-gray-400 ml-auto">
+                        {cumulativeBaseline.toFixed(2)} → {targetFsfvi.toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                      Milestone Pacing
+                    </label>
+                    <select
+                      value={targetCurve}
+                      onChange={(e) => setTargetCurve(e.target.value as 'smoothstep' | 'linear' | 'frontloaded')}
+                      className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm font-medium"
+                      aria-label="Milestone pacing"
+                      title="Milestone pacing"
+                    >
+                      <option value="smoothstep">Build-up phase first (recommended)</option>
+                      <option value="linear">Uniform annual targets</option>
+                      <option value="frontloaded">Early wins priority</option>
+                    </select>
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Annual budget growth rate (%)
-                  </label>
-                  <input
-                    type="number"
-                    min={0}
-                    max={25}
-                    step={1}
-                    value={Math.round(mtefGrowthRate * 100)}
-                    onChange={(e) => setMtefGrowthRate((Number(e.target.value) || 8) / 100)}
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                    aria-label="Annual budget growth"
-                    title="Annual budget growth"
-                  />
-                  <p className="text-xs text-gray-400 mt-1">Rwanda avg: 8-10% for agriculture</p>
+
+                {/* Row 2: Budget parameters */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                      Annual Budget Growth
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        min={0}
+                        max={25}
+                        step={1}
+                        value={Math.round(mtefGrowthRate * 100)}
+                        onChange={(e) => setMtefGrowthRate((Number(e.target.value) || 8) / 100)}
+                        className="w-20 rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm font-medium text-center"
+                        aria-label="Annual budget growth"
+                        title="Annual budget growth"
+                      />
+                      <span className="text-sm text-gray-500">% per year</span>
+                      <span className="text-xs text-gray-400 ml-auto">Rwanda avg: 8-10% for agriculture</span>
+                    </div>
+                  </div>
+                  <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                      MTEF 3-Year Improvement Target
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        min={5}
+                        max={50}
+                        step={5}
+                        value={mtefImprovementPercent}
+                        onChange={(e) => setMtefImprovementPercent(Number(e.target.value) || 15)}
+                        className="w-20 rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm font-medium text-center"
+                        aria-label="MTEF improvement target"
+                        title="MTEF improvement target"
+                      />
+                      <span className="text-sm text-gray-500">% over 3 years</span>
+                      <span className="text-xs text-gray-400 ml-auto">Rolling expenditure framework</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Row 3: Weighting & Scenario */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                      Component Weighting Method
+                    </label>
+                    <select
+                      value={weightingMethod}
+                      onChange={(e) => setWeightingMethod(e.target.value)}
+                      className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm font-medium"
+                      aria-label="Weighting method"
+                      title="Weighting method"
+                    >
+                      <option value="hybrid">Hybrid (expert + network + financial)</option>
+                      <option value="equal">Equal weights (1/n)</option>
+                      <option value="expert">Expert judgment (AHP)</option>
+                      <option value="financial">Budget proportional</option>
+                      <option value="network">Network centrality (PageRank)</option>
+                    </select>
+                  </div>
+                  <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                      Planning Scenario
+                    </label>
+                    <select
+                      value={scenario}
+                      onChange={(e) => setScenario(e.target.value)}
+                      className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm font-medium"
+                      aria-label="Planning scenario"
+                      title="Planning scenario"
+                    >
+                      <option value="normal_operations">Normal Operations</option>
+                      <option value="climate_shock">Climate Shock</option>
+                      <option value="financial_crisis">Financial Crisis</option>
+                      <option value="pandemic_disruption">Pandemic Disruption</option>
+                      <option value="political_instability">Political Instability</option>
+                    </select>
+                  </div>
                 </div>
               </div>
             </CardContent>
@@ -379,6 +468,19 @@ export default function PlanningPage() {
                     </Card>
                   </div>
 
+                  {/* Component Recovery Trajectory */}
+                  <ComponentTrajectoryTable
+                    yearlyPlans={multiYearPlan.yearly_plans}
+                    baselineComponents={
+                      Object.fromEntries(
+                        (assessment?.component_results ?? []).map((c) => [
+                          c.component,
+                          c.cumulative_stress ?? c.component_stress,
+                        ])
+                      )
+                    }
+                  />
+
                   <Card>
                     <CardHeader>
                       <CardTitle>{t('planning.insights_title')}</CardTitle>
@@ -438,6 +540,72 @@ export default function PlanningPage() {
               </div>
             </>
           )}
+
+          {/* Save Plan */}
+          {hasPlans && assessment && multiYearPlan && (
+            <Card className="border-2 border-[var(--rw-green)]/30 bg-green-50/30">
+              <CardContent className="py-5">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                  <div className="flex-1">
+                    <h3 className="text-sm font-semibold text-gray-900">Save this plan as the official strategic plan</h3>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Saving persists this plan to the database and displays a summary on the National Overview.
+                      Only one active plan per fiscal year — saving replaces any previous plan.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3 w-full sm:w-auto">
+                    <input
+                      type="text"
+                      placeholder={`PSTA-5 Plan FY${assessment.fiscal_year}`}
+                      value={planName}
+                      onChange={(e) => { setPlanName(e.target.value); setPlanSaved(false); }}
+                      className="flex-1 sm:w-56 rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                    />
+                    <button
+                      type="button"
+                      disabled={savingPlan || planSaved}
+                      onClick={async () => {
+                        setSavingPlan(true);
+                        setPlanSaved(false);
+                        try {
+                          await planningAPI.savePlan({
+                            assessment_id: assessment.id,
+                            plan_name: planName || `Strategic Plan FY${assessment.fiscal_year}`,
+                            planning_years: planningYears,
+                            target_fsfvi: targetFsfvi,
+                            target_reduction_pct: targetReductionPct,
+                            yearly_budget_growth_rate: mtefGrowthRate,
+                            target_curve: targetCurve,
+                          });
+                          setPlanSaved(true);
+                        } catch {
+                          setError('Failed to save plan');
+                        } finally {
+                          setSavingPlan(false);
+                        }
+                      }}
+                      className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg whitespace-nowrap ${
+                        planSaved
+                          ? 'bg-green-600 text-white'
+                          : 'bg-[var(--rw-green)] text-white hover:opacity-90'
+                      } disabled:opacity-50`}
+                    >
+                      {savingPlan ? (
+                        <><Loader2 className="h-4 w-4 animate-spin" /> Saving...</>
+                      ) : planSaved ? (
+                        <><AlertTriangle className="h-4 w-4" /> Plan Saved</>
+                      ) : (
+                        <><Sparkles className="h-4 w-4" /> Save Plan</>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Advanced: Cumulative Stress Parameters */}
+          <PersistenceConfigPanel onConfigSaved={fetchAssessment} />
         </>
       )}
     </div>

@@ -33,6 +33,7 @@ from .views import (
     NetworkAnalysisView,
     # Config
     ConfigView,
+    PersistenceConfigView,
     StressLevelView,
 )
 
@@ -98,4 +99,6 @@ urlpatterns = [
     path("config/", ConfigView.as_view(), name="config"),
     # GET /api/assessments/stress-level/ - Get stress level
     path("stress-level/", StressLevelView.as_view(), name="stress-level"),
+    # GET/PUT /api/assessments/persistence-config/ - Cumulative stress parameters
+    path("persistence-config/", PersistenceConfigView.as_view(), name="persistence-config"),
 ]

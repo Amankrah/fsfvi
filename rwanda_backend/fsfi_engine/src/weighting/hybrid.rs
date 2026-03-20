@@ -9,7 +9,7 @@ use crate::config::get_weighting_config;
 use crate::errors::FsfiResult;
 use crate::weighting::expert::calculate_ahp_weights;
 use crate::weighting::financial::calculate_financial_weights;
-use crate::weighting::models::{normalize_weights, Component, COMPONENT_ORDER};
+use crate::weighting::models::{normalize_weights, Component, INDICATOR_COMPONENT_ORDER};
 use crate::weighting::network::{calculate_cascade_multipliers, calculate_pagerank};
 use pyo3::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -49,7 +49,7 @@ pub fn calculate_hybrid_weights(
     let delta = config.hybrid_financial_weight;
 
     let mut hybrid = HashMap::new();
-    for &component in &COMPONENT_ORDER {
+    for &component in &INDICATOR_COMPONENT_ORDER {
         let name = component.to_string();
         let w = alpha * expert_weights.get(&name).copied().unwrap_or(0.0)
             + beta * pagerank_weights.get(&name).copied().unwrap_or(0.0)
@@ -143,48 +143,14 @@ mod tests {
 
     fn test_components() -> Vec<Component> {
         vec![
-            Component {
-                name: "Agriculture".into(),
-                component_type: "agricultural_development".into(),
-                financial_allocation: 30.0,
-                observed_value: 80.0,
-                benchmark_value: 100.0,
-            },
-            Component {
-                name: "Infrastructure".into(),
-                component_type: "infrastructure".into(),
-                financial_allocation: 25.0,
-                observed_value: 70.0,
-                benchmark_value: 90.0,
-            },
-            Component {
-                name: "Nutrition".into(),
-                component_type: "nutrition_health".into(),
-                financial_allocation: 20.0,
-                observed_value: 60.0,
-                benchmark_value: 85.0,
-            },
-            Component {
-                name: "Climate".into(),
-                component_type: "climate_natural_resources".into(),
-                financial_allocation: 10.0,
-                observed_value: 50.0,
-                benchmark_value: 75.0,
-            },
-            Component {
-                name: "Social".into(),
-                component_type: "social_protection_equity".into(),
-                financial_allocation: 10.0,
-                observed_value: 55.0,
-                benchmark_value: 80.0,
-            },
-            Component {
-                name: "Governance".into(),
-                component_type: "governance_institutions".into(),
-                financial_allocation: 5.0,
-                observed_value: 65.0,
-                benchmark_value: 70.0,
-            },
+            Component { name: "Markets".into(), component_type: "markets".into(), financial_allocation: 931.0, observed_value: 35.0, benchmark_value: 60.0 },
+            Component { name: "Crop Production".into(), component_type: "crop_production".into(), financial_allocation: 276.0, observed_value: 45.0, benchmark_value: 80.0 },
+            Component { name: "Nutrition".into(), component_type: "nutrition".into(), financial_allocation: 431.0, observed_value: 42.0, benchmark_value: 60.0 },
+            Component { name: "Research".into(), component_type: "research".into(), financial_allocation: 360.0, observed_value: 35.0, benchmark_value: 50.0 },
+            Component { name: "Post-Harvest".into(), component_type: "post_harvest".into(), financial_allocation: 118.0, observed_value: 15.0, benchmark_value: 50.0 },
+            Component { name: "Environment".into(), component_type: "environment".into(), financial_allocation: 84.0, observed_value: 25.0, benchmark_value: 40.0 },
+            Component { name: "Animal Systems".into(), component_type: "animal_systems".into(), financial_allocation: 36.0, observed_value: 35.0, benchmark_value: 60.0 },
+            Component { name: "Finance".into(), component_type: "finance".into(), financial_allocation: 4.0, observed_value: 12.0, benchmark_value: 40.0 },
         ]
     }
 
@@ -198,22 +164,24 @@ mod tests {
     #[test]
     fn test_hybrid_all_components_present() {
         let result = calculate_hybrid_weights(&test_components(), None).unwrap();
-        assert_eq!(result.hybrid_weights.len(), 6);
-        assert_eq!(result.expert_weights.len(), 6);
-        assert_eq!(result.financial_weights.len(), 6);
-        assert_eq!(result.pagerank_weights.len(), 6);
-        assert_eq!(result.cascade_weights.len(), 6);
+        assert_eq!(result.hybrid_weights.len(), 8);
+        assert_eq!(result.expert_weights.len(), 8);
+        assert_eq!(result.financial_weights.len(), 8);
+        assert_eq!(result.pagerank_weights.len(), 8);
+        assert_eq!(result.cascade_weights.len(), 8);
     }
 
     #[test]
     fn test_hybrid_with_performance() {
         let mut stress = HashMap::new();
-        stress.insert("agricultural_development".to_string(), 0.5);
-        stress.insert("infrastructure".to_string(), 0.3);
-        stress.insert("nutrition_health".to_string(), 0.8);
-        stress.insert("climate_natural_resources".to_string(), 0.2);
-        stress.insert("social_protection_equity".to_string(), 0.4);
-        stress.insert("governance_institutions".to_string(), 0.1);
+        stress.insert("markets".to_string(), 0.4);
+        stress.insert("crop_production".to_string(), 0.5);
+        stress.insert("nutrition".to_string(), 0.8);
+        stress.insert("research".to_string(), 0.4);
+        stress.insert("post_harvest".to_string(), 0.5);
+        stress.insert("environment".to_string(), 0.3);
+        stress.insert("animal_systems".to_string(), 0.5);
+        stress.insert("finance".to_string(), 0.7);
 
         let weights =
             calculate_hybrid_weights_with_performance(&test_components(), &stress, None).unwrap();
@@ -224,8 +192,8 @@ mod tests {
         // Nutrition has highest stress (0.8) — should get a weight boost
         let nutr_base = calculate_hybrid_weights(&test_components(), None)
             .unwrap()
-            .hybrid_weights["nutrition_health"];
-        let nutr_adjusted = weights["nutrition_health"];
+            .hybrid_weights["nutrition"];
+        let nutr_adjusted = weights["nutrition"];
         assert!(nutr_adjusted > nutr_base * 0.9); // At least not drastically lower
     }
 

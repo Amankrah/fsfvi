@@ -112,7 +112,7 @@ pub fn calculate_performance_gap_directional(
 ///
 /// Arguments:
 /// - `gap`: Performance gap δᵢ ∈ [0, 1]
-/// - `allocation`: Financial allocation fᵢ > 0 (in millions LCU)
+/// - `allocation`: Financial allocation fᵢ > 0 (units must match sensitivity calibration)
 /// - `sensitivity`: Sensitivity parameter αᵢ > 0
 pub fn calculate_stress(gap: f64, allocation: f64, sensitivity: f64) -> FsfiResult<f64> {
     if allocation < 0.0 {

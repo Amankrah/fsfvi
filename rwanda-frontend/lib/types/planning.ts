@@ -35,6 +35,12 @@ export interface PlanningComponentInput {
   weight?: number;
 }
 
+export interface ComponentProjection {
+  cumulative_stress: number;
+  point_in_time_stress: number;
+  display: string;
+}
+
 export interface YearlyPlanOutput {
   year: number;
   target_fsfvi: number;
@@ -45,6 +51,8 @@ export interface YearlyPlanOutput {
   total_budget: number;
   key_interventions: string[];
   milestones: string[];
+  component_projections?: Record<string, ComponentProjection>;
+  year_target?: number;
 }
 
 export interface ImplementationRisk {
@@ -88,4 +96,53 @@ export interface MtefPlan {
   year_2_plan: MtefYearPlan;
   year_3_plan: MtefYearPlan;
   fiscal_implications: string[];
+}
+
+// ---------------------------------------------------------------------------
+// Saved Strategic Plans
+// ---------------------------------------------------------------------------
+
+export interface SavePlanRequest {
+  assessment_id: string;
+  plan_name?: string;
+  planning_years: number;
+  target_fsfvi: number;
+  target_reduction_pct: number;
+  yearly_budget_growth_rate: number;
+  target_curve: string;
+}
+
+export interface SavedStrategicPlanFull {
+  id: string;
+  assessment_id: string;
+  fiscal_year: number;
+  plan_name: string;
+  is_active: boolean;
+  planning_years: number;
+  target_fsfvi: number;
+  target_reduction_pct: number;
+  yearly_budget_growth_rate: number;
+  target_curve: string;
+  baseline_fsfsi: number;
+  final_projected_fsfsi: number | null;
+  total_additional_investment: number | null;
+  plan_json: MultiYearStrategicPlan;
+  created_at: string;
+  updated_at: string;
+  created_by_username: string | null;
+}
+
+export interface SavedPlanExcerpt {
+  id: string;
+  fiscal_year: number;
+  plan_name: string;
+  is_active: boolean;
+  planning_years: number;
+  target_fsfvi: number;
+  baseline_fsfsi: number;
+  final_projected_fsfsi: number | null;
+  total_additional_investment: number | null;
+  target_reduction_pct: number;
+  yearly_budget_growth_rate: number;
+  created_at: string;
 }

@@ -20,6 +20,7 @@ from .serializers import (
     AssessmentResultListSerializer,
     AssessmentResultOutputSerializer,
     AssessmentResultSerializer,
+    ComponentPersistenceConfigSerializer,
     DashboardSummarySerializer,
     QuickCheckOutputSerializer,
     QuickCheckRequestSerializer,
@@ -639,3 +640,88 @@ class StressLevelView(APIView):
         service = get_config_service()
         level = service.get_stress_level(float(score))
         return Response({"score": float(score), "stress_level": level})
+
+
+class PersistenceConfigView(APIView):
+    """
+    View and update cumulative stress persistence parameters.
+
+    GET  /api/assessments/persistence-config/ — list all 8 component configs
+    PUT  /api/assessments/persistence-config/ — update configs and recalculate
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    @staticmethod
+    def _ensure_all_configs_exist():
+        """Seed missing configs from defaults."""
+        from .models import ComponentPersistenceConfig
+        from apps.fsfvi_data.models import IndicatorComponent
+        from decimal import Decimal
+
+        existing = set(
+            ComponentPersistenceConfig.objects.values_list("component", flat=True)
+        )
+        for comp_value, _ in IndicatorComponent.choices:
+            if comp_value not in existing:
+                defaults = ComponentPersistenceConfig.DEFAULTS.get(comp_value, {})
+                ComponentPersistenceConfig.objects.create(
+                    component=comp_value,
+                    rho_up=Decimal(defaults.get("rho_up", "0.40")),
+                    rho_down=Decimal(defaults.get("rho_down", "0.15")),
+                )
+
+    def get(self, request):
+        self._ensure_all_configs_exist()
+        from .models import ComponentPersistenceConfig
+
+        configs = ComponentPersistenceConfig.objects.order_by("component")
+        serializer = ComponentPersistenceConfigSerializer(configs, many=True)
+        return Response(serializer.data)
+
+    def put(self, request):
+        from .models import ComponentPersistenceConfig
+        from decimal import Decimal
+
+        updates = request.data
+        if not isinstance(updates, list):
+            return Response(
+                {"error": "Expected a list of {component, rho_up, rho_down} objects"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        errors = []
+        updated = []
+        for item in updates:
+            comp = item.get("component")
+            if not comp:
+                errors.append({"error": "component is required"})
+                continue
+
+            try:
+                config = ComponentPersistenceConfig.objects.get(component=comp)
+            except ComponentPersistenceConfig.DoesNotExist:
+                errors.append({"component": comp, "error": "Not found"})
+                continue
+
+            serializer = ComponentPersistenceConfigSerializer(
+                config, data=item, partial=True
+            )
+            if serializer.is_valid():
+                serializer.save()
+                updated.append(serializer.data)
+            else:
+                errors.append({"component": comp, "errors": serializer.errors})
+
+        if errors and not updated:
+            return Response({"errors": errors}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Recalculate all cumulative stress with new parameters
+        service = get_assessment_service()
+        recalc_count = service.recalculate_all_cumulative_stress()
+
+        return Response({
+            "updated": updated,
+            "errors": errors,
+            "recalculated_assessments": recalc_count,
+        })

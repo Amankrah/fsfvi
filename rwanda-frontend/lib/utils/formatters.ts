@@ -89,16 +89,18 @@ export function formatRWF(amount: number): string {
 
 /** Format RWF with compact notation (B/M) */
 export function formatRWFCompact(amount: number): string {
-  if (amount >= 1_000_000_000_000) {
-    return `RWF ${(amount / 1_000_000_000_000).toFixed(1)}T`;
+  const abs = Math.abs(amount);
+  const sign = amount < 0 ? '-' : '';
+  if (abs >= 1_000_000_000_000) {
+    return `${sign}RWF ${(abs / 1_000_000_000_000).toFixed(1)}T`;
   }
-  if (amount >= 1_000_000_000) {
-    return `RWF ${(amount / 1_000_000_000).toFixed(1)}B`;
+  if (abs >= 1_000_000_000) {
+    return `${sign}RWF ${(abs / 1_000_000_000).toFixed(1)}B`;
   }
-  if (amount >= 1_000_000) {
-    return `RWF ${(amount / 1_000_000).toFixed(1)}M`;
+  if (abs >= 1_000_000) {
+    return `${sign}RWF ${(abs / 1_000_000).toFixed(1)}M`;
   }
-  return formatRWF(amount);
+  return `${sign}RWF ${abs.toFixed(0)}`;
 }
 
 /** Format score/index for display (backend may send number or string). Uses 4 decimal places for index precision. */

@@ -266,20 +266,35 @@ python manage.py run_assessments_all_years \
 - `--years` — comma-separated years (default: all years with IndicatorData)
 - `--dry-run` — list years and indicator counts without running
 
-**Expected output:**
+**Expected output (with hybrid weighting):**
 ```
-FY2018: saved assessment ... (FSFSI=0.0000)
-FY2019: saved assessment ... (FSFSI=0.2436)
-FY2020: saved assessment ... (FSFSI=0.3355)
-FY2021: saved assessment ... (FSFSI=0.4045)
-FY2022: saved assessment ... (FSFSI=0.4578)
-FY2023: saved assessment ... (FSFSI=0.4960)
-FY2024: saved assessment ... (FSFSI=0.3890)
+FY2018: saved assessment ... (FSFSI=0.4070)
+FY2019: saved assessment ... (FSFSI=0.4296)
+FY2020: saved assessment ... (FSFSI=0.4227)
+FY2021: saved assessment ... (FSFSI=0.4214)
+FY2022: saved assessment ... (FSFSI=0.4095)
+FY2023: saved assessment ... (FSFSI=0.3953)
+FY2024: saved assessment ... (FSFSI=0.2894)
 Done. Saved 7 assessment(s).
 ```
 
+The engine uses **hybrid weights** by default (expert AHP + network PageRank + financial).
+Policymakers can choose from 5 weighting methods via the UI:
+
+| Method | FY2024 FSFSI | Description |
+|---|---|---|
+| **Hybrid** (default) | 0.2894 | Balanced: expert + network + financial |
+| Equal | 0.2895 | All indicators equally important |
+| Expert (AHP) | 0.2881 | Nutrition & crop production priority |
+| Financial | 0.2131 | Budget-proportional (favors funded sectors) |
+| Network (PageRank) | 0.3018 | Systemic interdependencies |
+
 > **Reference:** The Excel computes FSFSI = 0.3624 for FY2024 using equal weights (1/37).
-> The engine uses budget-share weights, which gives a slightly different result (~0.39).
+> The difference from the engine's equal-weight result (0.2895) is due to some indicators
+> having different observed/benchmark values from the imputation steps.
+
+The assessment also computes **cumulative FSFSI** (asymmetric EMA accounting for
+damage persistence). See the [Cumulative Stress Technical Note](CUMULATIVE_STRESS_TECHNICAL_NOTE.md).
 
 ---
 
@@ -292,12 +307,27 @@ python manage.py runserver 0.0.0.0:8000
 The API is now available at `http://localhost:8000/api/`.
 
 Key endpoints:
-- `GET /api/assessments/available-years/` — fiscal years with assessment data
-- `GET /api/assessments/dashboard/?fiscal_year=2024` — dashboard summary
-- `GET /api/assessments/history/` — trend data for charts
-- `GET /api/optimization/<assessment_id>/efficiency/` — optimization (assessment-based)
-- `GET /api/optimization/<assessment_id>/reallocation/` — reallocation plan
-- `GET /api/optimization/<assessment_id>/roi/` — ROI analysis
+
+**Assessment:**
+- `POST /api/assessments/run-for-year/` — run assessment (accepts `weighting_method`, `scenario`)
+- `GET /api/assessments/dashboard/?fiscal_year=2024` — dashboard summary (includes cumulative FSFSI)
+- `GET /api/assessments/available-years/` — fiscal years with data
+- `GET /api/assessments/history/` — trend data (includes cumulative)
+- `GET /api/assessments/persistence-config/` — cumulative stress parameters
+- `PUT /api/assessments/persistence-config/` — update parameters & recalculate
+
+**Optimization (assessment-based):**
+- `GET /api/assessments/optimization/<assessment_id>/efficiency/` — allocation efficiency
+- `GET /api/assessments/optimization/<assessment_id>/reallocation/` — reallocation plan
+- `GET /api/assessments/optimization/<assessment_id>/roi/` — ROI analysis
+
+**Planning (assessment-based):**
+- `GET /api/planning/<assessment_id>/multi-year/` — multi-year plan (accepts `weighting_method`, `scenario`, `target_curve`)
+- `GET /api/planning/<assessment_id>/mtef/` — 3-year MTEF
+- `POST /api/planning/saved-plans/` — save a strategic plan
+- `GET /api/planning/active-plan/?fiscal_year=2024` — active plan excerpt for dashboard
+
+**Auth:**
 - `GET /api/auth/verify/` — verify JWT token
 
 ---
@@ -398,34 +428,56 @@ DB (IndicatorData)
   ↓ weighted_lcu_bn, observed_value, benchmark_value, sensitivity_parameter
   ↓
 Assessment Engine (Rust: py_run_indicator_assessment)
-  ↓ FSFSI score (source of truth for scores)
+  ↓ FSFSI score + hybrid weights (source of truth)
+  ↓ weighting_method: hybrid | equal | expert | financial | network
+  ↓ scenario: normal_operations | climate_shock | financial_crisis | pandemic | political
   ↓
-AssessmentResult (DB)
+Cumulative Stress Layer (Python: asymmetric EMA)
+  ↓ cumulative_fsfsi = accumulated damage with slow recovery
+  ↓ per-indicator, per-component, system-level
   ↓
-Optimization Engine (Rust: py_analyze_efficiency)
-  ↓ uses assessment's FSFSI as "current", only computes optimal allocation
+AssessmentResult + ComponentResult + IndicatorResult (DB)
+  ↓ stores both current and cumulative stress
+  ↓
+Optimization (Rust → Python stamp)
+  ↓ uses assessment's FSFSI, computes optimal allocation
+  ↓
+Planning (Rust → Python stamp + cumulative EMA projection)
+  ↓ multi-year trajectory with component recovery
+  ↓ saved plans persisted to DB
   ↓
 Dashboard (Frontend)
+  ↓ National Overview: cumulative FSFSI (the real state)
+  ↓ Assessment: current + cumulative, weighting/scenario selectors
+  ↓ Optimization: current FSFSI (this year's allocation efficiency)
+  ↓ Planning: cumulative baseline, recovery trajectory, saved plans
 ```
 
 The assessment engine is the **single source of truth** for FSFSI scores.
-The optimization engine never re-derives the FSFSI — it consumes the assessment
-and only computes allocation recommendations.
+The cumulative stress layer adds temporal persistence (damage accumulates fast,
+recovery is slow). Optimization and planning consume the assessment and
+never re-derive the FSFSI.
+
+See [CUMULATIVE_STRESS_TECHNICAL_NOTE.md](CUMULATIVE_STRESS_TECHNICAL_NOTE.md) for the full technical specification.
 
 ---
 
 ## 8 Food System Components
 
-| Component | Indicators | Alpha (per bn LCU) | Description |
-|---|---|---|---|
-| Crop Production | 5 | 0.035 | Yields, irrigation, fertilizer, seeds, diversification |
-| Animal Systems | 5 | 0.030 | Milk, meat, breeds, mortality, feed |
-| Nutrition | 3 | 0.040 | Stunting, food insecurity, dietary diversity |
-| Markets | 4 | 0.020 | Market access, exports, price volatility, cooperatives |
-| Post-Harvest | 5 | 0.025 | Losses, storage, cold chain, processing, food quality |
-| Research | 4 | 0.015 | Extension, R&D spending, mechanization, technology |
-| Environment | 5 | 0.020 | Soil erosion, CSA, protected areas, water, disasters |
-| Finance | 2 | 0.030 | Credit access, insurance |
+| Component | Indicators | Alpha | Hybrid Weight | Description |
+|---|---|---|---|---|
+| Nutrition | 3 | 0.040 | 16.4% | Stunting, food insecurity, dietary diversity |
+| Crop Production | 5 | 0.035 | 15.0% | Yields, irrigation, fertilizer, seeds, diversification |
+| Markets | 4 | 0.020 | 14.9% | Market access, exports, price volatility, cooperatives |
+| Finance | 2 | 0.030 | 13.1% | Credit access, insurance |
+| Post-Harvest | 5 | 0.025 | 10.8% | Losses, storage, cold chain, processing, food quality |
+| Animal Systems | 5 | 0.030 | 10.6% | Milk, meat, breeds, mortality, feed |
+| Research | 4 | 0.015 | 10.3% | Extension, R&D spending, mechanization, technology |
+| Environment | 5 | 0.020 | 9.0% | Soil erosion, CSA, protected areas, water, disasters |
+
+Hybrid weights combine expert judgment (AHP, 35%), network centrality (PageRank, 30%),
+cascade impact (25%), and financial proportionality (10%). Policymakers can switch
+to any of the 5 weighting methods via the UI.
 
 ---
 
@@ -447,9 +499,9 @@ Run Step 6 (`run_assessments_all_years`). The dashboard reads from `AssessmentRe
 not from `IndicatorData`.
 
 ### Assessment FSFSI differs from Excel
-The engine uses budget-share weights (`share_weighted_percent`), while the Excel
-uses equal weights (1/37). The alpha and allocation units must match: both in
-billions LCU (`alpha_per_bnLCU` × `weighted_lcu_bn`).
+The engine uses hybrid weights by default, while the Excel uses equal weights (1/37).
+Select "Equal weights" in the weighting dropdown to match the Excel exactly.
+The alpha and allocation units must match: both in billions LCU (`alpha_per_bnLCU` × `weighted_lcu_bn`).
 
 ### Assessment fails with "Budget constraint error: allocation=0.00"
 That fiscal year has no budget data. Re-run Step 1 (`import_budget_mapping`)
@@ -462,6 +514,20 @@ FY2024 — intermediate years need values propagated.
 ### `compute_benchmark_sample` overwrote Excel benchmarks
 Run `import_indicator_parameters` again (Step 2) — it is the last word on
 benchmarks. Only use `compute_benchmark_sample` when the Excel is not available.
+
+### All weighting methods give the same result
+The Rust engine must be rebuilt after changing the weighting dispatch code.
+Run `cd fsfi_engine && maturin develop --release && cd ..`.
+
+### Optimization shows unrealistic reallocation (e.g., 4000% increase)
+The FSFSI paper's closed-form solution assumes unconstrained reallocation.
+Real-world budgets have constraints (max ±30% per year). The optimization shows
+the theoretical optimum — the Strategic Planning page spreads changes over years.
+
+### Cumulative FSFSI not updating after config change
+After changing persistence parameters (rho_up/rho_down), click "Save & Recalculate"
+in the Cumulative Stress Parameters panel. This clears and recomputes all historical
+cumulative values in chronological order.
 
 ### DecimalField overflow on yoy_change_percent
 Already fixed in migration `0003_widen_yoy_change_percent`. Run `python manage.py migrate`.

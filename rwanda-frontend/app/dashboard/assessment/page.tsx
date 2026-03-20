@@ -42,6 +42,8 @@ export default function AssessmentPage() {
   const [sensitivities, setSensitivities] = useState<IndicatorComponentSensitivity[]>([]);
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
+  const [weightingMethod, setWeightingMethod] = useState('hybrid');
+  const [scenario, setScenario] = useState('normal_operations');
   const [error, setError] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
@@ -78,7 +80,9 @@ export default function AssessmentPage() {
     try {
       await assessmentAPI.runForYear(
         fiscalYear.start_year,
-        `FY${fiscalYear.start_year} assessment`
+        `FY${fiscalYear.start_year} assessment`,
+        weightingMethod,
+        scenario,
       );
       await fetchData();
     } catch (err) {
@@ -144,10 +148,16 @@ export default function AssessmentPage() {
             <CardContent className="p-5">
               <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">FSFSI Score</p>
               <p className="text-3xl font-bold text-gray-900 mt-1">
-                {formatScore(summary.overall_fsfsi)}
+                {formatScore(summary.cumulative_fsfsi ?? summary.overall_fsfsi)}
               </p>
-              <div className={`mt-2 inline-block px-3 py-1 rounded-full text-xs font-bold ${getRiskBgColor(stressLevel)}`}>
-                {stressLevel.charAt(0).toUpperCase() + stressLevel.slice(1)} Risk
+              <p className="text-xs text-gray-400 mt-0.5">
+                This year: {formatScore(summary.overall_fsfsi)}
+              </p>
+              <div className={`mt-1.5 inline-block px-3 py-1 rounded-full text-xs font-bold ${getRiskBgColor(
+                (summary.cumulative_stress_level || stressLevel) as StressLevel
+              )}`}>
+                {(summary.cumulative_stress_level || stressLevel).charAt(0).toUpperCase() +
+                 (summary.cumulative_stress_level || stressLevel).slice(1)} Risk
               </div>
             </CardContent>
           </Card>
@@ -274,28 +284,75 @@ export default function AssessmentPage() {
         </Card>
       )}
 
-      {/* Run assessment + List */}
+      {/* Run Assessment Controls */}
+      <Card className="border-[var(--rw-blue)]/20 bg-blue-50/30">
+        <CardContent className="py-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+            <div className="flex-1">
+              <h3 className="text-sm font-semibold text-gray-900">Run new assessment</h3>
+              <p className="text-xs text-gray-500 mt-0.5">Select weighting method and scenario, then run the FSFSI computation engine.</p>
+            </div>
+            <div className="flex items-center gap-3 flex-wrap">
+              <div>
+                <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Weighting</label>
+                <select
+                  value={weightingMethod}
+                  onChange={(e) => setWeightingMethod(e.target.value)}
+                  className="h-9 rounded-lg border border-gray-300 bg-white px-3 text-xs text-gray-700 min-w-[180px]"
+                  title="Weighting method"
+                >
+                  <option value="hybrid">Hybrid (expert + network + financial)</option>
+                  <option value="equal">Equal weights (1/n)</option>
+                  <option value="expert">Expert judgment (AHP)</option>
+                  <option value="financial">Budget proportional</option>
+                  <option value="network">Network centrality (PageRank)</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Scenario</label>
+                <select
+                  value={scenario}
+                  onChange={(e) => setScenario(e.target.value)}
+                  className="h-9 rounded-lg border border-gray-300 bg-white px-3 text-xs text-gray-700 min-w-[160px]"
+                  title="Scenario"
+                >
+                  <option value="normal_operations">Normal Operations</option>
+                  <option value="climate_shock">Climate Shock</option>
+                  <option value="financial_crisis">Financial Crisis</option>
+                  <option value="pandemic_disruption">Pandemic Disruption</option>
+                  <option value="political_instability">Political Instability</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">&nbsp;</label>
+                <button
+                  type="button"
+                  onClick={handleRunAssessment}
+                  disabled={running}
+                  className="h-9 inline-flex items-center gap-2 rounded-lg bg-[var(--rw-blue)] px-5 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {running ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Play className="h-4 w-4" />
+                  )}
+                  {running ? 'Running…' : 'Run assessment'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Saved Assessments + Component Breakdown */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-4">
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardHeader className="pb-2">
               <CardTitle className="flex items-center gap-2 text-lg">
                 <List className="h-5 w-5 text-[var(--rw-blue)]" />
                 Saved assessments — {fiscalYear.label}
               </CardTitle>
-              <button
-                type="button"
-                onClick={handleRunAssessment}
-                disabled={running}
-                className="inline-flex items-center gap-2 rounded-lg bg-[var(--rw-blue)] px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {running ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Play className="h-4 w-4" />
-                )}
-                {running ? 'Running…' : 'Run assessment'}
-              </button>
             </CardHeader>
             <CardContent>
               {assessments.length === 0 ? (

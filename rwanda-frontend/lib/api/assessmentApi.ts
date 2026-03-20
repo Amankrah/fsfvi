@@ -128,11 +128,18 @@ export const assessmentAPI = {
    */
   runForYear: async (
     fiscalYear: number,
-    assessmentName?: string
+    assessmentName?: string,
+    weightingMethod: string = 'hybrid',
+    scenario: string = 'normal_operations',
   ): Promise<AssessmentResult> => {
     const response = await assessmentClient.post<AssessmentResult>(
       '/run-for-year/',
-      { fiscal_year: fiscalYear, assessment_name: assessmentName ?? `FY${fiscalYear} assessment` }
+      {
+        fiscal_year: fiscalYear,
+        assessment_name: assessmentName ?? `FY${fiscalYear} assessment`,
+        weighting_method: weightingMethod,
+        scenario,
+      }
     );
     return response.data;
   },
@@ -272,6 +279,17 @@ export const assessmentAPI = {
     const response = await assessmentClient.get<{ score: number; stress_level: string }>(
       `/stress-level/?${params.toString()}`
     );
+    return response.data;
+  },
+
+  // Persistence config (cumulative stress parameters)
+  getPersistenceConfigs: async () => {
+    const response = await assessmentClient.get('/persistence-config/');
+    return response.data;
+  },
+
+  updatePersistenceConfigs: async (configs: Array<{ component: string; rho_up: number; rho_down: number }>) => {
+    const response = await assessmentClient.put('/persistence-config/', configs);
     return response.data;
   },
 };

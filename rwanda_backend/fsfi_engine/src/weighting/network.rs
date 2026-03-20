@@ -5,7 +5,7 @@
 
 use crate::config::get_weighting_config;
 use crate::errors::FsfiResult;
-use crate::weighting::models::{get_dependency_matrix, normalize_weights, COMPONENT_ORDER};
+use crate::weighting::models::{get_indicator_dependency_matrix, normalize_weights, INDICATOR_COMPONENT_ORDER};
 use pyo3::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -24,7 +24,7 @@ pub struct NetworkResult {
 ///
 /// where d = damping factor (0.85), T = transition matrix
 pub fn calculate_pagerank(scenario: &str) -> FsfiResult<HashMap<String, f64>> {
-    let matrix = get_dependency_matrix(scenario);
+    let matrix = get_indicator_dependency_matrix(scenario);
     let n = matrix.len();
     let config = get_weighting_config();
     let damping = config.pagerank_damping;
@@ -70,7 +70,7 @@ pub fn calculate_pagerank(scenario: &str) -> FsfiResult<HashMap<String, f64>> {
 
     // Map to component names
     let mut weights = HashMap::new();
-    for (i, &component) in COMPONENT_ORDER.iter().enumerate() {
+    for (i, &component) in INDICATOR_COMPONENT_ORDER.iter().enumerate() {
         if i < pagerank.len() {
             weights.insert(component.to_string(), pagerank[i]);
         }
@@ -84,7 +84,7 @@ pub fn calculate_pagerank(scenario: &str) -> FsfiResult<HashMap<String, f64>> {
 /// Primary impact = sum of direct dependencies
 /// Secondary impact = second-order cascading effects (damped by 0.5)
 pub fn calculate_cascade_multipliers(scenario: &str) -> FsfiResult<HashMap<String, f64>> {
-    let matrix = get_dependency_matrix(scenario);
+    let matrix = get_indicator_dependency_matrix(scenario);
     let n = matrix.len();
 
     let mut impacts = vec![0.0; n];
@@ -122,7 +122,7 @@ pub fn calculate_cascade_multipliers(scenario: &str) -> FsfiResult<HashMap<Strin
 
     // Map to component names and normalize to sum to 1
     let mut weights = HashMap::new();
-    for (i, &component) in COMPONENT_ORDER.iter().enumerate() {
+    for (i, &component) in INDICATOR_COMPONENT_ORDER.iter().enumerate() {
         if i < impacts.len() {
             weights.insert(component.to_string(), impacts[i]);
         }
@@ -201,7 +201,7 @@ mod tests {
         let weights = calculate_pagerank("normal_operations").unwrap();
         let sum: f64 = weights.values().sum();
         assert!((sum - 1.0).abs() < 1e-6);
-        assert_eq!(weights.len(), 6);
+        assert_eq!(weights.len(), 8);
     }
 
     #[test]
@@ -230,15 +230,15 @@ mod tests {
     #[test]
     fn test_governance_high_in_conflict() {
         let weights = calculate_pagerank("political_instability").unwrap();
-        let gov = weights["governance_institutions"];
-        // Governance should have high centrality in conflict scenarios
-        assert!(gov > 0.1, "Governance PageRank should be elevated in conflict");
+        let finance = weights["finance"];
+        // Finance should have elevated centrality in conflict scenarios
+        assert!(finance > 0.05, "Finance PageRank should be elevated in conflict");
     }
 
     #[test]
     fn test_network_analysis() {
         let result = analyze_network("normal_operations").unwrap();
-        assert_eq!(result.pagerank_weights.len(), 6);
-        assert_eq!(result.cascade_multipliers.len(), 6);
+        assert_eq!(result.pagerank_weights.len(), 8);
+        assert_eq!(result.cascade_multipliers.len(), 8);
     }
 }

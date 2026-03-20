@@ -182,21 +182,43 @@ class AssessmentService:
         )
 
         # Save component aggregations (priority_level from Rust only — no Django logic)
+        # Compute component weights using the hybrid weighting system
+        import json as _json
+        comp_inputs = [
+            {
+                "name": agg["component"],
+                "component_type": agg["component"],
+                "financial_allocation": agg["total_weighted_lcu_bn"],
+                "observed_value": agg["average_performance_gap"],
+                "benchmark_value": 1.0,
+            }
+            for agg in result["component_aggregations"]
+        ]
+        try:
+            hybrid_result = _json.loads(
+                fsfi_engine.py_calculate_hybrid_weights(_json.dumps(comp_inputs), scenario)
+            )
+            hybrid_weights = hybrid_result.get("hybrid_weights", {})
+        except Exception:
+            hybrid_weights = {}
+
         for comp_agg in result["component_aggregations"]:
+            comp = comp_agg["component"]
+            weight = hybrid_weights.get(comp, 1.0 / 8)
+
             priority = comp_agg.get("priority_level") or comp_agg.get("risk_level")
             if not priority:
                 priority = fsfi_engine.get_stress_level(comp_agg["average_performance_gap"])
+
+            gap = comp_agg["average_performance_gap"]
             ComponentResult.objects.create(
                 assessment=assessment,
-                component=comp_agg["component"],
-                weight=Decimal("0.125"),  # 1/8
-                avg_performance_gap=Decimal(str(comp_agg["average_performance_gap"])),
-                component_stress=Decimal(str(comp_agg["average_performance_gap"])),
-                weighted_stress=Decimal(str(comp_agg["average_performance_gap"] / 8)),
-                # Classify based on average_performance_gap (the value shown as
-                # "stress" on the dashboard), not the Rust-computed avg_stress,
-                # so the badge color matches the displayed number.
-                priority_level=self._classify_stress(comp_agg["average_performance_gap"]),
+                component=comp,
+                weight=Decimal(str(round(weight, 6))),
+                avg_performance_gap=Decimal(str(gap)),
+                component_stress=Decimal(str(gap)),
+                weighted_stress=Decimal(str(round(gap * weight, 6))),
+                priority_level=self._classify_stress(gap),
                 budget_lcu_bn=Decimal(str(comp_agg["total_weighted_lcu_bn"])),
                 budget_share_percent=Decimal(str(comp_agg["total_share_weighted_percent"])),
                 indicators_count=comp_agg["indicator_count"],
@@ -543,6 +565,29 @@ class AssessmentService:
             "computed_at": assessment.computed_at.isoformat(),
             "empty": False,
         }
+
+    def recalculate_all_cumulative_stress(self) -> int:
+        """Recalculate cumulative stress for all assessments after config change.
+
+        Clears all cumulative values, then recomputes in chronological order.
+        Returns the number of assessments recalculated.
+        """
+        from apps.assessments.models import IndicatorResult, ComponentResult
+
+        # Clear all cumulative data
+        IndicatorResult.objects.all().update(cumulative_stress=None)
+        ComponentResult.objects.all().update(cumulative_stress=None, cumulative_weighted_stress=None)
+        AssessmentResult.objects.all().update(cumulative_fsfsi=None, cumulative_stress_level=None)
+
+        # Recompute in chronological order
+        assessments = AssessmentResult.objects.order_by("fiscal_year", "computed_at")
+        count = 0
+        for assessment in assessments:
+            self._compute_cumulative_stress(assessment)
+            self._update_history(assessment)
+            count += 1
+
+        return count
 
     def load_indicators_from_db(self, fiscal_year: int) -> list[dict]:
         """Load indicator data from database for assessment.

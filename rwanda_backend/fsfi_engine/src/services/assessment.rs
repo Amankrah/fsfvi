@@ -483,15 +483,76 @@ pub fn assess_indicators(
     }
 
     // Calculate weights based on share_weighted_percent or equal if not provided
-    let weights: Vec<f64> = if indicators.iter().all(|i| i.share_weighted_percent > 0.0) {
-        let sum: f64 = indicators.iter().map(|i| i.share_weighted_percent).sum();
-        if sum > 0.0 {
-            indicators.iter().map(|i| i.share_weighted_percent / sum).collect()
-        } else {
-            vec![1.0 / n as f64; n]
+    // Weighting: dispatch to the selected method.
+    // Weights are computed at the component level (8 components),
+    // then distributed equally among indicators within each component.
+    let weights: Vec<f64> = {
+        use crate::weighting::models::Component;
+        use crate::weighting::hybrid::calculate_hybrid_weights;
+        use crate::weighting::expert::calculate_ahp_weights;
+        use crate::weighting::financial::calculate_financial_weights;
+        use crate::weighting::network::calculate_pagerank;
+
+        // Build component-level data from indicators
+        let mut comp_data: std::collections::HashMap<String, (f64, f64, f64, usize)> = std::collections::HashMap::new();
+        for ind in indicators {
+            let entry = comp_data.entry(ind.indicator_component.clone()).or_insert((0.0, 0.0, 0.0, 0));
+            entry.0 += ind.weighted_lcu_bn;
+            entry.1 += ind.observed_value.unwrap_or(0.0);
+            entry.2 += ind.benchmark_value.unwrap_or(0.0);
+            entry.3 += 1;
         }
-    } else {
-        vec![1.0 / n as f64; n]
+
+        let components: Vec<Component> = comp_data.iter().map(|(comp, (alloc, obs, bench, count))| {
+            Component {
+                name: comp.clone(),
+                component_type: comp.clone(),
+                financial_allocation: *alloc,
+                observed_value: obs / *count as f64,
+                benchmark_value: bench / *count as f64,
+            }
+        }).collect();
+
+        // Compute component-level weights based on selected method
+        let method = weighting_method.to_lowercase();
+        let component_weights: Option<std::collections::HashMap<String, f64>> = match method.as_str() {
+            "equal" => None, // will use equal weights below
+            "expert" => {
+                calculate_ahp_weights(scenario).ok().map(|r| r.weights)
+            }
+            "financial" => {
+                calculate_financial_weights(&components).ok()
+            }
+            "network" => {
+                calculate_pagerank(scenario).ok()
+            }
+            _ => { // "hybrid" or anything else
+                calculate_hybrid_weights(&components, Some(scenario)).ok().map(|r| r.hybrid_weights)
+            }
+        };
+
+        match component_weights {
+            Some(weights_map) => {
+                // Distribute component weight equally among its indicators
+                let mut indicator_weights = Vec::with_capacity(n);
+                for ind in indicators {
+                    let comp_weight = weights_map.get(&ind.indicator_component).copied().unwrap_or(1.0 / 8.0);
+                    let n_in_comp = comp_data.get(&ind.indicator_component).map(|d| d.3).unwrap_or(1);
+                    indicator_weights.push(comp_weight / n_in_comp as f64);
+                }
+                // Normalize
+                let sum: f64 = indicator_weights.iter().sum();
+                if sum > 0.0 {
+                    indicator_weights.iter().map(|w| w / sum).collect()
+                } else {
+                    vec![1.0 / n as f64; n]
+                }
+            }
+            None => {
+                // Equal weights (explicit choice or fallback)
+                vec![1.0 / n as f64; n]
+            }
+        }
     };
 
     // Calculate indicator-level results
@@ -598,9 +659,12 @@ pub fn assess_indicators(
     }
 
     // System FSFSI (weighted sum of indicator stresses)
+    // Must use the SAME sensitivities as the per-indicator stress computation
     let allocations: Vec<f64> = indicators.iter().map(|i| i.weighted_lcu_bn).collect();
     let sensitivities: Vec<f64> = indicators.iter()
-        .map(|i| get_indicator_component_sensitivity(&i.indicator_component))
+        .map(|i| i.sensitivity_parameter
+            .filter(|&s| s > 0.0)
+            .unwrap_or_else(|| get_indicator_component_sensitivity(&i.indicator_component)))
         .collect();
 
     let fsfsi_actual = calculate_system_fsfsi(&gaps, &allocations, &sensitivities, &weights)?;
