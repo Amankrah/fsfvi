@@ -6,22 +6,33 @@ Assessment-based endpoints (preferred — assessment is source of truth):
   GET  /api/planning/<assessment_id>/mtef/
 
 Saved plans:
-  POST /api/planning/saved-plans/          — save a plan
-  GET  /api/planning/saved-plans/          — list saved plans
-  GET  /api/planning/saved-plans/<id>/     — get a saved plan
-  GET  /api/planning/active-plan/          — get active plan excerpt for dashboard
+  POST   /api/planning/saved-plans/              — save a plan (name unique per fiscal year, case-insensitive)
+  GET    /api/planning/saved-plans/               — list saved plans (summary, no plan_json)
+  GET    /api/planning/saved-plans/<id>/          — get a saved plan (full)
+  PATCH  /api/planning/saved-plans/<id>/          — update name and/or parameters (parameters regenerate plan_json)
+  DELETE /api/planning/saved-plans/<id>/          — permanently delete the plan
+  POST   /api/planning/saved-plans/<id>/activate/ — mark plan active for its fiscal year
+  GET    /api/planning/active-plan/               — get active plan excerpt for dashboard
 """
 
 import logging
 from decimal import Decimal
 
+from django.db import IntegrityError
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .models import SavedStrategicPlan
-from .serializers import SavedPlanExcerptSerializer, SavedPlanSerializer, SavePlanRequestSerializer
+from .serializers import (
+    SavedPlanExcerptSerializer,
+    SavedPlanSerializer,
+    SavedPlanSummarySerializer,
+    SavePlanRequestSerializer,
+    UpdateSavedPlanSerializer,
+)
+from .utils import plan_name_exists
 from .services import (
     generate_mtef,
     generate_multi_year_plan,
@@ -98,12 +109,16 @@ class AssessmentMtefView(APIView):
     def get(self, request, assessment_id):
         improvement = float(request.query_params.get("improvement_percent", 20))
         growth_rate = float(request.query_params.get("growth_rate", 0.05))
+        weighting_method = request.query_params.get("weighting_method", "hybrid")
+        scenario = request.query_params.get("scenario", "normal_operations")
 
         try:
             result = mtef_for_assessment(
                 str(assessment_id),
                 target_improvement_percent=improvement,
                 yearly_budget_growth_rate=growth_rate,
+                weighting_method=weighting_method,
+                scenario=scenario,
             )
             return Response(result)
         except Exception as e:
@@ -227,6 +242,17 @@ class SaveStrategicPlanView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
+        wm = data.get("weighting_method") or "hybrid"
+        sc = data.get("scenario") or "normal_operations"
+        pname = data["plan_name"]
+        if plan_name_exists(assessment.fiscal_year, pname):
+            return Response(
+                {
+                    "error": "A plan with this name already exists for this fiscal year.",
+                    "plan_name": ["This plan name is already in use."],
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         # Regenerate the plan to ensure stored JSON matches parameters exactly
         try:
             plan_result = plan_for_assessment(
@@ -235,6 +261,8 @@ class SaveStrategicPlanView(APIView):
                 target_fsfvi=data["target_fsfvi"],
                 yearly_budget_growth_rate=data["yearly_budget_growth_rate"],
                 yearly_target_curve=data["target_curve"],
+                weighting_method=wm,
+                scenario=sc,
             )
         except Exception as e:
             logger.exception("Plan generation failed during save")
@@ -251,21 +279,32 @@ class SaveStrategicPlanView(APIView):
         ).update(is_active=False)
 
         # Create the saved plan
-        saved = SavedStrategicPlan.objects.create(
-            assessment=assessment,
-            fiscal_year=assessment.fiscal_year,
-            plan_name=data.get("plan_name", ""),
-            planning_years=data["planning_years"],
-            target_fsfvi=Decimal(str(data["target_fsfvi"])),
-            target_reduction_pct=Decimal(str(data["target_reduction_pct"])),
-            yearly_budget_growth_rate=Decimal(str(data["yearly_budget_growth_rate"])),
-            target_curve=data["target_curve"],
-            baseline_fsfsi=Decimal(str(plan_result["baseline_fsfvi"])),
-            final_projected_fsfsi=Decimal(str(final_projected)) if final_projected else None,
-            total_additional_investment=Decimal(str(total_investment)) if total_investment else None,
-            plan_json=plan_result,
-            created_by=request.user if hasattr(request.user, "pk") else None,
-        )
+        try:
+            saved = SavedStrategicPlan.objects.create(
+                assessment=assessment,
+                fiscal_year=assessment.fiscal_year,
+                plan_name=pname,
+                planning_years=data["planning_years"],
+                target_fsfvi=Decimal(str(data["target_fsfvi"])),
+                target_reduction_pct=Decimal(str(data["target_reduction_pct"])),
+                yearly_budget_growth_rate=Decimal(str(data["yearly_budget_growth_rate"])),
+                target_curve=data["target_curve"],
+                weighting_method=wm,
+                scenario=sc,
+                baseline_fsfsi=Decimal(str(plan_result["baseline_fsfvi"])),
+                final_projected_fsfsi=Decimal(str(final_projected)) if final_projected else None,
+                total_additional_investment=Decimal(str(total_investment)) if total_investment else None,
+                plan_json=plan_result,
+                created_by=request.user if hasattr(request.user, "pk") else None,
+            )
+        except IntegrityError:
+            return Response(
+                {
+                    "error": "A plan with this name already exists for this fiscal year.",
+                    "plan_name": ["This plan name is already in use."],
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         return Response(
             SavedPlanSerializer(saved).data,
@@ -277,11 +316,47 @@ class SaveStrategicPlanView(APIView):
         qs = SavedStrategicPlan.objects.all()
         if fy:
             qs = qs.filter(fiscal_year=int(fy))
-        return Response(SavedPlanSerializer(qs, many=True).data)
+        return Response(SavedPlanSummarySerializer(qs, many=True).data)
+
+
+class ActivateSavedPlanView(APIView):
+    """
+    POST /api/planning/saved-plans/<id>/activate/
+
+    Sets this plan as the active strategic plan for its fiscal year (National Overview).
+    Other plans for the same year are deactivated; plan_json is not regenerated.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, plan_id):
+        try:
+            plan = SavedStrategicPlan.objects.get(pk=plan_id)
+        except SavedStrategicPlan.DoesNotExist:
+            return Response({"error": "Plan not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        SavedStrategicPlan.objects.filter(fiscal_year=plan.fiscal_year).exclude(pk=plan.pk).update(
+            is_active=False
+        )
+        plan.is_active = True
+        plan.save(update_fields=["is_active"])
+
+        return Response(SavedPlanSerializer(plan).data)
+
+
+_REGEN_FIELDS = frozenset({
+    "planning_years",
+    "target_fsfvi",
+    "target_reduction_pct",
+    "yearly_budget_growth_rate",
+    "target_curve",
+    "weighting_method",
+    "scenario",
+})
 
 
 class SavedPlanDetailView(APIView):
-    """GET/DELETE a specific saved plan."""
+    """GET / PATCH / DELETE a specific saved plan."""
 
     permission_classes = [IsAuthenticated]
 
@@ -292,14 +367,118 @@ class SavedPlanDetailView(APIView):
             return Response({"error": "Plan not found"}, status=status.HTTP_404_NOT_FOUND)
         return Response(SavedPlanSerializer(plan).data)
 
+    def patch(self, request, plan_id):
+        try:
+            plan = SavedStrategicPlan.objects.get(pk=plan_id)
+        except SavedStrategicPlan.DoesNotExist:
+            return Response({"error": "Plan not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        if not request.data:
+            return Response(
+                {"error": "No fields to update."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        serializer = UpdateSavedPlanSerializer(data=request.data, partial=True)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        data = serializer.validated_data
+        if not data:
+            return Response(
+                {"error": "No valid fields to update."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        from apps.assessments.models import AssessmentResult
+
+        if "assessment_id" in data:
+            try:
+                new_assessment = AssessmentResult.objects.get(pk=data["assessment_id"])
+            except AssessmentResult.DoesNotExist:
+                return Response(
+                    {"error": "Assessment not found"},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+            plan.assessment = new_assessment
+            plan.fiscal_year = new_assessment.fiscal_year
+
+        if "plan_name" in data:
+            nm = data["plan_name"]
+            if plan_name_exists(plan.fiscal_year, nm, exclude_plan_id=plan.pk):
+                return Response(
+                    {
+                        "error": "A plan with this name already exists for this fiscal year.",
+                        "plan_name": ["This plan name is already in use."],
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            plan.plan_name = nm
+
+        need_regen = bool(_REGEN_FIELDS.intersection(data.keys())) or ("assessment_id" in data)
+
+        if need_regen:
+            py = data.get("planning_years", plan.planning_years)
+            tf = data.get("target_fsfvi", float(plan.target_fsfvi))
+            gr = data.get("yearly_budget_growth_rate", float(plan.yearly_budget_growth_rate))
+            curve = data.get("target_curve", plan.target_curve)
+            wm = data.get("weighting_method", plan.weighting_method)
+            sc = data.get("scenario", plan.scenario)
+            try:
+                plan_result = plan_for_assessment(
+                    str(plan.assessment.pk),
+                    planning_years=py,
+                    target_fsfvi=tf,
+                    yearly_budget_growth_rate=gr,
+                    yearly_target_curve=curve,
+                    weighting_method=wm,
+                    scenario=sc,
+                )
+            except Exception as e:
+                logger.exception("Plan regeneration failed during update")
+                return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+            yearly_plans = plan_result.get("yearly_plans", [])
+            final_projected = yearly_plans[-1]["projected_fsfvi"] if yearly_plans else None
+            total_investment = plan_result.get("total_additional_investment_needed", 0)
+
+            plan.planning_years = py
+            plan.target_fsfvi = Decimal(str(tf))
+            if "target_reduction_pct" in data:
+                plan.target_reduction_pct = Decimal(str(data["target_reduction_pct"]))
+            plan.yearly_budget_growth_rate = Decimal(str(gr))
+            plan.target_curve = curve
+            plan.weighting_method = wm
+            plan.scenario = sc
+            plan.baseline_fsfsi = Decimal(str(plan_result["baseline_fsfvi"]))
+            plan.final_projected_fsfsi = (
+                Decimal(str(final_projected)) if final_projected is not None else None
+            )
+            plan.total_additional_investment = (
+                Decimal(str(total_investment)) if total_investment else None
+            )
+            plan.plan_json = plan_result
+
+        try:
+            plan.save()
+        except IntegrityError:
+            return Response(
+                {
+                    "error": "A plan with this name already exists for this fiscal year.",
+                    "plan_name": ["This plan name is already in use."],
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        return Response(SavedPlanSerializer(plan).data)
+
     def delete(self, request, plan_id):
         try:
             plan = SavedStrategicPlan.objects.get(pk=plan_id)
         except SavedStrategicPlan.DoesNotExist:
             return Response({"error": "Plan not found"}, status=status.HTTP_404_NOT_FOUND)
-        plan.is_active = False
-        plan.save(update_fields=["is_active"])
-        return Response({"status": "deactivated"})
+        plan.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class ActivePlanExcerptView(APIView):

@@ -92,6 +92,76 @@ def _build_planning_components(assessment):
     return components
 
 
+def _apply_planning_weighting(
+    components: list[dict],
+    weighting_method: str = "hybrid",
+    scenario: str = "normal_operations",
+) -> None:
+    """Set each planning component's ``weight`` for Rust multi-year / MTEF (mutates ``components``).
+
+    The saved assessment stores hybrid component weights in the DB; planning must
+    override ωᵢ when the user selects expert | financial | network | equal | hybrid
+    so trajectories and investment differ by method.
+    """
+    if not components:
+        return
+    method = (weighting_method or "hybrid").lower().strip()
+    scen = scenario or "normal_operations"
+    n = len(components)
+    keys = [c["component_type"] for c in components]
+
+    def _normalize(local: dict[str, float]) -> dict[str, float]:
+        s = sum(local.get(k, 0.0) for k in keys)
+        if s <= 0:
+            return {k: 1.0 / n for k in keys}
+        return {k: float(local.get(k, 0.0)) / s for k in keys}
+
+    weights: dict[str, float] = {}
+    try:
+        if method == "equal":
+            weights = {k: 1.0 / n for k in keys}
+        elif method == "expert":
+            data = _from_json(fsfi_engine.py_calculate_ahp_weights(scen))
+            raw = data.get("weights") or {}
+            weights = _normalize({k: float(raw.get(k, 0.0)) for k in keys})
+        elif method == "financial":
+            comp_payload = [
+                {
+                    "name": c["component_type"],
+                    "component_type": c["component_type"],
+                    "financial_allocation": float(c["financial_allocation_lcu"]),
+                    "observed_value": float(c["observed_value"]),
+                    "benchmark_value": float(c["benchmark_value"]),
+                }
+                for c in components
+            ]
+            raw = _from_json(fsfi_engine.py_calculate_financial_weights(_to_json(comp_payload)))
+            weights = _normalize({k: float(raw.get(k, 0.0)) for k in keys})
+        elif method == "network":
+            raw = _from_json(fsfi_engine.py_calculate_pagerank(scen))
+            weights = _normalize({k: float(raw.get(k, 0.0)) for k in keys})
+        else:
+            comp_payload = [
+                {
+                    "name": c["component_type"],
+                    "component_type": c["component_type"],
+                    "financial_allocation": float(c["financial_allocation_lcu"]),
+                    "observed_value": float(c["observed_value"]),
+                    "benchmark_value": float(c["benchmark_value"]),
+                }
+                for c in components
+            ]
+            data = _from_json(fsfi_engine.py_calculate_hybrid_weights(_to_json(comp_payload), scen))
+            raw = data.get("hybrid_weights") or {}
+            weights = _normalize({k: float(raw.get(k, 0.0)) for k in keys})
+    except Exception as exc:
+        logger.warning("Planning weighting fallback to equal (%s): %s", method, exc)
+        weights = {k: 1.0 / n for k in keys}
+
+    for c in components:
+        c["weight"] = weights[c["component_type"]]
+
+
 def _stamp_planning_result(result, assessment, target_fsfvi, planning_years, growth_rate):
     """Override Rust engine's internal FSFSI with assessment's authoritative values.
 
@@ -252,6 +322,7 @@ def plan_for_assessment(
 
     assessment = AssessmentResult.objects.get(pk=assessment_id)
     components = _build_planning_components(assessment)
+    _apply_planning_weighting(components, weighting_method, scenario)
 
     # The Rust engine computes its own FSFSI from component inputs, which won't
     # match the indicator-level cumulative FSFSI. Scale the target so the Rust
@@ -414,13 +485,20 @@ def plan_for_assessment(
     if "total_additional_investment_needed" in result:
         result["total_additional_investment_needed"] *= budget_scale
 
-    return _stamp_planning_result(result, assessment, target_fsfvi, planning_years, yearly_budget_growth_rate)
+    stamped = _stamp_planning_result(
+        result, assessment, target_fsfvi, planning_years, yearly_budget_growth_rate
+    )
+    stamped["planning_weighting_method"] = weighting_method
+    stamped["planning_scenario"] = scenario
+    return stamped
 
 
 def mtef_for_assessment(
     assessment_id: str,
     target_improvement_percent: float = 20,
     yearly_budget_growth_rate: float = 0.05,
+    weighting_method: str = "hybrid",
+    scenario: str = "normal_operations",
 ) -> dict:
     """Generate a 3-year MTEF using a saved assessment.
 
@@ -434,6 +512,7 @@ def mtef_for_assessment(
 
     assessment = AssessmentResult.objects.get(pk=assessment_id)
     components = _build_planning_components(assessment)
+    _apply_planning_weighting(components, weighting_method, scenario)
 
     raw = fsfi_engine.py_generate_mtef(
         _to_json(components),

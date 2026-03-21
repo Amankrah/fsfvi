@@ -325,6 +325,10 @@ Key endpoints:
 - `GET /api/planning/<assessment_id>/multi-year/` — multi-year plan (accepts `weighting_method`, `scenario`, `target_curve`)
 - `GET /api/planning/<assessment_id>/mtef/` — 3-year MTEF
 - `POST /api/planning/saved-plans/` — save a strategic plan
+- `GET /api/planning/saved-plans/?fiscal_year=2024` — list saved plans for that year (summary rows, no embedded `plan_json`)
+- `GET /api/planning/saved-plans/<plan_id>/` — full saved plan including `plan_json`
+- `POST /api/planning/saved-plans/<plan_id>/activate/` — mark a plan active for its fiscal year (National Overview)
+- `DELETE /api/planning/saved-plans/<plan_id>/` — deactivate (plan kept for history)
 - `GET /api/planning/active-plan/?fiscal_year=2024` — active plan excerpt for dashboard
 
 **Auth:**

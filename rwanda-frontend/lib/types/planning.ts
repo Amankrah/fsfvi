@@ -110,9 +110,12 @@ export interface SavePlanRequest {
   target_reduction_pct: number;
   yearly_budget_growth_rate: number;
   target_curve: string;
+  weighting_method?: string;
+  scenario?: string;
 }
 
-export interface SavedStrategicPlanFull {
+/** Saved plan row from GET /saved-plans/ (no embedded plan_json). */
+export interface SavedStrategicPlanSummary {
   id: string;
   assessment_id: string;
   fiscal_year: number;
@@ -123,13 +126,18 @@ export interface SavedStrategicPlanFull {
   target_reduction_pct: number;
   yearly_budget_growth_rate: number;
   target_curve: string;
+  weighting_method: string;
+  scenario: string;
   baseline_fsfsi: number;
   final_projected_fsfsi: number | null;
   total_additional_investment: number | null;
-  plan_json: MultiYearStrategicPlan;
   created_at: string;
   updated_at: string;
   created_by_username: string | null;
+}
+
+export interface SavedStrategicPlanFull extends SavedStrategicPlanSummary {
+  plan_json: MultiYearStrategicPlan;
 }
 
 export interface SavedPlanExcerpt {

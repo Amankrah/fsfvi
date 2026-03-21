@@ -138,6 +138,20 @@ export function NationalOverview() {
                 <p className="text-xs text-gray-400 mt-1">
                   This year: {formatScore(dashboardData.overall_fsfsi)}
                 </p>
+                {(dashboardData.weighting_method || dashboardData.scenario) && (
+                  <p className="text-[11px] text-gray-500 mt-1.5 leading-snug">
+                    Latest run:{' '}
+                    <span className="font-medium text-gray-700">
+                      {dashboardData.weighting_method ?? '—'}
+                    </span>
+                    {dashboardData.scenario ? (
+                      <>
+                        {' '}
+                        · <span className="font-medium text-gray-700">{dashboardData.scenario}</span>
+                      </>
+                    ) : null}
+                  </p>
+                )}
               </div>
               <div className={`px-3 py-1.5 rounded-full text-xs font-bold ${getRiskBgColor(
                 (dashboardData.cumulative_stress_level || stressLevel) as StressLevel

@@ -406,6 +406,9 @@ class DashboardSummarySerializer(serializers.Serializer):
     cumulative_fsfsi = serializers.FloatField(required=False, allow_null=True)
     cumulative_stress_level = serializers.CharField(required=False, allow_null=True)
     computed_at = serializers.CharField(allow_null=True)  # ISO datetime from backend
+    # Which engine run produced this summary (latest assessment for the fiscal year).
+    weighting_method = serializers.CharField(required=False, allow_null=True)
+    scenario = serializers.CharField(required=False, allow_null=True)
     empty = serializers.BooleanField(default=False)
 
 

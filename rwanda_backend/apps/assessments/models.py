@@ -20,7 +20,8 @@ from apps.fsfvi_data.models import IndicatorComponent
 
 
 class WeightingMethod(models.TextChoices):
-    """Supported weighting methodologies."""
+    """Supported weighting methodologies (must match Rust fsfi_engine assess_indicators dispatch)."""
+    EQUAL = "equal", "Equal (1/n indicators)"
     EXPERT = "expert", "Expert (AHP)"
     FINANCIAL = "financial", "Financial (Budget-based)"
     NETWORK = "network", "Network (PageRank)"

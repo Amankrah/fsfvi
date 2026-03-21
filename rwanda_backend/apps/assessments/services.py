@@ -511,6 +511,8 @@ class AssessmentService:
                 "efficiency_index": 0.0,
                 "yoy_change_percent": None,
                 "computed_at": None,
+                "weighting_method": None,
+                "scenario": None,
                 "empty": True,
             }
 
@@ -563,6 +565,8 @@ class AssessmentService:
             "cumulative_fsfsi": float(assessment.cumulative_fsfsi) if assessment.cumulative_fsfsi else None,
             "cumulative_stress_level": assessment.cumulative_stress_level,
             "computed_at": assessment.computed_at.isoformat(),
+            "weighting_method": assessment.weighting_method,
+            "scenario": assessment.scenario,
             "empty": False,
         }
 

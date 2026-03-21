@@ -9,6 +9,7 @@ import uuid
 from decimal import Decimal
 
 from django.db import models
+from django.db.models.functions import Lower
 
 from apps.authentication.models import GovernmentUser
 
@@ -41,6 +42,9 @@ class SavedStrategicPlan(models.Model):
     target_reduction_pct = models.DecimalField(max_digits=5, decimal_places=2)
     yearly_budget_growth_rate = models.DecimalField(max_digits=5, decimal_places=4)
     target_curve = models.CharField(max_length=20, default="smoothstep")
+    # Must match the weighting used when generating plan_json (Rust multi-year uses these ωᵢ).
+    weighting_method = models.CharField(max_length=32, default="hybrid", db_index=True)
+    scenario = models.CharField(max_length=64, default="normal_operations")
 
     # Summary fields (denormalized for quick dashboard reads)
     baseline_fsfsi = models.DecimalField(max_digits=8, decimal_places=6)
@@ -65,6 +69,13 @@ class SavedStrategicPlan(models.Model):
         ordering = ["-created_at"]
         indexes = [
             models.Index(fields=["fiscal_year", "is_active"]),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                Lower("plan_name"),
+                "fiscal_year",
+                name="uniq_saved_plan_name_per_fy_ci",
+            ),
         ]
 
     def __str__(self):

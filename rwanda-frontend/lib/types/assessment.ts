@@ -45,6 +45,7 @@ export const COMPONENT_DISPLAY_NAMES: Record<IndicatorComponent, string> = {
 
 export const WEIGHTING_METHODS = {
   HYBRID: 'hybrid',
+  EQUAL: 'equal',
   EXPERT: 'expert',
   FINANCIAL: 'financial',
   NETWORK: 'network',
@@ -309,6 +310,9 @@ export interface DashboardSummary {
   cumulative_fsfsi?: number | null;
   cumulative_stress_level?: string | null;
   computed_at?: string | null;
+  /** Weighting used for the saved assessment shown (latest run for this fiscal year). */
+  weighting_method?: string | null;
+  scenario?: string | null;
   /** True when no assessment has been run yet for this fiscal year. */
   empty?: boolean;
 }

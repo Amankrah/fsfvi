@@ -11,6 +11,8 @@ import type {
   MultiYearStrategicPlan,
   MtefPlan,
   PlanningComponentInput,
+  SavedStrategicPlanFull,
+  SavedStrategicPlanSummary,
 } from '@/lib/types/planning';
 
 const RWANDA_API_BASE_URL =
@@ -94,10 +96,19 @@ export const planningAPI = {
     assessmentId: string,
     improvementPercent: number = 20,
     growthRate: number = 0.05,
+    weightingMethod: string = 'hybrid',
+    scenario: string = 'normal_operations',
   ): Promise<MtefPlan> => {
     const response = await planningClient.get<MtefPlan>(
       `/${assessmentId}/mtef/`,
-      { params: { improvement_percent: improvementPercent, growth_rate: growthRate } }
+      {
+        params: {
+          improvement_percent: improvementPercent,
+          growth_rate: growthRate,
+          weighting_method: weightingMethod,
+          scenario,
+        },
+      }
     );
     return response.data;
   },
@@ -112,15 +123,64 @@ export const planningAPI = {
 
   savePlan: async (request: {
     assessment_id: string;
-    plan_name?: string;
+    plan_name: string;
     planning_years: number;
     target_fsfvi: number;
     target_reduction_pct: number;
     yearly_budget_growth_rate: number;
     target_curve: string;
-  }) => {
-    const response = await planningClient.post('/saved-plans/', request);
+    weighting_method?: string;
+    scenario?: string;
+  }): Promise<SavedStrategicPlanFull> => {
+    const response = await planningClient.post<SavedStrategicPlanFull>('/saved-plans/', request);
     return response.data;
+  },
+
+  /** Update an existing saved plan (regenerates plan_json when planning parameters change). */
+  updateSavedPlan: async (
+    planId: string,
+    request: {
+      plan_name?: string;
+      assessment_id?: string;
+      planning_years?: number;
+      target_fsfvi?: number;
+      target_reduction_pct?: number;
+      yearly_budget_growth_rate?: number;
+      target_curve?: string;
+      weighting_method?: string;
+      scenario?: string;
+    },
+  ): Promise<SavedStrategicPlanFull> => {
+    const response = await planningClient.patch<SavedStrategicPlanFull>(
+      `/saved-plans/${planId}/`,
+      request,
+    );
+    return response.data;
+  },
+
+  /** List saved plans; optional fiscal_year filter. */
+  listSavedPlans: async (fiscalYear?: number): Promise<SavedStrategicPlanSummary[]> => {
+    const response = await planningClient.get<SavedStrategicPlanSummary[]>('/saved-plans/', {
+      params: fiscalYear != null ? { fiscal_year: fiscalYear } : undefined,
+    });
+    return response.data;
+  },
+
+  /** Full saved plan including plan_json (multi-year trajectory). */
+  getSavedPlan: async (planId: string): Promise<SavedStrategicPlanFull> => {
+    const response = await planningClient.get<SavedStrategicPlanFull>(`/saved-plans/${planId}/`);
+    return response.data;
+  },
+
+  /** Mark plan as the active one for National Overview (same fiscal year). */
+  activateSavedPlan: async (planId: string): Promise<SavedStrategicPlanFull> => {
+    const response = await planningClient.post<SavedStrategicPlanFull>(`/saved-plans/${planId}/activate/`);
+    return response.data;
+  },
+
+  /** Permanently delete a saved plan. */
+  deleteSavedPlan: async (planId: string): Promise<void> => {
+    await planningClient.delete(`/saved-plans/${planId}/`);
   },
 
   getActivePlan: async (fiscalYear: number) => {
