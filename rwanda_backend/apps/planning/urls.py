@@ -14,6 +14,13 @@ from .views import (
     PlanYearActualsView,
     SavedPlanDetailView,
     SaveStrategicPlanView,
+    # PSTA-5
+    PSTA5AlignmentSummaryView,
+    PSTA5ComponentMappingsView,
+    PSTA5KPIsView,
+    PSTA5PillarsView,
+    PSTA5ProgressView,
+    PSTA5TrackerDataView,
 )
 
 app_name = "planning"
@@ -52,4 +59,12 @@ urlpatterns = [
     # Legacy
     path("multi-year/", MultiYearPlanView.as_view(), name="multi-year-plan"),
     path("mtef/", MtefView.as_view(), name="mtef"),
+
+    # PSTA-5 Alignment Tracking
+    path("psta5/pillars/", PSTA5PillarsView.as_view(), name="psta5-pillars"),
+    path("psta5/kpis/", PSTA5KPIsView.as_view(), name="psta5-kpis"),
+    path("psta5/mappings/", PSTA5ComponentMappingsView.as_view(), name="psta5-mappings"),
+    path("psta5/progress/", PSTA5ProgressView.as_view(), name="psta5-progress"),
+    path("psta5/alignment-summary/", PSTA5AlignmentSummaryView.as_view(), name="psta5-alignment-summary"),
+    path("psta5/tracker/", PSTA5TrackerDataView.as_view(), name="psta5-tracker"),
 ]

@@ -979,6 +979,521 @@ def mtef_for_assessment(
 
 
 # =============================================================================
+# PSTA-5 Alignment Computation
+# =============================================================================
+
+
+def compute_psta5_budget_alignment(
+    component_allocations_bn: dict[str, float],
+    total_budget_bn: float | None = None,
+) -> dict:
+    """
+    Compute how well a budget allocation pattern aligns with PSTA-5 priorities.
+
+    Given component allocations (from a strategic plan), this function:
+    1. Maps each component allocation to Priority Areas using contribution weights
+    2. Calculates the effective budget flow to each Priority Area
+    3. Compares actual allocation % to PSTA-5 target % (PA1:58%, PA2:17%, PA3:24%)
+    4. Returns an alignment score (0-100) and detailed breakdown
+
+    Args:
+        component_allocations_bn: Budget per component in billions LCU
+            e.g., {"markets": 100.5, "crop_production": 200.3, ...}
+        total_budget_bn: Optional override; if None, computed from sum of allocations
+
+    Returns:
+        {
+            "alignment_score": 85.3,  # 0-100, higher = better alignment
+            "priority_area_allocations": [
+                {"code": "PA1", "name": "...", "actual_pct": 55.2, "target_pct": 58.0, "deviation_ppt": -2.8},
+                ...
+            ],
+            "component_contributions": [
+                {"component": "markets", "allocation_bn": 100.5, "contributions": {"PA2": 50.25}},
+                ...
+            ],
+            "total_budget_bn": 1234.5,
+            "methodology": "..."
+        }
+    """
+    from .models import PSTA5Pillar, PSTA5ComponentMapping
+
+    # Get all Priority Areas and mappings
+    priority_areas = list(PSTA5Pillar.objects.filter(is_active=True).order_by("sort_order"))
+    mappings = list(PSTA5ComponentMapping.objects.select_related("pillar").all())
+
+    if not priority_areas:
+        return {"error": "No PSTA-5 Priority Areas defined. Run seed_psta5 command."}
+
+    # Build mapping lookup: component -> [(pillar_code, weight), ...]
+    component_to_pillars: dict[str, list[tuple[str, float]]] = {}
+    for m in mappings:
+        comp = m.component
+        if comp not in component_to_pillars:
+            component_to_pillars[comp] = []
+        component_to_pillars[comp].append((m.pillar.code, float(m.contribution_weight)))
+
+    # Calculate total budget
+    total_bn = total_budget_bn if total_budget_bn and total_budget_bn > 0 else sum(
+        float(v or 0) for v in component_allocations_bn.values()
+    )
+    if total_bn <= 0:
+        return {"error": "Total budget must be positive"}
+
+    # Compute effective allocation to each Priority Area
+    pa_allocations: dict[str, float] = {pa.code: 0.0 for pa in priority_areas}
+    component_contributions = []
+
+    for comp, alloc_bn in component_allocations_bn.items():
+        alloc = float(alloc_bn or 0)
+        if alloc <= 0:
+            continue
+
+        contributions: dict[str, float] = {}
+        if comp in component_to_pillars:
+            for pillar_code, weight in component_to_pillars[comp]:
+                contrib = alloc * weight
+                pa_allocations[pillar_code] = pa_allocations.get(pillar_code, 0) + contrib
+                contributions[pillar_code] = contrib
+        # else: component not mapped (e.g., legacy or unknown)
+
+        component_contributions.append({
+            "component": comp,
+            "allocation_bn": round(alloc, 2),
+            "contributions": {k: round(v, 2) for k, v in contributions.items()},
+        })
+
+    # Calculate actual % for each Priority Area
+    total_mapped = sum(pa_allocations.values())
+    pa_results = []
+
+    for pa in priority_areas:
+        code = pa.code
+        actual_bn = pa_allocations.get(code, 0)
+        target_pct = float(pa.weight) * 100  # weight stored as 0.58 -> 58%
+
+        if total_mapped > 0:
+            actual_pct = (actual_bn / total_mapped) * 100
+        else:
+            actual_pct = 0
+
+        deviation_ppt = actual_pct - target_pct
+
+        pa_results.append({
+            "code": code,
+            "name": pa.name,
+            "actual_bn": round(actual_bn, 2),
+            "actual_pct": round(actual_pct, 1),
+            "target_pct": round(target_pct, 1),
+            "deviation_ppt": round(deviation_ppt, 1),
+        })
+
+    # Compute alignment score: 100 - average absolute deviation
+    # Perfect alignment = 0 deviation = score 100
+    # Maximum deviation (all in one PA) ≈ 42 ppt average = score ~58
+    avg_abs_deviation = sum(abs(pa["deviation_ppt"]) for pa in pa_results) / len(pa_results) if pa_results else 0
+    alignment_score = max(0, 100 - avg_abs_deviation * 2)  # Scale: 1 ppt deviation = -2 points
+
+    return {
+        "alignment_score": round(alignment_score, 1),
+        "priority_area_allocations": pa_results,
+        "component_contributions": component_contributions,
+        "total_budget_bn": round(total_bn, 2),
+        "total_mapped_bn": round(total_mapped, 2),
+        "unmapped_bn": round(total_bn - total_mapped, 2),
+        "methodology": (
+            "Budget alignment computed by mapping FSFSI component allocations to PSTA-5 Priority Areas "
+            "using contribution weights (e.g., crop_production→PA1 at 40%). Alignment score = 100 - "
+            "2×(average absolute deviation from target %). Perfect alignment with 58/17/24 split = 100."
+        ),
+    }
+
+
+def compute_psta5_alignment_summary(
+    plan_id: str | None = None,
+    fiscal_year: int | None = None,
+) -> dict:
+    """
+    Compute PSTA-5 alignment summary for dashboard display.
+
+    Computes TWO key metrics:
+    1. Budget Alignment: How well the plan's budget allocation matches PSTA-5 targets (PA1:58%, PA2:17%, PA3:24%)
+    2. Projected KPI Improvement: How much the plan's allocations will improve each PSTA-5 KPI,
+       using KPI-specific component mappings.
+
+    The KPI improvement is derived from the plan's component_projections:
+    - Each KPI has specific component(s) that drive it (via PSTA5KPIComponentMapping)
+    - Each component's stress reduction indicates indicator improvement
+    - KPI improvement = weighted sum of its driving components' improvements
+    - This provides KPI-specific granularity (e.g., PA1.1 shows crop_production improvement,
+      PA1.4 shows animal_systems improvement, not a PA-level average)
+    """
+    from .models import (
+        SavedStrategicPlan,
+        PSTA5Pillar,
+        PSTA5KPI,
+        PSTA5ComponentMapping,
+        PSTA5KPIComponentMapping,
+    )
+    from apps.assessments.models import AssessmentResult
+
+    # Find the plan to use
+    plan = None
+    if plan_id:
+        try:
+            plan = SavedStrategicPlan.objects.get(pk=plan_id)
+        except SavedStrategicPlan.DoesNotExist:
+            pass
+    elif fiscal_year:
+        plan = SavedStrategicPlan.objects.filter(
+            fiscal_year=fiscal_year, is_active=True
+        ).first()
+    else:
+        plan = SavedStrategicPlan.objects.filter(is_active=True).order_by("-fiscal_year").first()
+
+    # Get Priority Areas and component mappings
+    priority_areas = list(PSTA5Pillar.objects.filter(is_active=True).order_by("sort_order"))
+    kpis = list(PSTA5KPI.objects.filter(is_active=True).select_related("pillar"))
+    mappings = list(PSTA5ComponentMapping.objects.select_related("pillar").all())
+
+    if not priority_areas:
+        return {
+            "overall_score": 0,
+            "pillar_scores": [],
+            "component_alignment": [],
+            "kpis_at_risk": [],
+            "data_year": 2024,
+            "error": "No PSTA-5 Priority Areas defined",
+        }
+
+    # Build component -> Priority Area mapping: {component: [(pa_code, weight), ...]}
+    component_to_pa: dict[str, list[tuple[str, float]]] = {}
+    for m in mappings:
+        comp = m.component
+        if comp not in component_to_pa:
+            component_to_pa[comp] = []
+        component_to_pa[comp].append((m.pillar.code, float(m.contribution_weight)))
+
+    # Compute budget alignment and projected indicator improvement if we have a plan
+    budget_alignment = None
+    yearly_alignments = []
+    component_improvements: dict[str, float] = {}  # component -> improvement %
+    baseline_stresses: dict[str, float] = {}
+    final_stresses: dict[str, float] = {}
+
+    if plan and plan.plan_json:
+        yearly_plans = plan.plan_json.get("yearly_plans", [])
+        baseline_fsfvi = plan.plan_json.get("baseline_fsfvi", 0)
+
+        # Get baseline component stresses from the assessment
+        try:
+            assessment = AssessmentResult.objects.get(pk=plan.assessment_id)
+            for comp in assessment.component_results.all():
+                baseline_stresses[comp.component] = float(
+                    comp.cumulative_stress if comp.cumulative_stress else comp.component_stress
+                )
+        except AssessmentResult.DoesNotExist:
+            pass
+
+        # Compute alignment for each year in the plan
+        for yp in yearly_plans:
+            fy = yp.get("fiscal_year")
+            recommended = yp.get("recommended_allocations", {})
+            total_budget = yp.get("total_budget", 0)
+            projected_fsfvi = yp.get("projected_fsfvi", 0)
+            year_target = yp.get("year_target") or yp.get("target_fsfvi", 0)
+            component_projections = yp.get("component_projections", {})
+
+            # Scale to billions
+            total_budget_bn = total_budget / 1e9 if total_budget > 1e6 else total_budget
+            allocations_bn = {}
+            for comp, alloc in recommended.items():
+                alloc_bn = alloc / 1e9 if alloc > 1e6 else alloc
+                allocations_bn[comp] = alloc_bn
+
+            # Compute projected indicator improvement for this year
+            year_component_improvements: dict[str, float] = {}
+            for comp_name, proj in component_projections.items():
+                baseline = baseline_stresses.get(comp_name, 0)
+                final = float(proj.get("cumulative_stress", baseline))
+                if baseline > 0:
+                    # Stress reduction = indicator improvement
+                    improvement_pct = ((baseline - final) / baseline) * 100
+                    year_component_improvements[comp_name] = max(0, improvement_pct)
+                else:
+                    year_component_improvements[comp_name] = 0
+
+            if allocations_bn:
+                year_alignment = compute_psta5_budget_alignment(allocations_bn, total_budget_bn)
+
+                # Compute projected PA improvement from component improvements
+                pa_improvements: dict[str, float] = {pa.code: 0.0 for pa in priority_areas}
+                pa_weights: dict[str, float] = {pa.code: 0.0 for pa in priority_areas}
+
+                for comp_name, improvement in year_component_improvements.items():
+                    if comp_name in component_to_pa:
+                        for pa_code, weight in component_to_pa[comp_name]:
+                            pa_improvements[pa_code] += improvement * weight
+                            pa_weights[pa_code] += weight
+
+                # Normalize by total weights
+                for pa_code in pa_improvements:
+                    if pa_weights[pa_code] > 0:
+                        pa_improvements[pa_code] /= pa_weights[pa_code]
+
+                yearly_alignments.append({
+                    "fiscal_year": fy,
+                    "plan_year": yp.get("year", 0),
+                    "alignment_score": year_alignment.get("alignment_score", 0),
+                    "total_budget_bn": total_budget_bn,
+                    "projected_fsfvi": round(projected_fsfvi, 4) if projected_fsfvi else None,
+                    "year_target": round(year_target, 4) if year_target else None,
+                    "priority_area_allocations": year_alignment.get("priority_area_allocations", []),
+                    "pa_indicator_improvements": {k: round(v, 1) for k, v in pa_improvements.items()},
+                    "component_improvements": {k: round(v, 1) for k, v in year_component_improvements.items()},
+                })
+
+        # Use the final year for main metrics
+        if yearly_plans:
+            final_year = yearly_plans[-1]
+            recommended = final_year.get("recommended_allocations", {})
+            total_budget = final_year.get("total_budget", 0)
+            total_budget_bn = total_budget / 1e9 if total_budget > 1e6 else total_budget
+            allocations_bn = {}
+            for comp, alloc in recommended.items():
+                alloc_bn = alloc / 1e9 if alloc > 1e6 else alloc
+                allocations_bn[comp] = alloc_bn
+            if allocations_bn:
+                budget_alignment = compute_psta5_budget_alignment(allocations_bn, total_budget_bn)
+
+            # Final year component improvements
+            final_projections = final_year.get("component_projections", {})
+            for comp_name, proj in final_projections.items():
+                baseline = baseline_stresses.get(comp_name, 0)
+                final = float(proj.get("cumulative_stress", baseline))
+                final_stresses[comp_name] = final
+                if baseline > 0:
+                    component_improvements[comp_name] = max(0, ((baseline - final) / baseline) * 100)
+                else:
+                    component_improvements[comp_name] = 0
+
+    # Build KPI -> Component mapping for KPI-specific improvements
+    kpi_component_mappings = list(PSTA5KPIComponentMapping.objects.select_related("kpi").all())
+    kpi_to_components: dict[str, list[tuple[str, float]]] = {}  # kpi_code -> [(component, weight), ...]
+    for m in kpi_component_mappings:
+        kpi_code = m.kpi.code
+        if kpi_code not in kpi_to_components:
+            kpi_to_components[kpi_code] = []
+        kpi_to_components[kpi_code].append((m.component, float(m.weight)))
+
+    # Compute KPI-specific projected improvements
+    kpi_improvements: dict[str, float] = {}  # kpi_code -> improvement %
+    for kpi in kpis:
+        if kpi.code in kpi_to_components:
+            # KPI has specific component mappings - use weighted average of its components
+            kpi_improvement = 0.0
+            weight_sum = 0.0
+            for comp_name, weight in kpi_to_components[kpi.code]:
+                if comp_name in component_improvements:
+                    kpi_improvement += component_improvements[comp_name] * weight
+                    weight_sum += weight
+            if weight_sum > 0:
+                kpi_improvements[kpi.code] = kpi_improvement / weight_sum
+            else:
+                kpi_improvements[kpi.code] = 0.0
+        else:
+            # Fallback to PA-level average if no KPI-specific mapping exists
+            pa_code = kpi.pillar.code
+            pa_improvement = 0.0
+            pa_weight_sum = 0.0
+            for comp_name, improvement in component_improvements.items():
+                if comp_name in component_to_pa:
+                    for pa_c, weight in component_to_pa[comp_name]:
+                        if pa_c == pa_code:
+                            pa_improvement += improvement * weight
+                            pa_weight_sum += weight
+            if pa_weight_sum > 0:
+                kpi_improvements[kpi.code] = pa_improvement / pa_weight_sum
+            else:
+                kpi_improvements[kpi.code] = 0.0
+
+    # Compute pillar scores with PROJECTED indicator improvements
+    pillar_scores = []
+    kpis_at_risk = []
+
+    # Count components mapped to each PA
+    pa_component_counts: dict[str, int] = {pa.code: 0 for pa in priority_areas}
+    for comp_name in component_improvements.keys():
+        if comp_name in component_to_pa:
+            for pa_code, _ in component_to_pa[comp_name]:
+                pa_component_counts[pa_code] = pa_component_counts.get(pa_code, 0) + 1
+
+    for pa in priority_areas:
+        pa_kpis = [k for k in kpis if k.pillar_id == pa.id]
+
+        # Budget alignment score for this Priority Area
+        budget_score = 0
+        if budget_alignment and "priority_area_allocations" in budget_alignment:
+            pa_alloc = next(
+                (a for a in budget_alignment["priority_area_allocations"] if a["code"] == pa.code),
+                None
+            )
+            if pa_alloc:
+                budget_score = max(0, 100 - abs(pa_alloc["deviation_ppt"]) * 2)
+
+        # PA-level indicator improvement = weighted average of KPI improvements
+        pa_indicator_improvement = 0.0
+        pa_kpi_weight_sum = 0.0
+        pa_component_list: list[str] = []
+
+        for kpi in pa_kpis:
+            kpi_weight = float(kpi.weight)
+            kpi_improv = kpi_improvements.get(kpi.code, 0.0)
+            pa_indicator_improvement += kpi_improv * kpi_weight
+            pa_kpi_weight_sum += kpi_weight
+
+            # Collect components driving this KPI
+            if kpi.code in kpi_to_components:
+                for comp_name, _ in kpi_to_components[kpi.code]:
+                    if comp_name not in pa_component_list:
+                        pa_component_list.append(comp_name)
+
+        if pa_kpi_weight_sum > 0:
+            pa_indicator_improvement /= pa_kpi_weight_sum
+
+        # If no KPI-specific mappings, fall back to component -> PA mappings
+        if not pa_component_list:
+            for comp_name in component_improvements.keys():
+                if comp_name in component_to_pa:
+                    for pa_code, _ in component_to_pa[comp_name]:
+                        if pa_code == pa.code and comp_name not in pa_component_list:
+                            pa_component_list.append(comp_name)
+
+        # Flag KPIs at risk if they have low projected improvement
+        for kpi in pa_kpis:
+            kpi_improv = kpi_improvements.get(kpi.code, 0.0)
+            if kpi_improv < 40:
+                kpis_at_risk.append({
+                    "code": kpi.code,
+                    "name": kpi.name,
+                    "pillar_code": pa.code,
+                    "baseline_value": float(kpi.baseline_value),
+                    "target_value": float(kpi.target_value),
+                    "projected_improvement": round(kpi_improv, 1),
+                })
+
+        pillar_scores.append({
+            "pillar_code": pa.code,
+            "pillar_name": pa.name,
+            "score": round(budget_score, 1),  # Budget alignment
+            "indicator_improvement": round(pa_indicator_improvement, 1),  # Projected from plan
+            "budget_alignment_score": round(budget_score, 1),
+            "weight": float(pa.weight),
+            "components_count": len(pa_component_list),  # How many FSFSI components contribute
+            "components": pa_component_list,  # Which components
+            "kpis_total": len(pa_kpis),  # PSTA-5 KPIs linked to this PA
+        })
+
+    # Overall scores
+    overall_budget_alignment = sum(ps["budget_alignment_score"] * ps["weight"] for ps in pillar_scores)
+    overall_indicator_improvement = sum(ps["indicator_improvement"] * ps["weight"] for ps in pillar_scores)
+
+    # Component-level improvements for display
+    component_alignment = []
+    for comp_name, improvement in component_improvements.items():
+        baseline = baseline_stresses.get(comp_name, 0)
+        final = final_stresses.get(comp_name, baseline)
+        component_alignment.append({
+            "component": comp_name,
+            "baseline_stress": round(baseline * 100, 1),  # as %
+            "projected_stress": round(final * 100, 1),
+            "improvement_pct": round(improvement, 1),
+        })
+
+    # Sort by improvement (best first)
+    component_alignment.sort(key=lambda x: x["improvement_pct"], reverse=True)
+
+    # Compute average yearly alignment score
+    avg_yearly_alignment = (
+        sum(ya["alignment_score"] for ya in yearly_alignments) / len(yearly_alignments)
+        if yearly_alignments else 0
+    )
+
+    # Data year = final year of the plan
+    data_year = yearly_alignments[-1]["fiscal_year"] if yearly_alignments else 2024
+
+    return {
+        # PRIMARY: Budget alignment with PSTA-5 targets
+        "overall_score": round(overall_budget_alignment, 1),
+
+        # SECONDARY: Projected indicator improvement from plan allocations
+        "overall_indicator_improvement": round(overall_indicator_improvement, 1),
+
+        "pillar_scores": pillar_scores,
+        "component_alignment": component_alignment,
+        "kpis_at_risk": kpis_at_risk,
+        "data_year": data_year,
+        "plan_used": {
+            "id": str(plan.id) if plan else None,
+            "name": plan.plan_name if plan else None,
+            "fiscal_year": plan.fiscal_year if plan else None,
+            "planning_years": plan.planning_years if plan else None,
+            "planning_start_fy": plan.plan_json.get("planning_start_fiscal_year") if plan and plan.plan_json else None,
+        } if plan else None,
+        "budget_alignment": budget_alignment,
+        "yearly_alignments": yearly_alignments,
+        "avg_yearly_alignment_score": round(avg_yearly_alignment, 1),
+        # KPI-specific improvements (using KPI → Component mappings)
+        "kpi_improvements": {k: round(v, 1) for k, v in kpi_improvements.items()},
+    }
+
+
+def get_psta5_tracker_data() -> dict:
+    """
+    Get full PSTA-5 tracker data including alignment with active plan.
+
+    Returns all data needed for the PSTA-5 Tracker page:
+    - Priority Areas (pillars)
+    - KPIs with current progress
+    - Component mappings
+    - Annual targets
+    - Progress records
+    - Alignment summary (computed from active plan)
+    """
+    from .models import (
+        PSTA5Pillar,
+        PSTA5KPI,
+        PSTA5ComponentMapping,
+        PSTA5AnnualTarget,
+        PSTA5Progress,
+    )
+    from .serializers import (
+        PSTA5PillarSerializer,
+        PSTA5KPISerializer,
+        PSTA5ComponentMappingSerializer,
+        PSTA5AnnualTargetSerializer,
+        PSTA5ProgressSerializer,
+    )
+
+    pillars = PSTA5Pillar.objects.filter(is_active=True).order_by("sort_order")
+    kpis = PSTA5KPI.objects.filter(is_active=True).select_related("pillar").prefetch_related("progress_records")
+    mappings = PSTA5ComponentMapping.objects.select_related("pillar").all()
+    targets = PSTA5AnnualTarget.objects.select_related("kpi").all()
+    progress = PSTA5Progress.objects.select_related("kpi").order_by("-fiscal_year")
+
+    alignment_summary = compute_psta5_alignment_summary()
+
+    return {
+        "pillars": PSTA5PillarSerializer(pillars, many=True).data,
+        "kpis": PSTA5KPISerializer(kpis, many=True).data,
+        "component_mappings": PSTA5ComponentMappingSerializer(mappings, many=True).data,
+        "annual_targets": PSTA5AnnualTargetSerializer(targets, many=True).data,
+        "progress": PSTA5ProgressSerializer(progress, many=True).data,
+        "alignment_summary": alignment_summary,
+    }
+
+
+# =============================================================================
 # Legacy functions (raw component inputs — kept for backwards compatibility)
 # =============================================================================
 

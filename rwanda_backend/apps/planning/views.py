@@ -38,8 +38,10 @@ from .serializers import (
 )
 from .utils import plan_name_exists
 from .services import (
+    compute_psta5_alignment_summary,
     generate_mtef,
     generate_multi_year_plan,
+    get_psta5_tracker_data,
     mtef_for_assessment,
     plan_for_assessment,
     simulate_user_allocation_year,
@@ -767,3 +769,196 @@ class PlanYearActualDetailView(APIView):
             )
         actual.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+# =============================================================================
+# PSTA-5 ALIGNMENT TRACKING
+# =============================================================================
+
+from .models import (
+    PSTA5AnnualTarget,
+    PSTA5ComponentMapping,
+    PSTA5KPI,
+    PSTA5Pillar,
+    PSTA5Progress,
+)
+from .serializers import (
+    PSTA5AlignmentSummarySerializer,
+    PSTA5AnnualTargetSerializer,
+    PSTA5ComponentMappingSerializer,
+    PSTA5KPISerializer,
+    PSTA5PillarSerializer,
+    PSTA5ProgressInputSerializer,
+    PSTA5ProgressSerializer,
+)
+
+
+class PSTA5PillarsView(APIView):
+    """
+    List all PSTA-5 pillars.
+
+    GET /api/planning/psta5/pillars/
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        pillars = PSTA5Pillar.objects.filter(is_active=True)
+        return Response(PSTA5PillarSerializer(pillars, many=True).data)
+
+
+class PSTA5KPIsView(APIView):
+    """
+    List all PSTA-5 KPIs.
+
+    GET /api/planning/psta5/kpis/
+    GET /api/planning/psta5/kpis/?pillar=P1
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        kpis = PSTA5KPI.objects.filter(is_active=True).select_related("pillar")
+
+        pillar_code = request.query_params.get("pillar")
+        if pillar_code:
+            kpis = kpis.filter(pillar__code=pillar_code)
+
+        return Response(PSTA5KPISerializer(kpis, many=True).data)
+
+
+class PSTA5ComponentMappingsView(APIView):
+    """
+    List component-to-pillar mappings.
+
+    GET /api/planning/psta5/mappings/
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        mappings = PSTA5ComponentMapping.objects.select_related("pillar")
+        return Response(PSTA5ComponentMappingSerializer(mappings, many=True).data)
+
+
+class PSTA5ProgressView(APIView):
+    """
+    List and record KPI progress.
+
+    GET  /api/planning/psta5/progress/
+    GET  /api/planning/psta5/progress/?fiscal_year=2024
+    POST /api/planning/psta5/progress/
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        progress = PSTA5Progress.objects.select_related("kpi").order_by(
+            "kpi__pillar__sort_order", "kpi__sort_order", "-fiscal_year"
+        )
+
+        fiscal_year = request.query_params.get("fiscal_year")
+        if fiscal_year:
+            progress = progress.filter(fiscal_year=fiscal_year)
+
+        return Response(PSTA5ProgressSerializer(progress, many=True).data)
+
+    def post(self, request):
+        serializer = PSTA5ProgressInputSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        data = serializer.validated_data
+
+        try:
+            kpi = PSTA5KPI.objects.get(pk=data["kpi_id"])
+        except PSTA5KPI.DoesNotExist:
+            return Response({"error": "KPI not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        progress, created = PSTA5Progress.objects.update_or_create(
+            kpi=kpi,
+            fiscal_year=data["fiscal_year"],
+            defaults={
+                "actual_value": Decimal(str(data["actual_value"])),
+                "source": data.get("source", ""),
+                "notes": data.get("notes", ""),
+                "recorded_by": request.user if hasattr(request.user, "pk") else None,
+            },
+        )
+
+        return Response(
+            PSTA5ProgressSerializer(progress).data,
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+        )
+
+
+class PSTA5AlignmentSummaryView(APIView):
+    """
+    Get PSTA-5 alignment summary for dashboard.
+
+    Integrates the active strategic plan's budget allocations with PSTA-5
+    Priority Areas to show how financial planning contributes to PSTA-5 goals.
+
+    GET /api/planning/psta5/alignment-summary/
+    GET /api/planning/psta5/alignment-summary/?fiscal_year=2024
+    GET /api/planning/psta5/alignment-summary/?plan_id=<uuid>
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        fiscal_year_param = request.query_params.get("fiscal_year")
+        plan_id = request.query_params.get("plan_id")
+
+        fiscal_year = int(fiscal_year_param) if fiscal_year_param else None
+
+        try:
+            summary = compute_psta5_alignment_summary(
+                plan_id=plan_id,
+                fiscal_year=fiscal_year,
+            )
+        except Exception as e:
+            logger.exception("PSTA-5 alignment summary computation failed")
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        if "error" in summary and not summary.get("pillar_scores"):
+            return Response(
+                {"error": summary["error"]},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        return Response(summary)
+
+
+class PSTA5TrackerDataView(APIView):
+    """
+    Get full PSTA-5 tracker data for the PSTA-5 page.
+
+    Integrates the active strategic plan's budget allocations to show
+    how financial planning contributes to achieving PSTA-5 goals.
+
+    GET /api/planning/psta5/tracker/
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            data = get_psta5_tracker_data()
+        except Exception as e:
+            logger.exception("PSTA-5 tracker data retrieval failed")
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        if "error" in data and not data.get("pillars"):
+            return Response(
+                {"error": data["error"]},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        return Response(data)

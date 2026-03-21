@@ -15,6 +15,12 @@ import type {
   PlanningComponentInput,
   PlanYearActual,
   PlanYearActualSummary,
+  PSTA5AlignmentSummary,
+  PSTA5ComponentMapping,
+  PSTA5KPI,
+  PSTA5Pillar,
+  PSTA5Progress,
+  PSTA5TrackerData,
   SavedStrategicPlanFull,
   SavedStrategicPlanSummary,
   SaveYearActualRequest,
@@ -281,6 +287,67 @@ export const planningAPI = {
       target_fsfvi_improvement_percent: targetFsfviImprovementPercent,
       yearly_budget_growth_rate: yearlyBudgetGrowthRate,
     });
+    return response.data;
+  },
+
+  // ==========================================================================
+  // PSTA-5 Alignment Tracking
+  // ==========================================================================
+
+  /** Get all PSTA-5 pillars. */
+  getPSTA5Pillars: async (): Promise<PSTA5Pillar[]> => {
+    const response = await planningClient.get<PSTA5Pillar[]>('/psta5/pillars/');
+    return response.data;
+  },
+
+  /** Get all PSTA-5 KPIs. */
+  getPSTA5KPIs: async (pillarId?: string): Promise<PSTA5KPI[]> => {
+    const response = await planningClient.get<PSTA5KPI[]>('/psta5/kpis/', {
+      params: pillarId ? { pillar_id: pillarId } : undefined,
+    });
+    return response.data;
+  },
+
+  /** Get PSTA-5 component mappings. */
+  getPSTA5ComponentMappings: async (): Promise<PSTA5ComponentMapping[]> => {
+    const response = await planningClient.get<PSTA5ComponentMapping[]>('/psta5/mappings/');
+    return response.data;
+  },
+
+  /** Get PSTA-5 progress records. */
+  getPSTA5Progress: async (kpiId?: string, fiscalYear?: number): Promise<PSTA5Progress[]> => {
+    const response = await planningClient.get<PSTA5Progress[]>('/psta5/progress/', {
+      params: {
+        ...(kpiId ? { kpi_id: kpiId } : {}),
+        ...(fiscalYear ? { fiscal_year: fiscalYear } : {}),
+      },
+    });
+    return response.data;
+  },
+
+  /** Record KPI progress. */
+  recordPSTA5Progress: async (request: {
+    kpi_id: string;
+    fiscal_year: number;
+    actual_value: number;
+    source?: string;
+    notes?: string;
+  }): Promise<PSTA5Progress> => {
+    const response = await planningClient.post<PSTA5Progress>('/psta5/progress/', request);
+    return response.data;
+  },
+
+  /** Get PSTA-5 alignment summary. */
+  getPSTA5AlignmentSummary: async (fiscalYear?: number): Promise<PSTA5AlignmentSummary> => {
+    const response = await planningClient.get<PSTA5AlignmentSummary>('/psta5/alignment-summary/', {
+      params: fiscalYear ? { fiscal_year: fiscalYear } : undefined,
+    });
+    return response.data;
+  },
+
+  /** Get full PSTA-5 tracker data (pillars, KPIs, mappings, targets, progress, summary). */
+  getPSTA5TrackerData: async (): Promise<PSTA5TrackerData> => {
+    const response = await planningClient.get<PSTA5TrackerData>('/psta5/tracker/');
     return response.data;
   },
 };

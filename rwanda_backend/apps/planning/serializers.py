@@ -2,7 +2,16 @@
 
 from rest_framework import serializers
 
-from .models import PlanYearActual, SavedStrategicPlan
+from .models import (
+    PlanYearActual,
+    SavedStrategicPlan,
+    PSTA5Pillar,
+    PSTA5KPI,
+    PSTA5ComponentMapping,
+    PSTA5KPIComponentMapping,
+    PSTA5AnnualTarget,
+    PSTA5Progress,
+)
 
 
 class SavePlanRequestSerializer(serializers.Serializer):
@@ -217,3 +226,161 @@ class PlanYearActualSummarySerializer(serializers.ModelSerializer):
             "updated_at",
         ]
         read_only_fields = fields
+
+
+# =============================================================================
+# PSTA-5 Alignment Tracking Serializers
+# =============================================================================
+
+
+class PSTA5PillarSerializer(serializers.ModelSerializer):
+    """PSTA-5 Strategic Pillar."""
+
+    kpi_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = PSTA5Pillar
+        fields = [
+            "id", "code", "name", "name_fr", "name_rw",
+            "description", "weight", "sort_order", "kpi_count",
+        ]
+        read_only_fields = fields
+
+    def get_kpi_count(self, obj):
+        return obj.kpis.filter(is_active=True).count()
+
+
+class PSTA5KPIComponentMappingSerializer(serializers.ModelSerializer):
+    """Mapping between PSTA-5 KPI and its driving FSFSI component(s)."""
+
+    kpi_code = serializers.CharField(source="kpi.code", read_only=True)
+
+    class Meta:
+        model = PSTA5KPIComponentMapping
+        fields = ["kpi_id", "kpi_code", "component", "weight"]
+        read_only_fields = fields
+
+
+class PSTA5KPISerializer(serializers.ModelSerializer):
+    """PSTA-5 Key Performance Indicator."""
+
+    pillar_code = serializers.CharField(source="pillar.code", read_only=True)
+    current_value = serializers.SerializerMethodField()
+    current_year = serializers.SerializerMethodField()
+    progress_percent = serializers.SerializerMethodField()
+    driving_components = serializers.SerializerMethodField()
+
+    class Meta:
+        model = PSTA5KPI
+        fields = [
+            "id", "pillar_id", "pillar_code", "code", "name",
+            "name_fr", "name_rw", "description", "unit",
+            "baseline_year", "baseline_value",
+            "target_year", "target_value",
+            "higher_is_better", "weight", "sort_order",
+            "current_value", "current_year", "progress_percent",
+            "driving_components",
+        ]
+        read_only_fields = fields
+
+    def get_current_value(self, obj):
+        latest = obj.progress_records.order_by("-fiscal_year").first()
+        return float(latest.actual_value) if latest else None
+
+    def get_current_year(self, obj):
+        latest = obj.progress_records.order_by("-fiscal_year").first()
+        return latest.fiscal_year if latest else None
+
+    def get_progress_percent(self, obj):
+        latest = obj.progress_records.order_by("-fiscal_year").first()
+        if latest:
+            return round(obj.progress_percent(latest.actual_value), 1)
+        return None
+
+    def get_driving_components(self, obj):
+        """Return list of components driving this KPI with their weights."""
+        return [
+            {"component": m.component, "weight": float(m.weight)}
+            for m in obj.component_mappings.all()
+        ]
+
+
+class PSTA5ComponentMappingSerializer(serializers.ModelSerializer):
+    """Mapping between FSFSI component and PSTA-5 pillar."""
+
+    pillar_code = serializers.CharField(source="pillar.code", read_only=True)
+
+    class Meta:
+        model = PSTA5ComponentMapping
+        fields = [
+            "pillar_id", "pillar_code", "component",
+            "contribution_weight", "indicator_codes",
+        ]
+        read_only_fields = fields
+
+
+class PSTA5AnnualTargetSerializer(serializers.ModelSerializer):
+    """Annual target for a KPI."""
+
+    kpi_code = serializers.CharField(source="kpi.code", read_only=True)
+
+    class Meta:
+        model = PSTA5AnnualTarget
+        fields = ["kpi_id", "kpi_code", "fiscal_year", "target_value", "notes"]
+        read_only_fields = fields
+
+
+class PSTA5ProgressSerializer(serializers.ModelSerializer):
+    """Progress record for a KPI."""
+
+    kpi_code = serializers.CharField(source="kpi.code", read_only=True)
+    progress_percent = serializers.SerializerMethodField()
+
+    class Meta:
+        model = PSTA5Progress
+        fields = [
+            "id", "kpi_id", "kpi_code", "fiscal_year",
+            "actual_value", "progress_percent",
+            "source", "notes", "recorded_at",
+        ]
+        read_only_fields = fields
+
+    def get_progress_percent(self, obj):
+        return round(obj.progress_percent, 1)
+
+
+class PSTA5ProgressInputSerializer(serializers.Serializer):
+    """Input for recording KPI progress."""
+
+    kpi_id = serializers.UUIDField()
+    fiscal_year = serializers.IntegerField(min_value=2020, max_value=2035)
+    actual_value = serializers.FloatField()
+    source = serializers.CharField(max_length=255, required=False, allow_blank=True)
+    notes = serializers.CharField(required=False, allow_blank=True)
+
+
+class PSTA5AlignmentSummarySerializer(serializers.Serializer):
+    """PSTA-5 alignment summary for dashboard."""
+
+    overall_score = serializers.FloatField()
+    pillar_scores = serializers.ListField(
+        child=serializers.DictField()
+    )
+    component_alignment = serializers.ListField(
+        child=serializers.DictField()
+    )
+    kpis_at_risk = serializers.ListField(
+        child=serializers.DictField()
+    )
+    data_year = serializers.IntegerField()
+
+
+class PSTA5TrackerDataSerializer(serializers.Serializer):
+    """Full PSTA-5 tracker data."""
+
+    pillars = PSTA5PillarSerializer(many=True)
+    kpis = PSTA5KPISerializer(many=True)
+    component_mappings = PSTA5ComponentMappingSerializer(many=True)
+    annual_targets = PSTA5AnnualTargetSerializer(many=True)
+    progress = PSTA5ProgressSerializer(many=True)
+    alignment_summary = PSTA5AlignmentSummarySerializer()

@@ -247,3 +247,189 @@ export interface PlanYearActualSummary {
   delta_vs_plan_fsfsi: number | null;
   updated_at: string;
 }
+
+// ---------------------------------------------------------------------------
+// PSTA-5 Alignment Tracking Types
+// ---------------------------------------------------------------------------
+
+/** PSTA-5 Strategic Pillar */
+export interface PSTA5Pillar {
+  id: string;
+  code: string;
+  name: string;
+  name_fr?: string;
+  name_rw?: string;
+  description?: string;
+  weight: number;
+  sort_order: number;
+  kpi_count?: number;
+  alignment_score?: number;  // Calculated based on component allocations
+}
+
+/** PSTA-5 Key Performance Indicator */
+export interface PSTA5KPI {
+  id: string;
+  pillar_id: string;
+  pillar_code: string;
+  code: string;
+  name: string;
+  name_fr?: string;
+  name_rw?: string;
+  description?: string;
+  unit: string;
+  baseline_year: number;
+  baseline_value: number;
+  target_year: number;
+  target_value: number;
+  higher_is_better: boolean;
+  weight: number;
+  sort_order: number;
+  // Current progress (if loaded)
+  current_value?: number;
+  current_year?: number;
+  progress_percent?: number;
+  /** FSFSI components that drive this KPI's improvement */
+  driving_components?: { component: string; weight: number }[];
+}
+
+/** Mapping between FSFSI component and PSTA-5 pillar */
+export interface PSTA5ComponentMapping {
+  pillar_id: string;
+  pillar_code: string;
+  component: string;
+  contribution_weight: number;
+  indicator_codes?: string[];
+}
+
+/** Annual target for a KPI */
+export interface PSTA5AnnualTarget {
+  kpi_id: string;
+  kpi_code: string;
+  fiscal_year: number;
+  target_value: number;
+  notes?: string;
+}
+
+/** Progress record for a KPI */
+export interface PSTA5Progress {
+  id: string;
+  kpi_id: string;
+  kpi_code: string;
+  fiscal_year: number;
+  actual_value: number;
+  progress_percent: number;
+  source?: string;
+  notes?: string;
+  recorded_at: string;
+}
+
+/** Budget alignment result for a single Priority Area */
+export interface PSTA5PriorityAreaAllocation {
+  code: string;
+  name: string;
+  actual_bn: number;
+  actual_pct: number;
+  target_pct: number;
+  deviation_ppt: number;
+}
+
+/** Budget alignment computation result */
+export interface PSTA5BudgetAlignment {
+  alignment_score: number;
+  priority_area_allocations: PSTA5PriorityAreaAllocation[];
+  component_contributions: {
+    component: string;
+    allocation_bn: number;
+    contributions: Record<string, number>;
+  }[];
+  total_budget_bn: number;
+  total_mapped_bn: number;
+  unmapped_bn: number;
+  methodology: string;
+}
+
+/** Reference to the plan used for alignment */
+export interface PSTA5PlanReference {
+  id: string | null;
+  name: string | null;
+  fiscal_year: number | null;
+  planning_years?: number | null;
+  planning_start_fy?: number | null;
+}
+
+/** Year-by-year alignment data for trajectory chart */
+export interface PSTA5YearlyAlignment {
+  fiscal_year: number;
+  plan_year: number;
+  alignment_score: number;
+  total_budget_bn: number;
+  projected_fsfvi: number | null;
+  year_target: number | null;
+  priority_area_allocations: PSTA5PriorityAreaAllocation[];
+  /** Projected indicator improvements per Priority Area for this year */
+  pa_indicator_improvements?: Record<string, number>;
+  /** Projected component improvements for this year */
+  component_improvements?: Record<string, number>;
+}
+
+/** PSTA-5 Alignment Summary for dashboard */
+export interface PSTA5AlignmentSummary {
+  /** Overall budget alignment score (0-100) - how well the plan's budget matches PSTA-5 targets */
+  overall_score: number;
+  /** Overall projected indicator improvement (0-100) - derived from plan's component stress reductions */
+  overall_indicator_improvement?: number;
+  /** Per-pillar alignment scores */
+  pillar_scores: {
+    pillar_code: string;
+    pillar_name: string;
+    score: number;
+    /** Projected indicator improvement % for this PA (from plan's component projections) */
+    indicator_improvement?: number;
+    budget_alignment_score?: number;
+    weight: number;
+    /** Number of FSFSI components contributing to this PA */
+    components_count?: number;
+    /** List of FSFSI components contributing to this PA */
+    components?: string[];
+    /** Number of PSTA-5 KPIs linked to this PA */
+    kpis_total: number;
+  }[];
+  /** Component stress improvements from the plan */
+  component_alignment: {
+    component: string;
+    baseline_stress: number;
+    projected_stress: number;
+    improvement_pct: number;
+  }[];
+  /** KPIs needing attention (projected improvement < 40%) */
+  kpis_at_risk: {
+    code: string;
+    name: string;
+    pillar_code: string;
+    baseline_value: number;
+    target_value: number;
+    projected_improvement: number;
+  }[];
+  /** Latest fiscal year with data */
+  data_year: number;
+  /** The plan used for budget alignment (if any) */
+  plan_used?: PSTA5PlanReference | null;
+  /** Detailed budget alignment data (final year) */
+  budget_alignment?: PSTA5BudgetAlignment | null;
+  /** Year-by-year alignment trajectory */
+  yearly_alignments?: PSTA5YearlyAlignment[];
+  /** Average alignment score across all plan years */
+  avg_yearly_alignment_score?: number;
+  /** KPI-specific projected improvements (kpi_code -> improvement %) */
+  kpi_improvements?: Record<string, number>;
+}
+
+/** Full PSTA-5 data for the tracker page */
+export interface PSTA5TrackerData {
+  pillars: PSTA5Pillar[];
+  kpis: PSTA5KPI[];
+  component_mappings: PSTA5ComponentMapping[];
+  annual_targets: PSTA5AnnualTarget[];
+  progress: PSTA5Progress[];
+  alignment_summary: PSTA5AlignmentSummary;
+}
