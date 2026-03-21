@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     "apps.fsfvi_data",
     "apps.assessments",
     "apps.optimization",
+    "apps.budget_analysis",
     "apps.analysis",
     "apps.planning",
     "apps.reports",

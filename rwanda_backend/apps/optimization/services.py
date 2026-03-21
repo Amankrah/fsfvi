@@ -180,6 +180,22 @@ class OptimizationService:
         result = self.generate_reallocation_plan(components, target_budget)
         return _stamp_assessment_fsfsi(result, assessment)
 
+    def budget_bundle_for_assessment(
+        self, assessment_id: str, target_budget: float | None = None
+    ) -> tuple[dict, dict]:
+        """Efficiency + reallocation in one Rust call (single optimal allocation solve)."""
+        from apps.assessments.models import AssessmentResult
+
+        assessment = AssessmentResult.objects.get(pk=assessment_id)
+        components = _build_component_inputs_from_assessment(assessment)
+        engine = _get_engine()
+        raw = json.loads(
+            engine.py_budget_analysis_bundle(_components_to_json(components), target_budget)
+        )
+        eff = _stamp_assessment_fsfsi(raw["efficiency"], assessment)
+        rel = _stamp_assessment_fsfsi(raw["reallocation"], assessment)
+        return eff, rel
+
     def roi_for_assessment(self, assessment_id: str) -> dict:
         """Calculate ROI using a saved assessment."""
         from apps.assessments.models import AssessmentResult

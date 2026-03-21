@@ -69,6 +69,13 @@ pub struct ReallocationItem {
     pub projected_impact: String,
 }
 
+/// Single pass: one `prepare_vectors` + one `calculate_optimal_allocation` for both views.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BudgetAnalysisBundle {
+    pub efficiency: EfficiencyAnalysis,
+    pub reallocation: ReallocationPlan,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RoiAnalysis {
     pub components: Vec<ComponentRoi>,
@@ -90,6 +97,112 @@ pub struct ComponentRoi {
 // ---------------------------------------------------------------------------
 // Service Functions
 // ---------------------------------------------------------------------------
+
+/// One optimal solve powers both efficiency and reallocation payloads.
+pub fn budget_analysis_bundle(
+    components: &[ComponentInput],
+    target_budget: Option<f64>,
+) -> FsfiResult<BudgetAnalysisBundle> {
+    let start = Instant::now();
+    let n = components.len();
+    let total_budget = target_budget
+        .unwrap_or_else(|| components.iter().map(|c| c.financial_allocation_lcu).sum());
+
+    let (gaps, allocs_m, sensitivities, weights) = prepare_vectors(components)?;
+
+    let current_fsfsi = calculate_system_fsfsi(&gaps, &allocs_m, &sensitivities, &weights)?;
+    let optimal_allocs =
+        calculate_optimal_allocation(&gaps, &sensitivities, &weights, total_budget / 1_000_000.0)?;
+    let optimal_fsfsi = calculate_system_fsfsi(&gaps, &optimal_allocs, &sensitivities, &weights)?;
+
+    let efficiency_index = if current_fsfsi > 0.0 {
+        (optimal_fsfsi / current_fsfsi).clamp(0.0, 1.0)
+    } else {
+        1.0
+    };
+
+    let mut comp_results = Vec::with_capacity(n);
+    for i in 0..n {
+        let current_stress = calculate_stress(gaps[i], allocs_m[i], sensitivities[i])?;
+        let optimal_stress = calculate_stress(gaps[i], optimal_allocs[i], sensitivities[i])?;
+        let optimal_lcu = optimal_allocs[i] * 1_000_000.0;
+        let current_lcu = components[i].financial_allocation_lcu;
+        let gap_lcu = optimal_lcu - current_lcu;
+
+        comp_results.push(ComponentEfficiency {
+            component_type: components[i].component_type.clone(),
+            current_allocation_lcu: current_lcu,
+            optimal_allocation_lcu: round_to_precision(optimal_lcu, Some(0)),
+            allocation_gap_lcu: round_to_precision(gap_lcu, Some(0)),
+            allocation_gap_pct: round_to_precision(
+                safe_divide(gap_lcu, current_lcu, 0.0) * 100.0,
+                Some(1),
+            ),
+            current_stress: round_to_precision(current_stress, Some(4)),
+            optimal_stress: round_to_precision(optimal_stress, Some(4)),
+            stress_reduction: round_to_precision(current_stress - optimal_stress, Some(4)),
+            is_underfunded: gap_lcu > 0.0,
+        });
+    }
+
+    let improvement = current_fsfsi - optimal_fsfsi;
+    let improvement_pct = safe_divide(improvement, current_fsfsi, 0.0) * 100.0;
+
+    let mut indexed: Vec<(usize, f64)> = (0..components.len())
+        .map(|i| {
+            let change = (optimal_allocs[i] * 1_000_000.0) - components[i].financial_allocation_lcu;
+            (i, change.abs())
+        })
+        .collect();
+    indexed.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+
+    let items: Vec<ReallocationItem> = indexed
+        .iter()
+        .enumerate()
+        .map(|(rank, &(idx, _))| {
+            let current_lcu = components[idx].financial_allocation_lcu;
+            let recommended_lcu = optimal_allocs[idx] * 1_000_000.0;
+            let change = recommended_lcu - current_lcu;
+
+            ReallocationItem {
+                component_type: components[idx].component_type.clone(),
+                current_allocation_lcu: current_lcu,
+                recommended_allocation_lcu: round_to_precision(recommended_lcu, Some(0)),
+                change_lcu: round_to_precision(change, Some(0)),
+                change_pct: round_to_precision(safe_divide(change, current_lcu, 0.0) * 100.0, Some(1)),
+                priority: rank + 1,
+                projected_impact: if change > 0.0 {
+                    "Increase funding to reduce stress".to_string()
+                } else {
+                    "Reallocate surplus to higher-need areas".to_string()
+                },
+            }
+        })
+        .collect();
+
+    let elapsed = start.elapsed().as_millis() as u64;
+
+    Ok(BudgetAnalysisBundle {
+        efficiency: EfficiencyAnalysis {
+            current_fsfsi: round_to_precision(current_fsfsi, Some(4)),
+            optimal_fsfsi: round_to_precision(optimal_fsfsi, Some(4)),
+            efficiency_index: round_to_precision(efficiency_index, Some(4)),
+            waste_ratio: round_to_precision(1.0 - efficiency_index, Some(4)),
+            components: comp_results,
+            total_budget_lcu: total_budget,
+            computing_time_ms: elapsed,
+        },
+        reallocation: ReallocationPlan {
+            components: items,
+            current_fsfsi: round_to_precision(current_fsfsi, Some(4)),
+            projected_fsfsi: round_to_precision(optimal_fsfsi, Some(4)),
+            projected_improvement: round_to_precision(improvement, Some(4)),
+            projected_improvement_pct: round_to_precision(improvement_pct, Some(1)),
+            total_budget_lcu: total_budget,
+            computing_time_ms: elapsed,
+        },
+    })
+}
 
 pub fn analyze_efficiency(components: &[ComponentInput]) -> FsfiResult<EfficiencyAnalysis> {
     let start = Instant::now();
@@ -163,7 +276,6 @@ pub fn generate_reallocation_plan(
     let improvement = current_fsfsi - projected_fsfsi;
     let improvement_pct = safe_divide(improvement, current_fsfsi, 0.0) * 100.0;
 
-    // Sort by absolute change descending for priority
     let mut indexed: Vec<(usize, f64)> = (0..components.len())
         .map(|i| {
             let change = (optimal_allocs[i] * 1_000_000.0) - components[i].financial_allocation_lcu;
@@ -321,6 +433,22 @@ pub fn py_generate_reallocation_plan(
 }
 
 #[pyfunction]
+#[pyo3(signature = (components_json, target_budget=None))]
+pub fn py_budget_analysis_bundle(
+    components_json: &str,
+    target_budget: Option<f64>,
+) -> PyResult<String> {
+    let components: Vec<ComponentInput> = serde_json::from_str(components_json)
+        .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Invalid JSON: {}", e)))?;
+
+    let result = budget_analysis_bundle(&components, target_budget)
+        .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+
+    serde_json::to_string(&result)
+        .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))
+}
+
+#[pyfunction]
 pub fn py_calculate_roi(components_json: &str) -> PyResult<String> {
     let components: Vec<ComponentInput> = serde_json::from_str(components_json)
         .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Invalid JSON: {}", e)))?;
@@ -335,6 +463,7 @@ pub fn py_calculate_roi(components_json: &str) -> PyResult<String> {
 pub fn register_functions(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(py_analyze_efficiency, m)?)?;
     m.add_function(wrap_pyfunction!(py_generate_reallocation_plan, m)?)?;
+    m.add_function(wrap_pyfunction!(py_budget_analysis_bundle, m)?)?;
     m.add_function(wrap_pyfunction!(py_calculate_roi, m)?)?;
     Ok(())
 }
@@ -390,6 +519,21 @@ mod tests {
         let priorities: Vec<usize> = result.components.iter().map(|c| c.priority).collect();
         assert!(priorities.contains(&1));
         assert!(priorities.contains(&4));
+    }
+
+    #[test]
+    fn test_budget_analysis_bundle_matches_separate_calls() {
+        let c = sample();
+        let bundle = budget_analysis_bundle(&c, None).unwrap();
+        let eff = analyze_efficiency(&c).unwrap();
+        let plan = generate_reallocation_plan(&c, None).unwrap();
+        assert_eq!(bundle.efficiency.current_fsfsi, eff.current_fsfsi);
+        assert_eq!(bundle.efficiency.components.len(), eff.components.len());
+        assert_eq!(bundle.reallocation.projected_fsfsi, plan.projected_fsfsi);
+        assert_eq!(
+            bundle.efficiency.computing_time_ms,
+            bundle.reallocation.computing_time_ms
+        );
     }
 
     #[test]

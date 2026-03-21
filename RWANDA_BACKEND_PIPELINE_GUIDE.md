@@ -296,6 +296,28 @@ Policymakers can choose from 5 weighting methods via the UI:
 The assessment also computes **cumulative FSFSI** (asymmetric EMA accounting for
 damage persistence). See the [Cumulative Stress Technical Note](CUMULATIVE_STRESS_TECHNICAL_NOTE.md).
 
+### Step 7 (optional): Budget history analysis (financial view)
+
+After **Step 1** (`import_budget_mapping`) has populated `IndicatorData`, you can **summarise
+multi-year mapped spending** (totals, YoY volatility, CAGR, concentration, composition drift,
+indicator movers, mapping quality) — independent of FSFSI assessments and Rust optimization.
+
+```bash
+python manage.py run_budget_analysis
+python manage.py run_budget_analysis --start-year 2018 --end-year 2024 --json
+```
+
+**Flags:**
+- `--start-year` / `--end-year` — optional bounds (defaults: min/max fiscal years in `IndicatorData`)
+- `--json` — print the full API-shaped payload (same shape as `GET /api/budget-analysis/history/`)
+
+**API (authenticated):**
+- `GET /api/budget-analysis/history/?start_year=&end_year=&top_movers=` — multi-year financial analysis
+- `GET /api/budget-analysis/snapshot/?fiscal_year=` — single-year indicator + component breakdown
+
+**Allocation efficiency and reallocation** remain on **Optimization** (`/api/optimization/.../`)
+and **Planning**; they are not part of budget analysis.
+
 ---
 
 ## 5. Start the Server
@@ -316,10 +338,14 @@ Key endpoints:
 - `GET /api/assessments/persistence-config/` — cumulative stress parameters
 - `PUT /api/assessments/persistence-config/` — update parameters & recalculate
 
-**Optimization (assessment-based):**
-- `GET /api/assessments/optimization/<assessment_id>/efficiency/` — allocation efficiency
-- `GET /api/assessments/optimization/<assessment_id>/reallocation/` — reallocation plan
-- `GET /api/assessments/optimization/<assessment_id>/roi/` — ROI analysis
+**Optimization (assessment-based, Rust closed-form optimum):**
+- `GET /api/optimization/<assessment_id>/efficiency/` — allocation efficiency
+- `GET /api/optimization/<assessment_id>/reallocation/` — reallocation plan
+- `GET /api/optimization/<assessment_id>/roi/` — ROI analysis
+
+**Budget analysis (mapped spending history — `IndicatorData` only):**
+- `GET /api/budget-analysis/history/?start_year=&end_year=&top_movers=` — trends, composition, movers, insights
+- `GET /api/budget-analysis/snapshot/?fiscal_year=` — one-year breakdown by indicator and component
 
 **Planning (assessment-based):**
 - `GET /api/planning/<assessment_id>/multi-year/` — multi-year plan (accepts `weighting_method`, `scenario`, `target_curve`)
@@ -328,7 +354,8 @@ Key endpoints:
 - `GET /api/planning/saved-plans/?fiscal_year=2024` — list saved plans for that year (summary rows, no embedded `plan_json`)
 - `GET /api/planning/saved-plans/<plan_id>/` — full saved plan including `plan_json`
 - `POST /api/planning/saved-plans/<plan_id>/activate/` — mark a plan active for its fiscal year (National Overview)
-- `DELETE /api/planning/saved-plans/<plan_id>/` — deactivate (plan kept for history)
+- `DELETE /api/planning/saved-plans/<plan_id>/` — permanently delete saved plan
+- `PATCH /api/planning/saved-plans/<plan_id>/` — update name and/or parameters (regenerates stored plan when parameters change)
 - `GET /api/planning/active-plan/?fiscal_year=2024` — active plan excerpt for dashboard
 
 **Auth:**
