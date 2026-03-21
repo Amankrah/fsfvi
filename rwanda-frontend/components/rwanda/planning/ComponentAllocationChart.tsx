@@ -12,7 +12,7 @@ import {
   Legend,
 } from 'recharts';
 import type { YearlyPlanOutput } from '@/lib/types/planning';
-import { formatRWFCompact } from '@/lib/utils/formatters';
+import { formatPlanPeriodLabel } from '@/lib/utils/planningLabels';
 import { COMPONENT_DISPLAY_NAMES } from '@/lib/types/assessment';
 import type { IndicatorComponent } from '@/lib/types/assessment';
 
@@ -47,7 +47,7 @@ export function ComponentAllocationChart({
     const data = yearlyPlans.map((p) => {
       const allocs = p.recommended_allocations || {};
       const total = sortedKeys.reduce((s, k) => s + (allocs[k] ?? 0), 0) || 1;
-      const row: Record<string, number | string> = { year: `Year ${p.year}` };
+      const row: Record<string, number | string> = { year: formatPlanPeriodLabel(p) };
       sortedKeys.forEach((k) => {
         row[k] = total > 0 ? (allocs[k] ?? 0) / total : 0;
       });

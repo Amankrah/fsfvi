@@ -308,12 +308,12 @@ python manage.py run_budget_analysis --start-year 2018 --end-year 2024 --json
 ```
 
 **Flags:**
-- `--start-year` / `--end-year` — optional bounds (defaults: min/max fiscal years in `IndicatorData`)
+- `--start-year` / `--end-year` — optional bounds (defaults: min/max fiscal years in `IndicatorData` with **FY ≥ 2018**, consistent with assessments and the dashboard)
 - `--json` — print the full API-shaped payload (same shape as `GET /api/budget-analysis/history/`)
 
 **API (authenticated):**
-- `GET /api/budget-analysis/history/?start_year=&end_year=&top_movers=` — multi-year financial analysis
-- `GET /api/budget-analysis/snapshot/?fiscal_year=` — single-year indicator + component breakdown
+- `GET /api/budget-analysis/history/?start_year=&end_year=&top_movers=` — multi-year financial analysis (only FY **≥ 2018**)
+- `GET /api/budget-analysis/snapshot/?fiscal_year=` — single-year indicator + component breakdown (FY **≥ 2018** only)
 
 **Allocation efficiency and reallocation** remain on **Optimization** (`/api/optimization/.../`)
 and **Planning**; they are not part of budget analysis.

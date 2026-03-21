@@ -4,3 +4,4 @@ export { PlanningBudgetChart } from './PlanningBudgetChart';
 export { ComponentAllocationChart } from './ComponentAllocationChart';
 export { PlanningInsightsCards } from './PlanningInsightsCards';
 export { MtefSummaryCards } from './MtefSummaryCards';
+export { PlanningBudgetAlignmentCard } from './PlanningBudgetAlignmentCard';

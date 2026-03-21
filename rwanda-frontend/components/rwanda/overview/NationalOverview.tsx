@@ -5,17 +5,19 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useFiscalYear } from '@/contexts/FiscalYearContext';
 import { FiscalYearSelector } from '@/components/rwanda/shared/FiscalYearSelector';
 import { getCurrentSeason } from '@/lib/constants/rwanda';
-import { getRiskBgColor, getRiskBarColor, formatRWFCompact, formatScore } from '@/lib/utils/formatters';
+import { formatRWFCompact, formatScore, getRiskBgColor } from '@/lib/utils/formatters';
 import { assessmentAPI } from '@/lib/api/assessmentApi';
-import type { DashboardSummary, ComponentSummary, AssessmentHistory } from '@/lib/types/assessment';
+import type { DashboardSummary, AssessmentHistory } from '@/lib/types/assessment';
+import type { SavedStrategicPlanFull, PlanYearActualSummary } from '@/lib/types/planning';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { PlanVsActualCard } from './PlanVsActualCard';
+import { BudgetTrendCard } from './BudgetTrendCard';
 import { FSFSITrendChart, ComponentStressTrend, StressHeatmap } from '@/components/rwanda/charts';
 import {
   TrendingUp,
   TrendingDown,
   AlertTriangle,
   DollarSign,
-  Activity,
   BarChart3,
   LineChart,
   Loader2,
@@ -31,7 +33,9 @@ export function NationalOverview() {
 
   const [dashboardData, setDashboardData] = useState<DashboardSummary | null>(null);
   const [historyData, setHistoryData] = useState<AssessmentHistory[]>([]);
-  const [activePlan, setActivePlan] = useState<{ plan_name: string; baseline_fsfsi: number; final_projected_fsfsi: number | null; target_reduction_pct: number; planning_years: number; total_additional_investment: number | null } | null>(null);
+  const [activePlan, setActivePlan] = useState<{ id: string; plan_name: string; baseline_fsfsi: number; final_projected_fsfsi: number | null; target_reduction_pct: number; planning_years: number; total_additional_investment: number | null } | null>(null);
+  const [fullPlan, setFullPlan] = useState<SavedStrategicPlanFull | null>(null);
+  const [planActuals, setPlanActuals] = useState<PlanYearActualSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [trendView, setTrendView] = useState<TrendView>('fsfsi');
@@ -49,14 +53,26 @@ export function NationalOverview() {
         setDashboardData(dashboard);
         setHistoryData(history);
 
-        // Fetch active strategic plan (non-blocking)
+        // Fetch active strategic plan and actuals (non-blocking)
         try {
           const { planningAPI } = await import('@/lib/api/planningApi');
           const plan = await planningAPI.getActivePlan(fiscalYear.start_year);
           setActivePlan(plan);
+
+          // If we have an active plan, fetch full plan data and actuals
+          if (plan?.id) {
+            const [fullPlanData, actualsData] = await Promise.all([
+              planningAPI.getSavedPlan(plan.id),
+              planningAPI.listPlanActuals(plan.id),
+            ]);
+            setFullPlan(fullPlanData);
+            setPlanActuals(actualsData);
+          }
         } catch {
           // No plan saved — that's fine
           setActivePlan(null);
+          setFullPlan(null);
+          setPlanActuals([]);
         }
       } catch (err) {
         console.error('Failed to fetch dashboard:', err);
@@ -270,39 +286,8 @@ export function NationalOverview() {
         </Card>
       )}
 
-      {/* Component Breakdown */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <BarChart3 className="h-5 w-5 text-[var(--rw-blue)]" />
-            <span>{t('overview.component_breakdown')}</span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {dashboardData.components.map((component) => (
-              <ComponentCard key={component.component} component={component} />
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Efficiency Index */}
-      <Card className="border-[var(--rw-blue)]/30 bg-[var(--rw-blue)]/5">
-        <CardContent className="p-5">
-          <div className="flex items-start space-x-3">
-            <Activity className="h-6 w-6 text-[var(--rw-blue)] mt-0.5 flex-shrink-0" />
-            <div>
-              <p className="text-sm font-medium text-gray-900">
-                Efficiency Index: {formatScore(dashboardData.efficiency_index)}
-              </p>
-              <p className="text-xs text-gray-600 mt-1">
-                Measures how effectively budget allocations reduce food system stress.
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Budget Trend - National mapped total */}
+      <BudgetTrendCard />
 
       {/* Strategic Plan Excerpt */}
       {activePlan && (
@@ -344,49 +329,11 @@ export function NationalOverview() {
           </CardContent>
         </Card>
       )}
-    </div>
-  );
-}
 
-function ComponentCard({ component }: { component: ComponentSummary }) {
-  // Use cumulative stress as the primary display value
-  const displayStress = component.cumulative_stress ?? component.stress;
-  const classifyLevel = (score: number): StressLevel => {
-    if (score <= 0.05) return 'low';
-    if (score <= 0.15) return 'medium';
-    if (score <= 0.30) return 'high';
-    return 'critical';
-  };
-  const level = classifyLevel(displayStress);
-
-  return (
-    <div className="bg-gray-50 rounded-lg p-4 border border-gray-200 hover:shadow-md hover:border-[var(--rw-blue)]/30 transition-all">
-      <div className="flex items-center justify-between mb-2">
-        <h3 className="text-sm font-semibold text-gray-900 truncate">
-          {component.component_display}
-        </h3>
-        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${getRiskBgColor(level)}`}>
-          {formatScore(displayStress)}
-        </span>
-      </div>
-      <p className="text-xs text-gray-500">
-        {component.indicator_count} indicators · {component.budget_share_percent.toFixed(1)}% budget
-      </p>
-      {component.cumulative_stress != null && Math.abs(component.cumulative_stress - component.stress) > 0.01 && (
-        <p className="text-xs text-gray-400 mt-0.5">
-          This year: {formatScore(component.stress)}
-        </p>
+      {/* Plan vs Actual Tracking */}
+      {fullPlan && (
+        <PlanVsActualCard plan={fullPlan} actuals={planActuals} />
       )}
-      {/* Stress bar — shows cumulative */}
-      <div className="mt-2 h-2 bg-gray-200 rounded-full overflow-hidden">
-        <div
-          className="h-full rounded-full transition-all"
-          style={{
-            width: `${Math.min(displayStress * 100, 100)}%`,
-            backgroundColor: getRiskBarColor(level),
-          }}
-        />
-      </div>
     </div>
   );
 }

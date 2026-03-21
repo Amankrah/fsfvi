@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { useAlerts } from '@/contexts/AlertContext';
 import { LanguageToggle } from '@/components/rwanda/shared/LanguageToggle';
 import { RwandaLogo } from '@/components/rwanda/shared/RwandaLogo';
 import { Button } from '@/components/ui/button';
@@ -14,38 +13,33 @@ import {
   X,
   LayoutDashboard,
   FileCheck,
-  BarChart3,
   DollarSign,
-  Map,
-  Building2,
   Target,
   Sun,
   FileText,
-  Bell,
   Database,
   User,
   Shield,
+  Sparkles,
+  CalendarRange,
 } from 'lucide-react';
 
 export function RwandaTopBar() {
   const { user, logout } = useAuth(true);
   const { t } = useLanguage();
-  const { unreadCount } = useAlerts();
   const router = useRouter();
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const mobileNavItems = [
     { label: t('nav.overview'), icon: LayoutDashboard, href: '/dashboard' },
-    { label: t('nav.assessment'), icon: FileCheck, href: '/dashboard/assessment' },
-    { label: t('nav.performance'), icon: BarChart3, href: '/dashboard/performance' },
     { label: t('nav.budget'), icon: DollarSign, href: '/dashboard/budget' },
-    { label: t('nav.provinces'), icon: Map, href: '/dashboard/provinces' },
-    { label: t('nav.districts'), icon: Building2, href: '/dashboard/districts' },
+    { label: t('nav.assessment'), icon: FileCheck, href: '/dashboard/assessment' },
+    { label: t('nav.optimization'), icon: Sparkles, href: '/dashboard/optimization' },
+    { label: t('nav.planning'), icon: CalendarRange, href: '/dashboard/planning' },
     { label: t('nav.psta5'), icon: Target, href: '/dashboard/psta5' },
     { label: t('nav.seasonal'), icon: Sun, href: '/dashboard/seasonal' },
     { label: t('nav.reports'), icon: FileText, href: '/dashboard/reports' },
-    { label: t('nav.alerts'), icon: Bell, href: '/dashboard/alerts' },
     { label: t('nav.data_entry'), icon: Database, href: '/dashboard/data-entry' },
     { label: t('nav.profile'), icon: User, href: '/profile' },
     { label: t('nav.security'), icon: Shield, href: '/security' },
@@ -79,18 +73,6 @@ export function RwandaTopBar() {
           {/* Right: Language + User + Logout */}
           <div className="flex items-center space-x-3">
             <LanguageToggle />
-
-            {unreadCount > 0 && (
-              <button
-                onClick={() => router.push('/dashboard/alerts')}
-                className="relative p-2 text-gray-300 hover:text-white"
-              >
-                <Bell className="h-5 w-5" />
-                <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
-                  {unreadCount}
-                </span>
-              </button>
-            )}
 
             <div className="hidden md:block text-right">
               <p className="text-sm font-medium text-white">{user?.username}</p>

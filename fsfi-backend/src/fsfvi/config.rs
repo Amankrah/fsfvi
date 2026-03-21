@@ -360,42 +360,42 @@ pub struct FsfviConfig {
 impl Default for FsfviConfig {
     fn default() -> Self {
         let mut risk_thresholds = HashMap::new();
-        risk_thresholds.insert("low".to_string(), 0.050);
-        risk_thresholds.insert("medium".to_string(), 0.150);
-        risk_thresholds.insert("high".to_string(), 0.300);
-        risk_thresholds.insert("critical".to_string(), 0.500);
+        risk_thresholds.insert("low".to_string(), 0.0500);
+        risk_thresholds.insert("medium".to_string(), 0.1500);
+        risk_thresholds.insert("high".to_string(), 0.3000);
+        risk_thresholds.insert("critical".to_string(), 0.5000);
 
         let mut alternative_thresholds = HashMap::new();
 
         let mut original = HashMap::new();
-        original.insert("low".to_string(), 0.15);
-        original.insert("medium".to_string(), 0.30);
-        original.insert("high".to_string(), 0.50);
-        original.insert("critical".to_string(), 0.70);
+        original.insert("low".to_string(), 0.1500);
+        original.insert("medium".to_string(), 0.3000);
+        original.insert("high".to_string(), 0.5000);
+        original.insert("critical".to_string(), 0.7000);
         alternative_thresholds.insert("original".to_string(), original);
 
 
         let mut fine_grained = HashMap::new();
-        fine_grained.insert("low".to_string(), 0.010);
-        fine_grained.insert("medium".to_string(), 0.025);
-        fine_grained.insert("high".to_string(), 0.075);
-        fine_grained.insert("critical".to_string(), 0.200);
+        fine_grained.insert("low".to_string(), 0.0100);
+        fine_grained.insert("medium".to_string(), 0.0250);
+        fine_grained.insert("high".to_string(), 0.0750);
+        fine_grained.insert("critical".to_string(), 0.2000);
         alternative_thresholds.insert("fine_grained".to_string(), fine_grained);
 
 
         let mut logarithmic = HashMap::new();
-        logarithmic.insert("low".to_string(), 0.005);
-        logarithmic.insert("medium".to_string(), 0.025);
-        logarithmic.insert("high".to_string(), 0.100);
-        logarithmic.insert("critical".to_string(), 0.400);
+        logarithmic.insert("low".to_string(), 0.0050);
+        logarithmic.insert("medium".to_string(), 0.0250);
+        logarithmic.insert("high".to_string(), 0.1000);
+        logarithmic.insert("critical".to_string(), 0.4000);
         alternative_thresholds.insert("logarithmic".to_string(), logarithmic);
 
 
         let mut crisis_mode = HashMap::new();
-        crisis_mode.insert("low".to_string(), 0.100);
-        crisis_mode.insert("medium".to_string(), 0.250);
-        crisis_mode.insert("high".to_string(), 0.500);
-        crisis_mode.insert("critical".to_string(), 0.750);
+        crisis_mode.insert("low".to_string(), 0.1000);
+        crisis_mode.insert("medium".to_string(), 0.2500);
+        crisis_mode.insert("high".to_string(), 0.5000);
+        crisis_mode.insert("critical".to_string(), 0.7500);
         alternative_thresholds.insert("crisis_mode".to_string(), crisis_mode);
 
         Self {

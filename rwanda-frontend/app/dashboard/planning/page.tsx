@@ -21,6 +21,7 @@ import {
   PlanningInsightsCards,
   MtefSummaryCards,
   PlanTrajectoryCompareChart,
+  PlanningBudgetAlignmentCard,
 } from '@/components/rwanda/planning';
 import { PersistenceConfigPanel } from '@/components/rwanda/planning/PersistenceConfigPanel';
 import { ComponentTrajectoryTable } from '@/components/rwanda/planning/ComponentTrajectoryTable';
@@ -66,13 +67,23 @@ function toPlanningInput(assessment: SavedAssessment): PlanningComponentInput[] 
 function normalizeSavedPlanJson(raw: MultiYearStrategicPlan): MultiYearStrategicPlan {
   return {
     ...raw,
+    planning_weighting_method:
+      raw.planning_weighting_method != null ? String(raw.planning_weighting_method) : undefined,
+    planning_scenario: raw.planning_scenario != null ? String(raw.planning_scenario) : undefined,
     baseline_fsfvi: Number(raw.baseline_fsfvi),
     target_fsfvi: Number(raw.target_fsfvi),
     planning_years: Number(raw.planning_years),
     total_additional_investment_needed: Number(raw.total_additional_investment_needed),
+    planning_start_fiscal_year:
+      raw.planning_start_fiscal_year != null ? Number(raw.planning_start_fiscal_year) : undefined,
+    baseline_assessment_fiscal_year:
+      raw.baseline_assessment_fiscal_year != null
+        ? Number(raw.baseline_assessment_fiscal_year)
+        : undefined,
     yearly_plans: (raw.yearly_plans ?? []).map((p) => ({
       ...p,
       year: Number(p.year),
+      fiscal_year: p.fiscal_year != null ? Number(p.fiscal_year) : undefined,
       target_fsfvi: Number(p.target_fsfvi),
       projected_fsfvi: Number(p.projected_fsfvi),
       fsfvi_reduction_from_previous: Number(p.fsfvi_reduction_from_previous),
@@ -115,6 +126,8 @@ export default function PlanningPage() {
   const [deletingPlanId, setDeletingPlanId] = useState<string | null>(null);
   /** When set, saved plan was generated from this assessment id (may differ from current). */
   const [loadedFromAssessmentId, setLoadedFromAssessmentId] = useState<string | null>(null);
+  /** FY label for multi-year plan row 1 (Year 1); defaults to assessment FY + 1 when unset. */
+  const [planningStartFiscalYear, setPlanningStartFiscalYear] = useState(2025);
 
   const formatWeightingMethodLabel = useCallback(
     (code?: string | null) => {
@@ -190,7 +203,11 @@ export default function PlanningPage() {
           setError(t('planning.saved_invalid_json'));
           return;
         }
-        setMultiYearPlan(normalizeSavedPlanJson(pj as MultiYearStrategicPlan));
+        const normalized = normalizeSavedPlanJson(pj as MultiYearStrategicPlan);
+        setMultiYearPlan(normalized);
+        setPlanningStartFiscalYear(
+          normalized.planning_start_fiscal_year ?? full.fiscal_year + 1,
+        );
         setPlanningYears(full.planning_years);
         setTargetReductionPct(Number(full.target_reduction_pct));
         setMtefGrowthRate(Number(full.yearly_budget_growth_rate));
@@ -314,6 +331,7 @@ export default function PlanningPage() {
           targetCurve,
           weightingMethod,
           scenario,
+          planningStartFiscalYear,
         ),
         planningAPI.mtefForAssessment(
           assessment.id,
@@ -337,7 +355,17 @@ export default function PlanningPage() {
     } finally {
       setGenerating(false);
     }
-  }, [assessment, planningYears, targetFsfvi, mtefImprovementPercent, mtefGrowthRate, targetCurve, weightingMethod, scenario]);
+  }, [
+    assessment,
+    planningYears,
+    targetFsfvi,
+    mtefImprovementPercent,
+    mtefGrowthRate,
+    targetCurve,
+    weightingMethod,
+    scenario,
+    planningStartFiscalYear,
+  ]);
 
   useEffect(() => {
     fetchAssessment();
@@ -653,7 +681,7 @@ export default function PlanningPage() {
               {/* Two-row parameter layout */}
               <div className="space-y-4">
                 {/* Row 1: Strategic targets */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
                     <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
                       Planning Horizon
@@ -670,6 +698,25 @@ export default function PlanningPage() {
                       <option value={7}>7 years — NST-2 aligned</option>
                       <option value={10}>10 years — Vision 2035</option>
                     </select>
+                  </div>
+                  <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                      {t('planning.horizon_start_fy')}
+                    </label>
+                    <input
+                      type="number"
+                      min={1990}
+                      max={2100}
+                      step={1}
+                      value={planningStartFiscalYear}
+                      onChange={(e) =>
+                        setPlanningStartFiscalYear(Number(e.target.value) || assessment.fiscal_year + 1)
+                      }
+                      className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm font-mono"
+                      aria-label={t('planning.horizon_start_fy')}
+                      title={t('planning.horizon_start_fy_hint')}
+                    />
+                    <p className="text-xs text-gray-500 mt-1.5">{t('planning.horizon_start_fy_hint')}</p>
                   </div>
                   <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
                     <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
@@ -919,6 +966,16 @@ export default function PlanningPage() {
                     }
                   />
 
+                  <PlanningBudgetAlignmentCard
+                    assessmentId={assessment.id}
+                    weightingMethod={weightingMethod}
+                    scenario={scenario}
+                    yearlyPlans={multiYearPlan.yearly_plans}
+                    planWeightingMethod={multiYearPlan.planning_weighting_method}
+                    planScenario={multiYearPlan.planning_scenario}
+                    planId={loadedPlanId ?? undefined}
+                  />
+
                   <Card>
                     <CardHeader>
                       <CardTitle>{t('planning.insights_title')}</CardTitle>
@@ -1022,6 +1079,7 @@ export default function PlanningPage() {
                             target_curve: targetCurve,
                             weighting_method: weightingMethod,
                             scenario,
+                            planning_start_fiscal_year: planningStartFiscalYear,
                           };
                           if (loadedPlanId) {
                             const updated = await planningAPI.updateSavedPlan(loadedPlanId, payload);

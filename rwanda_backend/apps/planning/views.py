@@ -24,12 +24,16 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import SavedStrategicPlan
+from .models import PlanYearActual, SavedStrategicPlan
 from .serializers import (
+    AllocationSimulateSerializer,
+    PlanYearActualSerializer,
+    PlanYearActualSummarySerializer,
     SavedPlanExcerptSerializer,
     SavedPlanSerializer,
     SavedPlanSummarySerializer,
     SavePlanRequestSerializer,
+    SaveYearActualRequestSerializer,
     UpdateSavedPlanSerializer,
 )
 from .utils import plan_name_exists
@@ -38,6 +42,7 @@ from .services import (
     generate_multi_year_plan,
     mtef_for_assessment,
     plan_for_assessment,
+    simulate_user_allocation_year,
 )
 
 logger = logging.getLogger(__name__)
@@ -68,6 +73,16 @@ class AssessmentMultiYearPlanView(APIView):
         target_curve = request.query_params.get("target_curve", "smoothstep")
         weighting_method = request.query_params.get("weighting_method", "hybrid")
         scenario = request.query_params.get("scenario", "normal_operations")
+        psy = request.query_params.get("planning_start_fiscal_year")
+        planning_start_fiscal_year = None
+        if psy not in (None, ""):
+            try:
+                planning_start_fiscal_year = int(psy)
+            except ValueError:
+                return Response(
+                    {"error": "planning_start_fiscal_year must be an integer"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
         try:
             result = plan_for_assessment(
@@ -78,6 +93,7 @@ class AssessmentMultiYearPlanView(APIView):
                 yearly_target_curve=target_curve,
                 weighting_method=weighting_method,
                 scenario=scenario,
+                planning_start_fiscal_year=planning_start_fiscal_year,
             )
             return Response(result)
         except Exception as e:
@@ -92,6 +108,56 @@ class AssessmentMultiYearPlanView(APIView):
                 {"error": str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+
+
+class AssessmentAllocationSimulateView(APIView):
+    """
+    POST /api/planning/<assessment_id>/simulate-allocation/
+
+    Counterfactual cumulative FSFSI / component stress for a user-specified national
+    total (bn LCU) and component mix (%), using the same stress dynamics as planning.
+    Optional plan_reference compares to the optimal plan row for that horizon year.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, assessment_id):
+        ser = AllocationSimulateSerializer(data=request.data)
+        if not ser.is_valid():
+            return Response(ser.errors, status=status.HTTP_400_BAD_REQUEST)
+        data = ser.validated_data
+        plan_ref = data.get("plan_reference")
+        plan_ref_dict = dict(plan_ref) if plan_ref else None
+        try:
+            result = simulate_user_allocation_year(
+                str(assessment_id),
+                data["plan_year"],
+                data["total_budget_bn"],
+                dict(data["component_shares_pct"]),
+                weighting_method=data.get("weighting_method") or "hybrid",
+                scenario=data.get("scenario") or "normal_operations",
+                prior_system_cumulative=data.get("prior_system_cumulative"),
+                prior_component_cumulative=dict(data["prior_component_cumulative"])
+                if data.get("prior_component_cumulative")
+                else None,
+                plan_reference=plan_ref_dict,
+            )
+        except Exception as e:
+            error_name = type(e).__name__
+            if "DoesNotExist" in error_name:
+                return Response(
+                    {"error": f"Assessment {assessment_id} not found"},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+            logger.exception("Allocation simulation failed")
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        if isinstance(result, dict) and result.get("error"):
+            return Response(result, status=status.HTTP_400_BAD_REQUEST)
+        return Response(result)
 
 
 class AssessmentMtefView(APIView):
@@ -244,6 +310,8 @@ class SaveStrategicPlanView(APIView):
 
         wm = data.get("weighting_method") or "hybrid"
         sc = data.get("scenario") or "normal_operations"
+        psy = data.get("planning_start_fiscal_year")
+        planning_start_fiscal_year = int(psy) if psy is not None else None
         pname = data["plan_name"]
         if plan_name_exists(assessment.fiscal_year, pname):
             return Response(
@@ -263,6 +331,7 @@ class SaveStrategicPlanView(APIView):
                 yearly_target_curve=data["target_curve"],
                 weighting_method=wm,
                 scenario=sc,
+                planning_start_fiscal_year=planning_start_fiscal_year,
             )
         except Exception as e:
             logger.exception("Plan generation failed during save")
@@ -424,6 +493,16 @@ class SavedPlanDetailView(APIView):
             curve = data.get("target_curve", plan.target_curve)
             wm = data.get("weighting_method", plan.weighting_method)
             sc = data.get("scenario", plan.scenario)
+            prev_start = None
+            if isinstance(plan.plan_json, dict):
+                prev_start = plan.plan_json.get("planning_start_fiscal_year")
+            psy = data.get("planning_start_fiscal_year")
+            if psy is not None:
+                start_for_regen = int(psy)
+            elif prev_start is not None:
+                start_for_regen = int(prev_start)
+            else:
+                start_for_regen = None
             try:
                 plan_result = plan_for_assessment(
                     str(plan.assessment.pk),
@@ -433,6 +512,7 @@ class SavedPlanDetailView(APIView):
                     yearly_target_curve=curve,
                     weighting_method=wm,
                     scenario=sc,
+                    planning_start_fiscal_year=start_for_regen,
                 )
             except Exception as e:
                 logger.exception("Plan regeneration failed during update")
@@ -458,6 +538,22 @@ class SavedPlanDetailView(APIView):
                 Decimal(str(total_investment)) if total_investment else None
             )
             plan.plan_json = plan_result
+
+        elif "planning_start_fiscal_year" in data:
+            import copy
+
+            if not isinstance(plan.plan_json, dict):
+                return Response(
+                    {"error": "Cannot update horizon labels: plan has no stored JSON."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            pj = copy.deepcopy(plan.plan_json)
+            start = int(data["planning_start_fiscal_year"])
+            pj["planning_start_fiscal_year"] = start
+            for yp in pj.get("yearly_plans", []) or []:
+                yn = int(yp.get("year", 1))
+                yp["fiscal_year"] = start + (yn - 1)
+            plan.plan_json = pj
 
         try:
             plan.save()
@@ -504,3 +600,170 @@ class ActivePlanExcerptView(APIView):
         if not plan:
             return Response(status=status.HTTP_204_NO_CONTENT)
         return Response(SavedPlanExcerptSerializer(plan).data)
+
+
+# =============================================================================
+# PLAN YEAR ACTUALS — Record actual budget allocations per year
+# =============================================================================
+
+
+class PlanYearActualsView(APIView):
+    """
+    Manage actual allocations for a specific saved plan.
+
+    GET  /api/planning/saved-plans/<plan_id>/actuals/       — list all actuals for plan
+    POST /api/planning/saved-plans/<plan_id>/actuals/       — save/update actual for a year
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, plan_id):
+        try:
+            plan = SavedStrategicPlan.objects.get(pk=plan_id)
+        except SavedStrategicPlan.DoesNotExist:
+            return Response({"error": "Plan not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        actuals = plan.year_actuals.all()
+        return Response(PlanYearActualSummarySerializer(actuals, many=True).data)
+
+    def post(self, request, plan_id):
+        try:
+            plan = SavedStrategicPlan.objects.get(pk=plan_id)
+        except SavedStrategicPlan.DoesNotExist:
+            return Response({"error": "Plan not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = SaveYearActualRequestSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        data = serializer.validated_data
+        plan_year = data["plan_year"]
+        fiscal_year = data["fiscal_year"]
+
+        # If simulation results not provided, compute them
+        simulated_fsfsi = data.get("simulated_cumulative_fsfsi")
+        simulated_comp = data.get("simulated_component_stress", {})
+        delta_vs_plan = data.get("delta_vs_plan_fsfsi")
+
+        if simulated_fsfsi is None:
+            # Compute simulation based on actual allocation
+            comp_allocs = data["component_allocations_bn"]
+            total_bn = data["total_budget_bn"]
+
+            # Convert bn allocations to percentage shares
+            if total_bn > 0:
+                shares_pct = {k: (v / total_bn) * 100 for k, v in comp_allocs.items()}
+            else:
+                shares_pct = {k: 0 for k in comp_allocs}
+
+            # Get plan reference from plan_json
+            yearly_plans = plan.plan_json.get("yearly_plans", [])
+            yp = next((y for y in yearly_plans if y.get("year") == plan_year), None)
+
+            if yp:
+                # Get prior year data if plan_year > 1
+                prior_sys = None
+                prior_comp = None
+                if plan_year > 1:
+                    prev_yp = next(
+                        (y for y in yearly_plans if y.get("year") == plan_year - 1),
+                        None,
+                    )
+                    if prev_yp:
+                        # Check if we have actual for previous year, use that instead
+                        prev_actual = plan.year_actuals.filter(plan_year=plan_year - 1).first()
+                        if prev_actual and prev_actual.simulated_cumulative_fsfsi:
+                            prior_sys = float(prev_actual.simulated_cumulative_fsfsi)
+                            prior_comp = prev_actual.simulated_component_stress or {}
+                        else:
+                            prior_sys = float(prev_yp.get("projected_fsfvi", 0))
+                            prior_comp = {
+                                k: v.get("cumulative_stress", 0)
+                                for k, v in (prev_yp.get("component_projections") or {}).items()
+                            }
+
+                plan_ref = {
+                    "projected_cumulative_fsfsi": float(yp.get("projected_fsfvi", 0)),
+                    "year_target_fsfvi": float(yp.get("year_target") or yp.get("target_fsfvi", 0)),
+                    "recommended_allocations": yp.get("recommended_allocations", {}),
+                    "plan_total_budget_bn": float(yp.get("total_budget", 0)) / 1e9,
+                    "planning_weighting_method": plan.weighting_method,
+                    "planning_scenario": plan.scenario,
+                    "component_projections": yp.get("component_projections", {}),
+                }
+
+                try:
+                    sim_result = simulate_user_allocation_year(
+                        str(plan.assessment_id),
+                        plan_year,
+                        total_bn,
+                        shares_pct,
+                        weighting_method=plan.weighting_method,
+                        scenario=plan.scenario,
+                        prior_system_cumulative=prior_sys,
+                        prior_component_cumulative=prior_comp,
+                        plan_reference=plan_ref,
+                    )
+
+                    if not isinstance(sim_result, dict) or "error" not in sim_result:
+                        simulated_fsfsi = sim_result.get("user_projected_cumulative_fsfsi")
+                        simulated_comp = sim_result.get("user_component_cumulative_stress", {})
+                        delta_vs_plan = sim_result.get("delta_user_minus_plan_fsfsi")
+                except Exception as e:
+                    logger.warning("Could not simulate allocation for actual: %s", e)
+
+        # Create or update the actual record
+        actual, created = PlanYearActual.objects.update_or_create(
+            plan=plan,
+            plan_year=plan_year,
+            defaults={
+                "fiscal_year": fiscal_year,
+                "total_budget_bn": Decimal(str(data["total_budget_bn"])),
+                "component_allocations_bn": data["component_allocations_bn"],
+                "simulated_cumulative_fsfsi": (
+                    Decimal(str(simulated_fsfsi)) if simulated_fsfsi is not None else None
+                ),
+                "simulated_component_stress": simulated_comp,
+                "delta_vs_plan_fsfsi": (
+                    Decimal(str(delta_vs_plan)) if delta_vs_plan is not None else None
+                ),
+                "created_by": request.user if hasattr(request.user, "pk") else None,
+            },
+        )
+
+        return Response(
+            PlanYearActualSerializer(actual).data,
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+        )
+
+
+class PlanYearActualDetailView(APIView):
+    """
+    GET/DELETE a specific year actual.
+
+    GET    /api/planning/saved-plans/<plan_id>/actuals/<plan_year>/
+    DELETE /api/planning/saved-plans/<plan_id>/actuals/<plan_year>/
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, plan_id, plan_year):
+        try:
+            actual = PlanYearActual.objects.get(plan_id=plan_id, plan_year=plan_year)
+        except PlanYearActual.DoesNotExist:
+            return Response(
+                {"error": "Actual not found for this plan year"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        return Response(PlanYearActualSerializer(actual).data)
+
+    def delete(self, request, plan_id, plan_year):
+        try:
+            actual = PlanYearActual.objects.get(plan_id=plan_id, plan_year=plan_year)
+        except PlanYearActual.DoesNotExist:
+            return Response(
+                {"error": "Actual not found for this plan year"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        actual.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)

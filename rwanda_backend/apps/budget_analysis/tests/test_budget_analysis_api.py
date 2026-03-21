@@ -91,3 +91,33 @@ class BudgetAnalysisFinancialApiTests(TestCase):
     def test_snapshot_missing_404(self):
         r = self.client.get("/api/budget-analysis/snapshot/", {"fiscal_year": 1999})
         self.assertEqual(r.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_history_excludes_pre_2018_even_with_budget_amounts(self):
+        """Budget analysis floor FY2018 — align with other Rwanda dashboard components."""
+        for fy, w in [(2016, "3.0"), (2020, "5.0"), (2021, "6.0")]:
+            IndicatorData.objects.create(
+                indicator=self.ind,
+                fiscal_year=fy,
+                records_count=5,
+                fallback_records=0,
+                gross_lcu_bn=Decimal(w),
+                weighted_lcu_bn=Decimal(w),
+                share_weighted_percent=Decimal("100.0"),
+            )
+        r = self.client.get("/api/budget-analysis/history/")
+        self.assertEqual(r.status_code, status.HTTP_200_OK, r.data)
+        self.assertEqual(r.data["scope"]["years"], [2020, 2021])
+        self.assertEqual(r.data["scope"]["available_range"]["min"], 2020)
+
+    def test_snapshot_before_2018_404(self):
+        IndicatorData.objects.create(
+            indicator=self.ind,
+            fiscal_year=2017,
+            records_count=5,
+            fallback_records=0,
+            gross_lcu_bn=Decimal("9.0"),
+            weighted_lcu_bn=Decimal("9.0"),
+            share_weighted_percent=Decimal("100.0"),
+        )
+        r = self.client.get("/api/budget-analysis/snapshot/", {"fiscal_year": 2017})
+        self.assertEqual(r.status_code, status.HTTP_404_NOT_FOUND)

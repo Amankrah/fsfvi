@@ -81,3 +81,67 @@ class SavedStrategicPlan(models.Model):
     def __str__(self):
         name = self.plan_name or f"Plan FY{self.fiscal_year}"
         return f"{name}: {self.baseline_fsfsi:.4f} → {self.target_fsfvi:.4f} ({self.planning_years}yr)"
+
+
+class PlanYearActual(models.Model):
+    """
+    Stores actual budget allocations for a specific year within a strategic plan.
+
+    Policy makers use this to record what was actually allocated (which may differ
+    from the optimal plan). The system then re-calculates future year projections
+    based on these actuals, showing the real trajectory vs the planned trajectory.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
+    # Link to parent plan
+    plan = models.ForeignKey(
+        SavedStrategicPlan,
+        on_delete=models.CASCADE,
+        related_name="year_actuals",
+    )
+
+    # Which year this actual is for (1-indexed plan year, matches yearly_plans[].year)
+    plan_year = models.IntegerField()
+    fiscal_year = models.IntegerField(db_index=True)
+
+    # Total actual budget allocated (bn LCU)
+    total_budget_bn = models.DecimalField(max_digits=14, decimal_places=4)
+
+    # Per-component actual allocations (bn LCU)
+    # Format: {"markets": 379.4215, "finance": 341.7583, ...}
+    component_allocations_bn = models.JSONField(default=dict)
+
+    # Simulated results based on actual allocation (cached from simulate_user_allocation_year)
+    simulated_cumulative_fsfsi = models.DecimalField(
+        max_digits=8, decimal_places=6, null=True, blank=True
+    )
+    simulated_component_stress = models.JSONField(default=dict, blank=True)
+
+    # Comparison with plan
+    delta_vs_plan_fsfsi = models.DecimalField(
+        max_digits=8, decimal_places=6, null=True, blank=True
+    )
+
+    # Metadata
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    created_by = models.ForeignKey(
+        GovernmentUser,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+    )
+
+    class Meta:
+        db_table = "plan_year_actuals"
+        ordering = ["plan_year"]
+        constraints = [
+            models.UniqueConstraint(
+                "plan",
+                "plan_year",
+                name="uniq_plan_year_actual",
+            ),
+        ]
+
+    def __str__(self):
+        return f"FY{self.fiscal_year} actual: {self.total_budget_bn:.2f} bn"

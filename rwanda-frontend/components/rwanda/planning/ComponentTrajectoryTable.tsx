@@ -4,6 +4,7 @@ import { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { COMPONENT_DISPLAY_NAMES, type IndicatorComponent } from '@/lib/types/assessment';
 import type { YearlyPlanOutput } from '@/lib/types/planning';
+import { formatPlanPeriodLabel } from '@/lib/utils/planningLabels';
 import { TrendingDown, TrendingUp, Minus, BarChart3 } from 'lucide-react';
 
 interface Props {
@@ -74,7 +75,7 @@ export function ComponentTrajectoryTable({ yearlyPlans, baselineComponents }: Pr
                 <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Baseline</th>
                 {yearlyPlans.map((yp) => (
                   <th key={yp.year} className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">
-                    Year {yp.year}
+                    {formatPlanPeriodLabel(yp)}
                   </th>
                 ))}
                 <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Change</th>

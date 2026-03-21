@@ -29,6 +29,83 @@ def _from_json(s):
     return json.loads(s)
 
 
+def _rust_current_fsfsi(components: list[dict]) -> float:
+    """Point-in-time system FSFSI from the Rust core (same as planning / analyze-efficiency)."""
+    raw = fsfi_engine.py_analyze_efficiency(_to_json(components))
+    return float(_from_json(raw)["current_fsfsi"])
+
+
+def _plan_total_bn_from_recommended(
+    recommended: dict[str, float],
+    keys: list[str],
+    budget_scale: float,
+) -> float:
+    """National total (bn LCU) implied by Rust recommended row × planning budget_scale."""
+    return sum((float(recommended.get(k, 0) or 0) * budget_scale) / 1e9 for k in keys)
+
+
+def _shares_match_recommended(
+    norm_shares_pct: dict[str, float],
+    recommended: dict[str, float],
+    keys: list[str],
+    tol_pp: float = 0.5,
+) -> bool:
+    """True if submitted % mix matches the plan row (same rules as the UI / plan JSON).
+
+    The API stamps ``recommended_share_pct`` with ``round(..., 4)``; the UI fills bn via
+    ``toFixed(4)`` then re-derives %. Multiple rounds of rounding (backend share % → frontend
+    bn values → re-derived %) accumulate small errors. A tolerance of 0.5 pp handles this
+    while still detecting meaningful allocation changes by policy makers.
+
+    Previous 0.12 pp tolerance was too tight and caused "phantom deltas" when users
+    clicked "Fill from plan mix" without making any changes.
+    """
+    tot = sum(float(v or 0) for v in recommended.values())
+    if tot <= 0:
+        return False
+    for k in keys:
+        if k not in recommended:
+            return False
+        opt = round((float(recommended.get(k, 0) or 0) / tot) * 100.0, 4)
+        if abs(float(norm_shares_pct.get(k, 0) or 0) - opt) > tol_pp:
+            return False
+    return True
+
+
+def _national_totals_match_for_plan_row(
+    user_total_bn: float,
+    plan_total_budget_bn: float | None,
+    recommended: dict[str, float],
+    keys: list[str],
+    budget_scale: float,
+    rel: float = 5e-4,
+) -> bool:
+    if plan_total_budget_bn is not None and float(plan_total_budget_bn) > 0:
+        ref = float(plan_total_budget_bn)
+    else:
+        ref = _plan_total_bn_from_recommended(recommended, keys, budget_scale)
+    if ref <= 0:
+        return False
+    return abs(user_total_bn - ref) <= max(rel * ref, 1e-3)
+
+
+def _system_cumulative_ema_from_rust_relative(
+    prev_cumulative: float,
+    assessment_cumulative: float,
+    rust_point_fsfsi: float,
+    rust_baseline_fsfsi: float,
+    avg_rho_down: float,
+) -> float:
+    """One planning year: map Rust FSFSI onto assessment cumulative scale, then ρ_down EMA.
+
+    Must stay identical to the loop in ``plan_for_assessment`` (strategic plan chart).
+    """
+    rb = rust_baseline_fsfsi if rust_baseline_fsfsi and rust_baseline_fsfsi > 0 else 1.0
+    rust_remaining = rust_point_fsfsi / rb
+    point_in_time = assessment_cumulative * rust_remaining
+    return prev_cumulative + avg_rho_down * (point_in_time - prev_cumulative)
+
+
 def _progress_fraction(year: int, total_years: int, curve: str = "smoothstep") -> float:
     """Compute progress fraction for a given year in the planning horizon.
 
@@ -313,10 +390,15 @@ def plan_for_assessment(
     yearly_target_curve: str = "smoothstep",
     weighting_method: str = "hybrid",
     scenario: str = "normal_operations",
+    planning_start_fiscal_year: int | None = None,
 ) -> dict:
     """Generate a multi-year strategic plan using a saved assessment.
 
     Uses cumulative FSFSI as the baseline (the real starting point for recovery).
+
+    planning_start_fiscal_year:
+        Calendar fiscal year label for plan index 1 (Rust ``year`` == 1). If omitted,
+        defaults to the assessment's fiscal year + 1 (first horizon year after baseline).
     """
     from apps.assessments.models import AssessmentResult
 
@@ -425,13 +507,14 @@ def plan_for_assessment(
     # Simulate cumulative trajectory (system + component level)
     prev_cumulative = cumulative
     for i, yp in enumerate(yearly_plans):
-        # Rust's point-in-time stress (scaled to cumulative range)
-        rust_remaining = yp["projected_fsfvi"] / rust_baseline if rust_baseline > 0 else 1.0
-        point_in_time = cumulative * rust_remaining
-
-        # Apply asymmetric EMA: cumulative recovers slowly
-        rho = avg_rho_down  # recovering
-        new_cumulative = prev_cumulative + rho * (point_in_time - prev_cumulative)
+        rust_raw_projected = float(yp["projected_fsfvi"])
+        new_cumulative = _system_cumulative_ema_from_rust_relative(
+            prev_cumulative,
+            cumulative,
+            rust_raw_projected,
+            float(rust_baseline),
+            avg_rho_down,
+        )
         yp["projected_fsfvi"] = round(new_cumulative, 4)
 
         # Per-component projection using FSFSI formula: v = δ · e^(-α·f)
@@ -439,22 +522,15 @@ def plan_for_assessment(
         recommended = yp.get("recommended_allocations", {})
         component_projections = {}
         for comp_name, cd in comp_data.items():
-            # Get optimal allocation for this component from Rust
-            # Rust returns total per-component allocation (in scaled units)
             rust_alloc = recommended.get(comp_name, 0)
-            # Convert to per-indicator bn: rust_alloc * budget_scale / 1e9 / n_indicators
             if rust_alloc > 0 and budget_scale > 0:
                 optimal_budget_bn = (rust_alloc * budget_scale) / 1e9 / cd["n_indicators"]
             else:
-                # Fallback: grow current budget
                 optimal_budget_bn = cd["avg_budget_bn"] * ((1 + yearly_budget_growth_rate) ** (i + 1))
 
-            # FSFSI stress formula: v = δ · e^(-α · f)
-            # δ = gap, α = alpha per bn LCU, f = avg budget per indicator in bn
             alpha_f = cd["alpha"] * optimal_budget_bn
             comp_point_in_time = cd["gap"] * math.exp(-alpha_f)
 
-            # Apply asymmetric EMA for cumulative stress
             comp_cum = cd["prev_cumulative"] + cd["rho_down"] * (comp_point_in_time - cd["prev_cumulative"])
 
             component_projections[comp_name] = {
@@ -485,12 +561,302 @@ def plan_for_assessment(
     if "total_additional_investment_needed" in result:
         result["total_additional_investment_needed"] *= budget_scale
 
+    assessment_fy = int(assessment.fiscal_year)
+    start_fy = (
+        int(planning_start_fiscal_year)
+        if planning_start_fiscal_year is not None
+        else assessment_fy + 1
+    )
+    for yp in yearly_plans:
+        y_num = int(yp.get("year", 1))
+        yp["fiscal_year"] = start_fy + (y_num - 1)
+        rec = yp.get("recommended_allocations") or {}
+        tot_alloc = sum(float(v or 0) for v in rec.values())
+        if tot_alloc > 0:
+            yp["recommended_share_pct"] = {
+                k: round(float(rec.get(k) or 0) / tot_alloc * 100.0, 4) for k in rec
+            }
+        else:
+            yp["recommended_share_pct"] = {}
+
+    result["planning_start_fiscal_year"] = start_fy
+    result["baseline_assessment_fiscal_year"] = assessment_fy
+
     stamped = _stamp_planning_result(
         result, assessment, target_fsfvi, planning_years, yearly_budget_growth_rate
     )
     stamped["planning_weighting_method"] = weighting_method
     stamped["planning_scenario"] = scenario
     return stamped
+
+
+def simulate_user_allocation_year(
+    assessment_id: str,
+    plan_year: int,
+    total_budget_bn: float,
+    component_shares_pct: dict[str, float],
+    *,
+    weighting_method: str = "hybrid",
+    scenario: str = "normal_operations",
+    prior_system_cumulative: float | None = None,
+    prior_component_cumulative: dict[str, float] | None = None,
+    plan_reference: dict | None = None,
+) -> dict[str, object]:
+    """
+    One-step counterfactual: given a national total (bn LCU) and a component mix (%),
+    apply the **same** dynamics as multi-year planning.
+
+    System cumulative FSFSI uses ``fsfi_engine.py_analyze_efficiency`` (Rust
+    ``calculate_system_fsfsi``) on planning-shaped component payloads, then
+    ``_system_cumulative_ema_from_rust_relative`` — identical to ``plan_for_assessment``.
+    Per-component cumulative stress still uses δ·e^(−α·f) + component ρ_down EMA
+    (same Python path as the plan’s component projections).
+    """
+    import math
+
+    from apps.assessments.models import AssessmentResult, ComponentPersistenceConfig
+    from apps.fsfvi_data.models import Indicator
+    from django.db.models import Avg
+
+    assessment = AssessmentResult.objects.get(pk=assessment_id)
+    wm = (weighting_method or "hybrid").strip() or "hybrid"
+    sc = (scenario or "normal_operations").strip() or "normal_operations"
+    if plan_reference:
+        pr_wm = plan_reference.get("planning_weighting_method")
+        pr_sc = plan_reference.get("planning_scenario")
+        if isinstance(pr_wm, str) and pr_wm.strip():
+            wm = pr_wm.strip()
+        if isinstance(pr_sc, str) and pr_sc.strip():
+            sc = pr_sc.strip()
+
+    components = _build_planning_components(assessment)
+    _apply_planning_weighting(components, wm, sc)
+    keys = [c["component_type"] for c in components]
+    if not keys:
+        return {"error": "Assessment has no component results"}
+
+    component_alphas = {
+        r["component"]: float(r["alpha"])
+        for r in Indicator.objects.filter(default_sensitivity__isnull=False)
+        .values("component")
+        .annotate(alpha=Avg("default_sensitivity"))
+    }
+
+    rho_configs = {c.component: float(c.rho_down) for c in ComponentPersistenceConfig.objects.all()}
+    defaults_map = ComponentPersistenceConfig.DEFAULTS
+    rho_values = []
+    for comp in assessment.component_results.all():
+        if comp.component in rho_configs:
+            rho_values.append(rho_configs[comp.component])
+        elif comp.component in defaults_map:
+            rho_values.append(float(defaults_map[comp.component]["rho_down"]))
+        else:
+            rho_values.append(0.15)
+    avg_rho_down = sum(rho_values) / len(rho_values) if rho_values else 0.15
+
+    baseline_cumulative = float(assessment.cumulative_fsfsi) if assessment.cumulative_fsfsi else float(
+        assessment.fsfsi_score
+    )
+
+    comp_rows: dict[str, dict] = {}
+    for comp in assessment.component_results.all():
+        c = comp.component
+        if c not in keys:
+            continue
+        rho = rho_configs.get(c) or float(defaults_map.get(c, {}).get("rho_down", "0.15"))
+        comp_rows[c] = {
+            "gap": float(comp.avg_performance_gap or comp.component_stress),
+            "alpha": component_alphas.get(c, 0.02),
+            "n_indicators": max(1, int(comp.indicators_count or 1)),
+            "rho_down": rho,
+            "display": comp.get_component_display(),
+        }
+
+    raw_shares = {k: float(component_shares_pct.get(k, 0) or 0) for k in keys}
+    s = sum(raw_shares.values())
+    if s <= 0:
+        return {"error": "component_shares_pct must sum to a positive percentage"}
+    norm_shares = {k: raw_shares[k] / s * 100.0 for k in keys}
+
+    if plan_year < 1:
+        return {"error": "plan_year must be >= 1"}
+
+    if plan_year == 1:
+        prev_sys = baseline_cumulative
+        prev_comp: dict[str, float] = {}
+        for comp in assessment.component_results.all():
+            c = comp.component
+            if c not in keys:
+                continue
+            prev_comp[c] = float(comp.cumulative_stress) if comp.cumulative_stress else float(
+                comp.component_stress
+            )
+    else:
+        if prior_system_cumulative is None or prior_component_cumulative is None:
+            return {
+                "error": "For plan_year > 1, prior_system_cumulative and prior_component_cumulative "
+                "(end of previous plan year, optimal path) are required",
+            }
+        prev_sys = float(prior_system_cumulative)
+        prev_comp = {}
+        for k in keys:
+            if k not in prior_component_cumulative:
+                return {"error": f"prior_component_cumulative missing key: {k}"}
+            prev_comp[k] = float(prior_component_cumulative[k])
+
+    total_bn = float(total_budget_bn)
+    if total_bn < 0:
+        return {"error": "total_budget_bn must be non-negative"}
+
+    real_budget_lcu = float(assessment.total_budget_lcu_bn or 0) * 1e9
+    rust_input_sum = sum(c["financial_allocation_lcu"] for c in components)
+    budget_scale = real_budget_lcu / rust_input_sum if rust_input_sum > 0 else 1000.0
+
+    rec_opt: dict[str, float] | None = None
+    plan_bn_ref: float | None = None
+    if plan_reference:
+        raw_rec = plan_reference.get("recommended_allocations")
+        if isinstance(raw_rec, dict) and raw_rec:
+            rec_opt = {str(k): float(v or 0) for k, v in raw_rec.items()}
+        pt = plan_reference.get("plan_total_budget_bn")
+        if pt is not None and float(pt) > 0:
+            plan_bn_ref = float(pt)
+
+    ptbn = plan_bn_ref if plan_bn_ref and plan_bn_ref > 0 else None
+    if ptbn is None and rec_opt and budget_scale > 0:
+        ptbn = _plan_total_bn_from_recommended(rec_opt, keys, budget_scale)
+
+    totals_match = _national_totals_match_for_plan_row(total_bn, plan_bn_ref, rec_opt, keys, budget_scale) if rec_opt else False
+    shares_match = _shares_match_recommended(norm_shares, rec_opt, keys) if rec_opt else False
+
+    use_engine_optimal = bool(
+        rec_opt
+        and budget_scale > 0
+        and ptbn
+        and ptbn > 0
+        and all(float(rec_opt.get(k, 0) or 0) > 0 for k in keys)
+        and totals_match
+        and shares_match,
+    )
+
+    # When user matches the plan exactly, use the plan's pre-computed projection directly.
+    # This avoids numerical differences between py_generate_multi_year_plan (used for planning)
+    # and py_analyze_efficiency (used for simulation) which can cause "phantom deltas".
+    use_plan_projection_directly = (
+        use_engine_optimal
+        and plan_reference
+        and "projected_cumulative_fsfsi" in plan_reference
+        and totals_match
+        and shares_match
+    )
+
+    ratio = (total_bn / ptbn) if (use_engine_optimal and ptbn and ptbn > 0) else 1.0
+
+    avg_bn_by_comp: dict[str, float] = {}
+    user_components: list[dict] = []
+    for c in components:
+        ct = c["component_type"]
+        if ct not in norm_shares:
+            return {"error": f"component_shares_pct missing key: {ct}"}
+        n_ind = comp_rows[ct]["n_indicators"]
+        if use_engine_optimal and rec_opt is not None:
+            ra = float(rec_opt.get(ct, 0) or 0)
+            if ra > 0:
+                avg_bn = (ra * budget_scale) / 1e9 / n_ind * ratio
+            else:
+                avg_bn = (total_bn * (norm_shares[ct] / 100.0)) / n_ind
+        else:
+            comp_total_bn = total_bn * (norm_shares[ct] / 100.0)
+            avg_bn = comp_total_bn / n_ind
+        avg_bn_by_comp[ct] = avg_bn
+        u = dict(c)
+        u["financial_allocation_lcu"] = avg_bn * 1_000_000
+        user_components.append(u)
+
+    if use_plan_projection_directly:
+        # User's allocation matches the plan — use the plan's pre-computed cumulative FSFSI
+        # to ensure zero delta when following the optimal path.
+        new_sys = float(plan_reference["projected_cumulative_fsfsi"])
+        point_in_time_cumulative = new_sys  # Approximation; cumulative ≈ point-in-time for matching case
+
+        # For component stress, use the plan's component projections if available
+        new_comp: dict[str, float] = {}
+        plan_comp_proj = plan_reference.get("component_projections", {})
+        for c in keys:
+            if c in plan_comp_proj and "cumulative_stress" in plan_comp_proj[c]:
+                new_comp[c] = float(plan_comp_proj[c]["cumulative_stress"])
+            else:
+                # Fallback: compute using the formula
+                cd = comp_rows[c]
+                f_bn = avg_bn_by_comp[c]
+                pit = cd["gap"] * math.exp(-cd["alpha"] * f_bn)
+                pc = prev_comp[c]
+                new_comp[c] = pc + cd["rho_down"] * (pit - pc)
+
+        note = (
+            "Your allocation matches the optimal plan exactly. Using the plan's pre-computed "
+            "cumulative FSFSI projection to ensure consistency with the trajectory chart."
+        )
+    else:
+        try:
+            rust_baseline_fsfsi = _rust_current_fsfsi(components)
+            rust_point_fsfsi = _rust_current_fsfsi(user_components)
+        except Exception as e:
+            logger.exception("Rust FSFSI evaluation in simulate_user_allocation_year")
+            return {"error": f"Rust FSFSI evaluation failed: {e}"}
+
+        new_sys = _system_cumulative_ema_from_rust_relative(
+            prev_sys,
+            baseline_cumulative,
+            rust_point_fsfsi,
+            rust_baseline_fsfsi,
+            avg_rho_down,
+        )
+        rb = rust_baseline_fsfsi if rust_baseline_fsfsi and rust_baseline_fsfsi > 0 else 1.0
+        point_in_time_cumulative = baseline_cumulative * (rust_point_fsfsi / rb)
+
+        new_comp: dict[str, float] = {}
+        for c in keys:
+            cd = comp_rows[c]
+            f_bn = avg_bn_by_comp[c]
+            pit = cd["gap"] * math.exp(-cd["alpha"] * f_bn)
+            pc = prev_comp[c]
+            new_comp[c] = pc + cd["rho_down"] * (pit - pc)
+
+        note = (
+            "System FSFSI uses Rust calculate_system_fsfsi (py_analyze_efficiency) and the same "
+            "cumulative EMA as plan_for_assessment. Per-component stress uses δ·e^(−α·f) with the "
+            "same per-indicator bn as the Rust payload."
+        )
+        if use_engine_optimal:
+            note += (
+                " Allocations are taken from recommended_allocations (not re-derived from "
+                "rounded bn inputs)."
+            )
+
+    out: dict[str, object] = {
+        "user_projected_cumulative_fsfsi": round(new_sys, 4),
+        "user_component_cumulative_stress": {k: round(new_comp[k], 4) for k in keys},
+        "user_point_in_time_stress_system": round(point_in_time_cumulative, 4),
+        "normalized_component_shares_pct": {k: round(norm_shares[k], 4) for k in keys},
+        "baseline_cumulative_fsfsi_used": round(baseline_cumulative, 4),
+        "plan_year": plan_year,
+        "methodology_note": note,
+    }
+
+    if plan_reference:
+        try:
+            pfs = float(plan_reference["projected_cumulative_fsfsi"])
+            tgt = float(plan_reference["year_target_fsfvi"])
+        except (KeyError, TypeError, ValueError):
+            return {"error": "plan_reference must include projected_cumulative_fsfsi and year_target_fsfvi"}
+        out["plan_projected_cumulative_fsfsi"] = round(pfs, 4)
+        out["plan_year_target_fsfvi"] = round(tgt, 4)
+        out["delta_user_minus_plan_fsfsi"] = round(new_sys - pfs, 4)
+        out["user_worse_than_plan_optimal"] = new_sys > pfs
+        out["user_on_track_vs_plan_target"] = new_sys <= tgt
+
+    return out
 
 
 def mtef_for_assessment(

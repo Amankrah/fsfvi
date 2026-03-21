@@ -12,6 +12,7 @@ import {
 } from 'recharts';
 import type { YearlyPlanOutput } from '@/lib/types/planning';
 import { formatRWFCompact } from '@/lib/utils/formatters';
+import { formatPlanPeriodLabel } from '@/lib/utils/planningLabels';
 
 interface PlanningBudgetChartProps {
   yearlyPlans: YearlyPlanOutput[];
@@ -51,7 +52,7 @@ export function PlanningBudgetChart({
       <div className="bg-white border border-gray-200 rounded-lg shadow-lg p-3">
         <p className="font-semibold text-gray-900">{year}</p>
         <p className="text-sm text-[var(--rw-blue)] font-mono">{label}</p>
-        <p className="text-xs text-gray-500">Total budget (USD)</p>
+        <p className="text-xs text-gray-500">Total budget (RWF)</p>
       </div>
     );
   };

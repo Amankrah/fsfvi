@@ -17,7 +17,7 @@ class BudgetHistoryView(APIView):
     GET /api/budget-analysis/history/
 
     Query params:
-      - start_year, end_year — optional; clipped to available IndicatorData years
+      - start_year, end_year — optional; clipped to available IndicatorData years (FY ≥ 2018 only)
       - top_movers — optional cap on indicator mover rows (default 25)
     """
 
@@ -61,7 +61,7 @@ class BudgetSnapshotView(APIView):
     """
     GET /api/budget-analysis/snapshot/?fiscal_year=2024
 
-    Single-year composition table (indicators + component shares).
+    Single-year composition table (indicators + component shares). Fiscal year must be ≥ 2018.
     """
 
     permission_classes = [IsAuthenticated]

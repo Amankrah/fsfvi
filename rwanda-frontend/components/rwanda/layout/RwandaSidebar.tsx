@@ -2,18 +2,13 @@
 
 import { usePathname, useRouter } from 'next/navigation';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { useAlerts } from '@/contexts/AlertContext';
 import {
   LayoutDashboard,
   FileCheck,
-  BarChart3,
   DollarSign,
-  Map,
-  Building2,
   Target,
   Sun,
   FileText,
-  Bell,
   Database,
   User,
   Shield,
@@ -34,21 +29,16 @@ export function RwandaSidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { t } = useLanguage();
-  const { unreadCount } = useAlerts();
 
   const navItems: NavItem[] = [
     { id: 'overview', labelKey: 'nav.overview', icon: LayoutDashboard, href: '/dashboard' },
-    { id: 'assessment', labelKey: 'nav.assessment', icon: FileCheck, href: '/dashboard/assessment' },
-    { id: 'performance', labelKey: 'nav.performance', icon: BarChart3, href: '/dashboard/performance' },
     { id: 'budget', labelKey: 'nav.budget', icon: DollarSign, href: '/dashboard/budget' },
+    { id: 'assessment', labelKey: 'nav.assessment', icon: FileCheck, href: '/dashboard/assessment' },
     { id: 'optimization', labelKey: 'nav.optimization', icon: Sparkles, href: '/dashboard/optimization' },
     { id: 'planning', labelKey: 'nav.planning', icon: CalendarRange, href: '/dashboard/planning' },
-    { id: 'provinces', labelKey: 'nav.provinces', icon: Map, href: '/dashboard/provinces' },
-    { id: 'districts', labelKey: 'nav.districts', icon: Building2, href: '/dashboard/districts' },
     { id: 'psta5', labelKey: 'nav.psta5', icon: Target, href: '/dashboard/psta5' },
     { id: 'seasonal', labelKey: 'nav.seasonal', icon: Sun, href: '/dashboard/seasonal' },
     { id: 'reports', labelKey: 'nav.reports', icon: FileText, href: '/dashboard/reports' },
-    { id: 'alerts', labelKey: 'nav.alerts', icon: Bell, href: '/dashboard/alerts', badge: unreadCount },
     { id: 'data_entry', labelKey: 'nav.data_entry', icon: Database, href: '/dashboard/data-entry' },
   ];
 

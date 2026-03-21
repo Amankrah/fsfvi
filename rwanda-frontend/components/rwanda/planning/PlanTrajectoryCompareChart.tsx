@@ -13,6 +13,7 @@ import {
 } from 'recharts';
 import type { MultiYearStrategicPlan } from '@/lib/types/planning';
 import { formatScore } from '@/lib/utils/formatters';
+import { formatPlanPeriodLabel } from '@/lib/utils/planningLabels';
 
 export interface PlanCompareSeries {
   id: string;
@@ -46,7 +47,10 @@ export function PlanTrajectoryCompareChart({
     });
     rows.push(base);
     for (let yi = 0; yi < maxYears; yi++) {
-      const row: Record<string, string | number> = { period: `Year ${yi + 1}` };
+      const refYp = series[0]?.plan.yearly_plans?.[yi];
+      const period =
+        refYp != null ? formatPlanPeriodLabel(refYp) : `Year ${yi + 1}`;
+      const row: Record<string, string | number> = { period };
       series.forEach((s) => {
         const yp = s.plan.yearly_plans?.[yi];
         row[dataKeyFor(s.id)] = yp != null ? Number(yp.projected_fsfvi) : NaN;

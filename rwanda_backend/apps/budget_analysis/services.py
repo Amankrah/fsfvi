@@ -20,6 +20,9 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
+# Align with Rwanda FSFI dashboard / assessments: do not surface pre-2018 fiscal years here.
+BUDGET_ANALYSIS_MIN_FISCAL_YEAR = 2018
+
 
 def _f(d: Decimal | None) -> float:
     if d is None:
@@ -60,7 +63,8 @@ def _available_fiscal_years() -> list[int]:
     from apps.fsfvi_data.models import IndicatorData
 
     rows = (
-        IndicatorData.objects.values("fiscal_year")
+        IndicatorData.objects.filter(fiscal_year__gte=BUDGET_ANALYSIS_MIN_FISCAL_YEAR)
+        .values("fiscal_year")
         .annotate(
             wsum=Sum("weighted_lcu_bn"),
             gsum=Sum("gross_lcu_bn"),
@@ -77,6 +81,9 @@ def build_budget_snapshot(fiscal_year: int) -> dict[str, Any] | None:
     """
     from apps.fsfvi_data.models import IndicatorData
     from django.db.models import Sum
+
+    if fiscal_year < BUDGET_ANALYSIS_MIN_FISCAL_YEAR:
+        return None
 
     agg = IndicatorData.objects.filter(fiscal_year=fiscal_year).aggregate(
         wsum=Sum("weighted_lcu_bn"),
@@ -160,7 +167,7 @@ def build_budget_history_analysis(
     y_min, y_max = all_years[0], all_years[-1]
     sy = start_year if start_year is not None else y_min
     ey = end_year if end_year is not None else y_max
-    sy = max(sy, y_min)
+    sy = max(sy, y_min, BUDGET_ANALYSIS_MIN_FISCAL_YEAR)
     ey = min(ey, y_max)
     if sy > ey:
         sy, ey = ey, sy

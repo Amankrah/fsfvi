@@ -13,6 +13,7 @@ import {
   Legend,
 } from 'recharts';
 import type { YearlyPlanOutput } from '@/lib/types/planning';
+import { formatPlanPeriodLabel } from '@/lib/utils/planningLabels';
 import { formatScore } from '@/lib/utils/formatters';
 
 interface PlanningTrajectoryChartProps {
@@ -41,7 +42,7 @@ export function PlanningTrajectoryChart({
     ];
     yearlyPlans.forEach((p) => {
       points.push({
-        year: `Year ${p.year}`,
+        year: formatPlanPeriodLabel(p),
         projected: p.projected_fsfvi,
         target: p.target_fsfvi,
         onTrack: p.on_track,

@@ -142,11 +142,19 @@ export default function BudgetPage() {
         </div>
         <div className="flex flex-wrap items-end gap-2">
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">{t('budget_page.range_from')}</label>
+            <label
+              className="block text-xs font-medium text-gray-500 mb-1"
+              htmlFor="budget-range-from"
+            >
+              {t('budget_page.range_from')}
+            </label>
             <select
+              id="budget-range-from"
               className="rounded-lg border border-gray-300 bg-white px-2 py-2 text-sm"
               value={startYear}
               onChange={(e) => setStartYear(e.target.value ? Number(e.target.value) : '')}
+              title={t('budget_page.range_from')}
+              aria-label={t('budget_page.range_from')}
             >
               <option value="">{t('budget_page.range_all')}</option>
               {data?.scope.years.map((y) => (
@@ -157,11 +165,19 @@ export default function BudgetPage() {
             </select>
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">{t('budget_page.range_to')}</label>
+            <label
+              className="block text-xs font-medium text-gray-500 mb-1"
+              htmlFor="budget-range-to"
+            >
+              {t('budget_page.range_to')}
+            </label>
             <select
+              id="budget-range-to"
               className="rounded-lg border border-gray-300 bg-white px-2 py-2 text-sm"
               value={endYear}
               onChange={(e) => setEndYear(e.target.value ? Number(e.target.value) : '')}
+              title={t('budget_page.range_to')}
+              aria-label={t('budget_page.range_to')}
             >
               <option value="">{t('budget_page.range_all')}</option>
               {data?.scope.years.map((y) => (
@@ -280,7 +296,11 @@ export default function BudgetPage() {
                   <XAxis dataKey="label" tick={{ fontSize: 12 }} />
                   <YAxis tick={{ fontSize: 12 }} label={{ value: 'bn LCU', angle: -90, position: 'insideLeft' }} />
                   <Tooltip
-                    formatter={(v: number) => [`${v.toFixed(4)} bn`, t('budget_page.tooltip_weighted')]}
+                    formatter={(value) => {
+                      const n = typeof value === 'number' ? value : Number(value);
+                      const label = Number.isFinite(n) ? `${n.toFixed(4)} bn` : '—';
+                      return [label, t('budget_page.tooltip_weighted')];
+                    }}
                     labelClassName="font-medium"
                   />
                   <Line type="monotone" dataKey="weighted_bn" name={t('budget_page.tooltip_weighted')} stroke="var(--rw-blue)" strokeWidth={2} dot={{ r: 3 }} />

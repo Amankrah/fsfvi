@@ -7,12 +7,17 @@
 
 import axios, { AxiosInstance } from 'axios';
 import type {
+  AllocationSimulateRequest,
+  AllocationSimulateResponse,
   MultiYearPlanRequest,
   MultiYearStrategicPlan,
   MtefPlan,
   PlanningComponentInput,
+  PlanYearActual,
+  PlanYearActualSummary,
   SavedStrategicPlanFull,
   SavedStrategicPlanSummary,
+  SaveYearActualRequest,
 } from '@/lib/types/planning';
 
 const RWANDA_API_BASE_URL =
@@ -72,17 +77,23 @@ export const planningAPI = {
     targetCurve: string = 'smoothstep',
     weightingMethod: string = 'hybrid',
     scenario: string = 'normal_operations',
+    planningStartFiscalYear?: number,
   ): Promise<MultiYearStrategicPlan> => {
     const response = await planningClient.get<MultiYearStrategicPlan>(
       `/${assessmentId}/multi-year/`,
-      { params: {
-        planning_years: planningYears,
-        target_fsfvi: targetFsfvi,
-        growth_rate: growthRate,
-        target_curve: targetCurve,
-        weighting_method: weightingMethod,
-        scenario,
-      } }
+      {
+        params: {
+          planning_years: planningYears,
+          target_fsfvi: targetFsfvi,
+          growth_rate: growthRate,
+          target_curve: targetCurve,
+          weighting_method: weightingMethod,
+          scenario,
+          ...(planningStartFiscalYear != null
+            ? { planning_start_fiscal_year: planningStartFiscalYear }
+            : {}),
+        },
+      },
     );
     return response.data;
   },
@@ -92,6 +103,21 @@ export const planningAPI = {
    *
    * GET /api/planning/<assessment_id>/mtef/
    */
+  /**
+   * Counterfactual cumulative FSFSI for a user budget mix (same dynamics as planning).
+   * POST /api/planning/<assessment_id>/simulate-allocation/
+   */
+  simulateAllocation: async (
+    assessmentId: string,
+    body: AllocationSimulateRequest,
+  ): Promise<AllocationSimulateResponse> => {
+    const response = await planningClient.post<AllocationSimulateResponse>(
+      `/${assessmentId}/simulate-allocation/`,
+      body,
+    );
+    return response.data;
+  },
+
   mtefForAssessment: async (
     assessmentId: string,
     improvementPercent: number = 20,
@@ -131,6 +157,7 @@ export const planningAPI = {
     target_curve: string;
     weighting_method?: string;
     scenario?: string;
+    planning_start_fiscal_year?: number;
   }): Promise<SavedStrategicPlanFull> => {
     const response = await planningClient.post<SavedStrategicPlanFull>('/saved-plans/', request);
     return response.data;
@@ -149,6 +176,7 @@ export const planningAPI = {
       target_curve?: string;
       weighting_method?: string;
       scenario?: string;
+      planning_start_fiscal_year?: number;
     },
   ): Promise<SavedStrategicPlanFull> => {
     const response = await planningClient.patch<SavedStrategicPlanFull>(
@@ -190,6 +218,43 @@ export const planningAPI = {
     });
     if (response.status === 204) return null;
     return response.data;
+  },
+
+  // ==========================================================================
+  // Plan Year Actuals — Record actual budget allocations per year
+  // ==========================================================================
+
+  /** List all actuals for a saved plan. */
+  listPlanActuals: async (planId: string): Promise<PlanYearActualSummary[]> => {
+    const response = await planningClient.get<PlanYearActualSummary[]>(
+      `/saved-plans/${planId}/actuals/`,
+    );
+    return response.data;
+  },
+
+  /** Save or update actual allocation for a plan year. */
+  saveYearActual: async (
+    planId: string,
+    request: SaveYearActualRequest,
+  ): Promise<PlanYearActual> => {
+    const response = await planningClient.post<PlanYearActual>(
+      `/saved-plans/${planId}/actuals/`,
+      request,
+    );
+    return response.data;
+  },
+
+  /** Get full actual record for a specific plan year. */
+  getYearActual: async (planId: string, planYear: number): Promise<PlanYearActual> => {
+    const response = await planningClient.get<PlanYearActual>(
+      `/saved-plans/${planId}/actuals/${planYear}/`,
+    );
+    return response.data;
+  },
+
+  /** Delete actual for a specific plan year. */
+  deleteYearActual: async (planId: string, planYear: number): Promise<void> => {
+    await planningClient.delete(`/saved-plans/${planId}/actuals/${planYear}/`);
   },
 
   // ==========================================================================

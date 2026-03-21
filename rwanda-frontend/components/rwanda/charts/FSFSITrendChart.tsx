@@ -21,9 +21,9 @@ interface FSFSITrendChartProps {
 }
 
 const STRESS_THRESHOLDS = {
-  low: 0.05,
-  medium: 0.15,
-  high: 0.30,
+  low: 0.0500,
+  medium: 0.1500,
+  high: 0.3000,
 };
 
 const STRESS_COLORS = {
