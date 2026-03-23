@@ -159,5 +159,9 @@ dmypy.json
 # pytype static type analyzer
 .pytype/
 
-# Archive folder
+# Archive / legacy dumps (never commit; repo folder may be "Achive" typo or "archive")
+archive/
+Archive/
+ARCHIVE/
 Achive/
+achive/
