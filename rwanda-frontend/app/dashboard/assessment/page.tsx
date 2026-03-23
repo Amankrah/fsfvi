@@ -13,7 +13,6 @@ import type {
   ActionPriority,
   ComponentResult,
   SavedIndicatorResult,
-  IndicatorComponentSensitivity,
 } from '@/lib/types/assessment';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -39,7 +38,6 @@ export default function AssessmentPage() {
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [assessments, setAssessments] = useState<SavedAssessment[]>([]);
   const [selectedAssessment, setSelectedAssessment] = useState<SavedAssessment | null>(null);
-  const [sensitivities, setSensitivities] = useState<IndicatorComponentSensitivity[]>([]);
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
   const [weightingMethod, setWeightingMethod] = useState('hybrid');
@@ -50,21 +48,18 @@ export default function AssessmentPage() {
     setLoading(true);
     setError(null);
     try {
-      const [summaryRes, listRes, configRes] = await Promise.all([
+      const [summaryRes, listRes] = await Promise.all([
         assessmentAPI.getDashboardSummary(fiscalYear.start_year),
         assessmentAPI.listAssessments(fiscalYear.start_year, 20),
-        assessmentAPI.getConfig(),
       ]);
       setSummary(summaryRes);
       setAssessments(listRes);
       setSelectedAssessment(null);
-      setSensitivities(configRes.indicator_component_sensitivities ?? []);
     } catch (err) {
       console.error('Assessment fetch failed:', err);
       setError('Unable to load assessment data.');
       setSummary(null);
       setAssessments([]);
-      setSensitivities([]);
     } finally {
       setLoading(false);
     }
@@ -247,42 +242,6 @@ export default function AssessmentPage() {
         </Card>
       )}
 
-      {/* Indicator component sensitivities (α) – from backend engine */}
-      {sensitivities.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <Activity className="h-5 w-5 text-[var(--rw-blue)]" />
-              Indicator component sensitivities (α)
-            </CardTitle>
-            <p className="text-sm text-gray-500 font-normal">
-              Sensitivity parameter α per component used in the stress model υ = δ · e^(-αf). Higher α means funding reduces stress faster for that component.
-            </p>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-gray-200 text-left text-gray-500 uppercase tracking-wide">
-                    <th className="pb-2 pr-4 font-medium">Component</th>
-                    <th className="pb-2 pr-4 font-medium text-right">α (sensitivity)</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {sensitivities.map((s) => (
-                    <tr key={s.component} className="border-b border-gray-100">
-                      <td className="py-2 pr-4 font-medium text-gray-900">{s.component_display}</td>
-                      <td className="py-2 pr-4 text-right tabular-nums text-gray-700">
-                        {formatScore(s.sensitivity)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       {/* Run Assessment Controls */}
       <Card className="border-[var(--rw-blue)]/20 bg-blue-50/30">

@@ -4,7 +4,7 @@
  * Constants and helper functions for Rwanda FSFI.
  */
 
-import type { RwandaFiscalYear, RwandaSeason, SeasonInfo } from '@/lib/types/rwanda';
+import type { RwandaFiscalYear } from '@/lib/types/rwanda';
 
 // ============================================================================
 // Fiscal Year (Rwanda: July to June)
@@ -51,57 +51,6 @@ export function getAvailableFiscalYears(): RwandaFiscalYear[] {
   }
 
   return years;
-}
-
-// ============================================================================
-// Seasons
-// ============================================================================
-
-export const RWANDA_SEASONS: SeasonInfo[] = [
-  {
-    id: 'season_a',
-    label: 'Season A',
-    label_rw: 'Igihembwe A',
-    months: 'Sep – Feb',
-    description: 'Main rainy season, largest harvest',
-  },
-  {
-    id: 'season_b',
-    label: 'Season B',
-    label_rw: 'Igihembwe B',
-    months: 'Mar – Jun',
-    description: 'Second rainy season',
-  },
-  {
-    id: 'season_c',
-    label: 'Season C',
-    label_rw: 'Igihembwe C',
-    months: 'Jul – Aug',
-    description: 'Dry season (irrigated crops)',
-  },
-];
-
-export function getCurrentSeasonId(): RwandaSeason {
-  const month = new Date().getMonth(); // 0-11
-
-  if (month >= 8 || month <= 1) {
-    // Sep-Feb
-    return 'season_a';
-  } else if (month >= 2 && month <= 5) {
-    // Mar-Jun
-    return 'season_b';
-  } else {
-    // Jul-Aug
-    return 'season_c';
-  }
-}
-
-export function getCurrentSeason(): SeasonInfo {
-  return getSeasonInfo(getCurrentSeasonId());
-}
-
-export function getSeasonInfo(season: RwandaSeason): SeasonInfo {
-  return RWANDA_SEASONS.find((s) => s.id === season) || RWANDA_SEASONS[0];
 }
 
 // ============================================================================

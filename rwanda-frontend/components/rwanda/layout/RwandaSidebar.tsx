@@ -7,7 +7,6 @@ import {
   FileCheck,
   DollarSign,
   Target,
-  Sun,
   FileText,
   Database,
   User,
@@ -37,7 +36,6 @@ export function RwandaSidebar() {
     { id: 'optimization', labelKey: 'nav.optimization', icon: Sparkles, href: '/dashboard/optimization' },
     { id: 'planning', labelKey: 'nav.planning', icon: CalendarRange, href: '/dashboard/planning' },
     { id: 'psta5', labelKey: 'nav.psta5', icon: Target, href: '/dashboard/psta5' },
-    { id: 'seasonal', labelKey: 'nav.seasonal', icon: Sun, href: '/dashboard/seasonal' },
     { id: 'reports', labelKey: 'nav.reports', icon: FileText, href: '/dashboard/reports' },
     { id: 'data_entry', labelKey: 'nav.data_entry', icon: Database, href: '/dashboard/data-entry' },
   ];

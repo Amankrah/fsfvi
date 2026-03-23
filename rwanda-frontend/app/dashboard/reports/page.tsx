@@ -13,7 +13,9 @@ export default function ReportsPage() {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <p className="text-gray-600">PDF report generation & history — coming in Phase 5.</p>
+        <p className="text-gray-600">
+          PDF report generation and download history are coming soon.
+        </p>
       </CardContent>
     </Card>
   );

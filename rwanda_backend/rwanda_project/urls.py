@@ -10,4 +10,5 @@ urlpatterns = [
     path("api/optimization/", include("apps.optimization.urls")),
     path("api/budget-analysis/", include("apps.budget_analysis.urls")),
     path("api/planning/", include("apps.planning.urls")),
+    path("api/indicators/", include("apps.fsfvi_data.urls")),
 ]

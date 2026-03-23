@@ -4,47 +4,18 @@ import Link from 'next/link';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { LanguageToggle } from '@/components/rwanda/shared/LanguageToggle';
 import { RwandaLogo } from '@/components/rwanda/shared/RwandaLogo';
+import { PartnerLogo } from '@/components/rwanda/shared/PartnerLogo';
+import akademiaLogo from '@/assets/partners/akademia2063_logo.png';
+import ifpriLogo from '@/assets/partners/ifpri_logo.webp';
+import mcgillLogo from '@/assets/partners/mcgill_logo.png';
 import {
   ArrowRight,
   BarChart3,
-  Shield,
-  TrendingUp,
-  DollarSign,
+  LineChart,
+  Scale,
   Target,
-  Sun,
-  FileText,
-  Wheat,
-  Activity,
-  Layers,
+  ArrowUpRight,
 } from 'lucide-react';
-
-const FEATURES = [
-  {
-    icon: BarChart3,
-    title: 'FSFI Assessment',
-    description: 'National food system financial intelligence scoring at indicator level (37 indicators, 8 components).',
-  },
-  {
-    icon: DollarSign,
-    title: 'Budget Optimization',
-    description: 'Data-driven budget allocation recommendations aligned to national priorities.',
-  },
-  {
-    icon: TrendingUp,
-    title: 'Performance Gap Analysis',
-    description: 'Identify gaps, track progress, and benchmark against global and national targets.',
-  },
-  {
-    icon: Target,
-    title: 'PSTA 5 Alignment',
-    description: 'Track progress toward Rwanda\'s Fifth Strategic Plan for Agriculture Transformation.',
-  },
-  {
-    icon: Sun,
-    title: 'Seasonal Intelligence',
-    description: 'Season A, B, and C crop calendar integration with financial analytics.',
-  },
-];
 
 export default function LandingPage() {
   const { t } = useLanguage();
@@ -63,6 +34,9 @@ export default function LandingPage() {
               </div>
             </div>
             <div className="flex items-center space-x-4">
+              <Link href="/about" className="text-sm text-gray-300 hover:text-white transition-colors">
+                {t('nav.about')}
+              </Link>
               <LanguageToggle />
               <Link
                 href="/login"
@@ -76,197 +50,188 @@ export default function LandingPage() {
         </div>
       </nav>
 
-      {/* Hero Section — FSFI rebrand */}
-      <section className="relative overflow-hidden bg-[var(--rw-dark)] min-h-[85vh] flex items-center">
-        {/* Subtle grid */}
-        <div
-          className="absolute inset-0 opacity-[0.04]"
-          style={{
-            backgroundImage: 'linear-gradient(rgba(255,255,255,.08) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.08) 1px, transparent 1px)',
-            backgroundSize: '48px 48px',
-          }}
-        />
-        <div className="absolute top-0 right-0 w-[50%] h-full bg-gradient-to-l from-[var(--rw-blue)]/5 to-transparent" />
-        <div className="absolute bottom-0 left-0 w-[40%] h-[60%] bg-gradient-to-tr from-[var(--rw-green)]/5 to-transparent" />
+      {/* Hero */}
+      <section className="relative bg-[var(--rw-dark)] min-h-[80vh] flex items-center">
+        <div className="absolute inset-0 opacity-[0.03]" style={{
+          backgroundImage: 'linear-gradient(rgba(255,255,255,.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.1) 1px, transparent 1px)',
+          backgroundSize: '48px 48px',
+        }} />
 
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 lg:py-24 w-full">
-          <div className="grid lg:grid-cols-2 gap-12 lg:gap-20 items-center">
-            {/* Left: Copy */}
-            <div className="relative pl-0 lg:pl-4">
-              <div className="absolute left-0 top-0 bottom-0 w-1 rounded-full bg-gradient-to-b from-[var(--rw-blue)] via-[var(--rw-yellow)] to-[var(--rw-green)] hidden lg:block" />
-
-              <p className="text-[var(--rw-blue)] font-semibold text-sm uppercase tracking-widest mb-6">
-                {t('app.ministry')} · Rwanda
-              </p>
-
-              <h1 className="text-4xl sm:text-5xl lg:text-[3.25rem] xl:text-6xl font-bold text-white leading-[1.08] tracking-tight">
-                <span className="block whitespace-nowrap">Where budget meets</span>
-                <span className="block text-[var(--rw-yellow)] whitespace-nowrap">food system impact</span>
-              </h1>
-
-              <p className="mt-5 text-lg text-gray-400 max-w-md">
-                Scores, gaps, and recommendations from national budget and indicator data.
-              </p>
-
-              <div className="mt-6 flex flex-wrap gap-x-5 gap-y-1 text-sm text-gray-500">
-                <span className="flex items-center gap-1.5">
-                  <Layers className="h-4 w-4 text-[var(--rw-blue)]" />
-                  37 indicators · 8 components
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <Target className="h-4 w-4 text-[var(--rw-green)]" />
-                  PSTA 5
-                </span>
-              </div>
-
-              <div className="mt-8 flex flex-col sm:flex-row gap-4">
-                <Link
-                  href="/login"
-                  className="inline-flex items-center justify-center px-6 py-3.5 text-base font-semibold text-[var(--rw-dark)] bg-white rounded-xl hover:bg-gray-100 transition-all shadow-lg group"
-                >
-                  Sign in to dashboard
-                  <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-0.5 transition-transform" />
-                </Link>
-                <a
-                  href="#features"
-                  className="inline-flex items-center justify-center px-6 py-3.5 text-base font-semibold text-white/90 border border-white/20 rounded-xl hover:bg-white/10 transition-all"
-                >
-                  See what it does
-                </a>
-              </div>
-            </div>
-
-            {/* Right: Product card */}
-            <div className="hidden lg:block">
-              <div className="relative">
-                <div className="absolute -inset-3 bg-gradient-to-br from-[var(--rw-blue)]/15 to-[var(--rw-green)]/15 rounded-3xl blur-2xl" />
-                <div className="relative bg-[var(--rw-dark)]/80 backdrop-blur-sm border border-white/10 rounded-2xl p-6 shadow-2xl">
-                  <div className="flex items-center justify-between mb-6">
-                    <span className="text-sm font-semibold text-gray-300">FSFI at a glance</span>
-                    <span className="text-xs text-gray-500 bg-white/5 px-2.5 py-1 rounded-md">National</span>
-                  </div>
-                  <div className="flex items-baseline gap-3 mb-4">
-                    <span className="text-5xl font-bold text-white tabular-nums">FSFI</span>
-                    <span className="text-2xl font-semibold text-[var(--rw-yellow)]">score</span>
-                  </div>
-                  <p className="text-sm text-gray-500 mb-5">
-                    Scores · Gaps · Optimization
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    {[
-                      { icon: BarChart3, label: 'Assessment' },
-                      { icon: TrendingUp, label: 'Gap analysis' },
-                      { icon: DollarSign, label: 'Optimization' },
-                    ].map(({ icon: Icon, label }) => (
-                      <div
-                        key={label}
-                        className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-lg px-3 py-2"
-                      >
-                        <Icon className="h-4 w-4 text-[var(--rw-blue)]" />
-                        <span className="text-xs font-medium text-gray-400">{label}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Features */}
-      <section id="features" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
-        <div className="text-center mb-14">
-          <h2 className="text-3xl sm:text-4xl font-bold text-gray-900">
-            Intelligence for Better Decisions
-          </h2>
-          <p className="mt-4 text-lg text-gray-600 max-w-2xl mx-auto">
-            A comprehensive platform designed for MINAGRI, MINECOFIN, RAB, and sector officials
-            to make data-driven food system investment decisions at national and indicator level.
-          </p>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-          {FEATURES.map((feature) => {
-            const Icon = feature.icon;
-            return (
-              <div
-                key={feature.title}
-                className="bg-white border border-gray-200 rounded-xl p-6 hover:shadow-lg hover:border-[var(--rw-blue)]/30 transition-all group"
-              >
-                <div className="w-12 h-12 bg-[var(--rw-blue)]/10 rounded-lg flex items-center justify-center mb-4 group-hover:bg-[var(--rw-blue)]/20 transition-colors">
-                  <Icon className="h-6 w-6 text-[var(--rw-blue)]" />
-                </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">{feature.title}</h3>
-                <p className="text-sm text-gray-600 leading-relaxed">{feature.description}</p>
-              </div>
-            );
-          })}
-        </div>
-      </section>
-
-      {/* Stakeholders */}
-      <section className="bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
-          <div className="text-center mb-14">
-            <h2 className="text-3xl sm:text-4xl font-bold text-gray-900">
-              Built for Government
-            </h2>
-            <p className="mt-4 text-lg text-gray-600 max-w-2xl mx-auto">
-              Serving key stakeholders across Rwanda&apos;s agriculture and finance ecosystem.
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 w-full">
+          <div className="max-w-3xl">
+            <p className="text-[var(--rw-blue)] font-medium text-sm uppercase tracking-widest mb-6">
+              {t('app.subtitle')}
             </p>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[
-              { name: 'MINAGRI', role: 'Policy & budget decisions', color: 'var(--rw-blue)' },
-              { name: 'MINECOFIN', role: 'Budget approval & fiscal oversight', color: 'var(--rw-green)' },
-              { name: 'RAB', role: 'Implementation & monitoring', color: 'var(--rw-yellow)' },
-              { name: 'NISR', role: 'Data provider & validation', color: 'var(--rw-blue)' },
-              { name: 'District Mayors', role: 'Local-level decision making', color: 'var(--rw-green)' },
-              { name: 'RDB', role: 'Investment & private sector', color: 'var(--rw-yellow)' },
-            ].map((stakeholder) => (
-              <div
-                key={stakeholder.name}
-                className="bg-white rounded-lg p-5 border border-gray-200 flex items-start space-x-4"
+
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-white leading-tight">
+              {t('landing.hero_title_1')}
+              <span className="block text-[var(--rw-yellow)] mt-2">{t('landing.hero_title_2')}</span>
+            </h1>
+
+            <div className="mt-6 text-lg text-gray-400 max-w-2xl space-y-4">
+              <p>{t('landing.hero_p1')}</p>
+              <p>{t('landing.hero_p2')}</p>
+            </div>
+
+            <div className="mt-10 flex flex-col sm:flex-row gap-4">
+              <Link
+                href="/login"
+                className="inline-flex items-center justify-center px-6 py-4 text-base font-semibold text-[var(--rw-dark)] bg-white rounded-xl hover:bg-gray-100 transition-all shadow-lg group"
               >
-                <div
-                  className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 text-white font-bold text-sm"
-                  style={{ backgroundColor: stakeholder.color }}
-                >
-                  {stakeholder.name.slice(0, 2)}
-                </div>
-                <div>
-                  <h3 className="font-semibold text-gray-900">{stakeholder.name}</h3>
-                  <p className="text-sm text-gray-600">{stakeholder.role}</p>
-                </div>
+                {t('landing.hero_cta_dashboard')}
+                <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-0.5 transition-transform" />
+              </Link>
+              <Link
+                href="/about"
+                className="inline-flex items-center justify-center px-6 py-4 text-base font-semibold text-white/90 border border-white/20 rounded-xl hover:bg-white/10 transition-all"
+              >
+                {t('landing.hero_cta_about')}
+                <ArrowUpRight className="ml-2 h-5 w-5" />
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Platform capabilities (rwanda_backend) */}
+      <section className="py-20 bg-white border-t border-gray-100">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-14 max-w-3xl mx-auto">
+            <h2 className="text-3xl font-bold text-gray-900">
+              {t('landing.features_title')}
+            </h2>
+          </div>
+
+          <div className="grid sm:grid-cols-2 xl:grid-cols-4 gap-10 xl:gap-8">
+            <div className="flex flex-col items-center sm:items-start text-center sm:text-left max-w-md mx-auto sm:mx-0">
+              <div className="w-14 h-14 bg-[var(--rw-blue)]/10 rounded-2xl flex items-center justify-center mb-4 shrink-0 sm:mx-0 mx-auto">
+                <BarChart3 className="h-7 w-7 text-[var(--rw-blue)]" aria-hidden />
+              </div>
+              <h3 className="font-semibold text-gray-900 mb-2 text-lg">
+                {t('landing.feature1_title')}
+              </h3>
+              <p className="text-sm text-gray-600 leading-relaxed">
+                {t('landing.feature1_desc')}
+              </p>
+            </div>
+
+            <div className="flex flex-col items-center sm:items-start text-center sm:text-left max-w-md mx-auto sm:mx-0">
+              <div className="w-14 h-14 bg-[var(--rw-green)]/10 rounded-2xl flex items-center justify-center mb-4 shrink-0 sm:mx-0 mx-auto">
+                <LineChart className="h-7 w-7 text-[var(--rw-green)]" aria-hidden />
+              </div>
+              <h3 className="font-semibold text-gray-900 mb-2 text-lg">
+                {t('landing.feature2_title')}
+              </h3>
+              <p className="text-sm text-gray-600 leading-relaxed">
+                {t('landing.feature2_desc')}
+              </p>
+            </div>
+
+            <div className="flex flex-col items-center sm:items-start text-center sm:text-left max-w-md mx-auto sm:mx-0">
+              <div className="w-14 h-14 bg-[var(--rw-yellow)]/20 rounded-2xl flex items-center justify-center mb-4 shrink-0 sm:mx-0 mx-auto">
+                <Scale className="h-7 w-7 text-[var(--rw-yellow)]" aria-hidden />
+              </div>
+              <h3 className="font-semibold text-gray-900 mb-2 text-lg">
+                {t('landing.feature3_title')}
+              </h3>
+              <p className="text-sm text-gray-600 leading-relaxed">
+                {t('landing.feature3_desc')}
+              </p>
+            </div>
+
+            <div className="flex flex-col items-center sm:items-start text-center sm:text-left max-w-md mx-auto sm:mx-0">
+              <div className="w-14 h-14 bg-purple-100 rounded-2xl flex items-center justify-center mb-4 shrink-0 sm:mx-0 mx-auto">
+                <Target className="h-7 w-7 text-purple-600" aria-hidden />
+              </div>
+              <h3 className="font-semibold text-gray-900 mb-2 text-lg">
+                {t('landing.feature4_title')}
+              </h3>
+              <p className="text-sm text-gray-600 leading-relaxed">
+                {t('landing.feature4_desc')}
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Components Preview */}
+      <section className="py-16 bg-gray-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6 mb-10">
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900">{t('landing.components_title')}</h2>
+              <p className="text-gray-600 mt-1">{t('landing.components_sub')}</p>
+            </div>
+            <Link
+              href="/about"
+              className="inline-flex items-center text-sm font-medium text-[var(--rw-blue)] hover:underline"
+            >
+              {t('landing.learn_more')}
+              <ArrowRight className="ml-1 h-4 w-4" />
+            </Link>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {[
+              { name: 'Crop Production', color: 'bg-green-500' },
+              { name: 'Animal Systems', color: 'bg-pink-500' },
+              { name: 'Post-Harvest', color: 'bg-yellow-500' },
+              { name: 'Markets', color: 'bg-blue-500' },
+              { name: 'Nutrition', color: 'bg-orange-500' },
+              { name: 'Finance', color: 'bg-indigo-500' },
+              { name: 'Research', color: 'bg-purple-500' },
+              { name: 'Environment', color: 'bg-teal-500' },
+            ].map((comp) => (
+              <div
+                key={comp.name}
+                className="bg-white rounded-lg p-4 border border-gray-200 flex items-center gap-3"
+              >
+                <div className={`w-3 h-3 rounded-full ${comp.color}`} />
+                <span className="text-sm font-medium text-gray-900">{comp.name}</span>
               </div>
             ))}
           </div>
         </div>
       </section>
 
+      {/* Partnership logos: static import so Next serves them from /_next/static/media/ */}
+      <section className="py-16 bg-white border-t border-gray-100">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <p className="text-center text-sm text-gray-500 mb-10">{t('landing.partnership')}</p>
+          <div className="flex flex-wrap justify-center items-center gap-x-10 gap-y-8 md:gap-x-16 md:gap-y-10">
+            <PartnerLogo
+              image={akademiaLogo}
+              label="Akademiya2063"
+              href="https://www.akademiya2063.org/"
+            />
+            <PartnerLogo image={ifpriLogo} label="IFPRI" href="https://www.ifpri.org/" />
+            <PartnerLogo image={mcgillLogo} label="McGill University" href="https://www.mcgill.ca/" />
+          </div>
+        </div>
+      </section>
+
       {/* CTA */}
-      <section className="bg-gradient-to-r from-[var(--rw-blue)] to-[var(--rw-green)]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 text-center">
+      <section className="bg-gradient-to-r from-[var(--rw-blue)] to-[var(--rw-green)] py-16">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-3xl font-bold text-white mb-4">
-            Ready to Access the FSFI Dashboard?
+            {t('landing.cta_access_title')}
           </h2>
-          <p className="text-lg text-white/80 max-w-xl mx-auto mb-8">
-            Sign in with your government credentials to explore Rwanda&apos;s food system financial intelligence data.
+          <p className="text-lg text-white/80 mb-8">
+            {t('landing.cta_access_body')}
           </p>
           <Link
             href="/login"
-            className="inline-flex items-center px-8 py-3.5 text-base font-semibold text-[var(--rw-blue)] bg-white rounded-lg hover:bg-gray-50 transition-colors shadow-lg group"
+            className="inline-flex items-center px-8 py-4 text-base font-semibold text-[var(--rw-blue)] bg-white rounded-xl hover:bg-gray-50 transition-colors shadow-lg"
           >
-            <Shield className="mr-2 h-5 w-5" />
             {t('auth.sign_in')}
-            <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
+            <ArrowRight className="ml-2 h-5 w-5" />
           </Link>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="bg-[var(--rw-dark)]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+      <footer className="bg-[var(--rw-dark)] py-10">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="flex items-center space-x-3">
               <RwandaLogo size="sm" />
@@ -276,17 +241,13 @@ export default function LandingPage() {
               </div>
             </div>
             <div className="flex items-center space-x-6 text-sm text-gray-400">
+              <Link href="/about" className="hover:text-white transition-colors">About</Link>
               <Link href="/login" className="hover:text-white transition-colors">{t('auth.sign_in')}</Link>
-              <a href="#features" className="hover:text-white transition-colors">Features</a>
             </div>
           </div>
-          <div className="mt-8 pt-6 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-2">
+          <div className="mt-8 pt-6 border-t border-white/10 text-center">
             <p className="text-xs text-gray-500">
-              &copy; {new Date().getFullYear()} {t('app.republic')} — {t('app.subtitle')}
-            </p>
-            <p className="text-xs text-gray-500">
-              <FileText className="inline h-3 w-3 mr-1" />
-              Powered by FSFI Platform
+              &copy; {new Date().getFullYear()} {t('app.republic')}. {t('about_page.footer_line')}.
             </p>
           </div>
         </div>

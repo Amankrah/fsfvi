@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useFiscalYear } from '@/contexts/FiscalYearContext';
 import { FiscalYearSelector } from '@/components/rwanda/shared/FiscalYearSelector';
-import { getCurrentSeason } from '@/lib/constants/rwanda';
 import { formatRWFCompact, formatScore, getRiskBgColor } from '@/lib/utils/formatters';
 import { assessmentAPI } from '@/lib/api/assessmentApi';
 import type { DashboardSummary, AssessmentHistory } from '@/lib/types/assessment';
@@ -29,7 +28,6 @@ type TrendView = 'fsfsi' | 'components' | 'heatmap';
 export function NationalOverview() {
   const { t } = useLanguage();
   const { fiscalYear } = useFiscalYear();
-  const season = getCurrentSeason();
 
   const [dashboardData, setDashboardData] = useState<DashboardSummary | null>(null);
   const [historyData, setHistoryData] = useState<AssessmentHistory[]>([]);
@@ -102,9 +100,7 @@ export function NationalOverview() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">{t('overview.national_fsfi')}</h1>
-            <p className="text-sm text-gray-600 mt-1">
-              {fiscalYear.label} — {season.label}
-            </p>
+            <p className="text-sm text-gray-600 mt-1">{fiscalYear.label}</p>
           </div>
           <FiscalYearSelector />
         </div>
@@ -133,9 +129,7 @@ export function NationalOverview() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">{t('overview.national_fsfi')}</h1>
-          <p className="text-sm text-gray-600 mt-1">
-            {fiscalYear.label} — {season.label}
-          </p>
+          <p className="text-sm text-gray-600 mt-1">{fiscalYear.label}</p>
         </div>
         <FiscalYearSelector />
       </div>

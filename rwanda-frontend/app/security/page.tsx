@@ -24,7 +24,9 @@ export default function SecurityPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-gray-600">Password management & two-factor authentication settings.</p>
+                  <p className="text-gray-600">
+                    Password management and two-factor authentication are coming soon.
+                  </p>
                 </CardContent>
               </Card>
             </main>
