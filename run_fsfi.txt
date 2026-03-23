@@ -1,3 +1,0 @@
-$env:RUST_LOG="fsfi_backend=info,actix_web=info"
-
-cargo watch -x run
