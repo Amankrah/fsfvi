@@ -1,3 +1,50 @@
-# Rwanda backend Python dependencies (install in venv)
-# Excel import for budget mapping
-openpyxl>=3.1.0
+# Rwanda FSFI backend — production-oriented dependencies
+# Python 3.10+ (matches fsfi_engine)
+#
+# Native engine fsfi_engine (required): Rust + PyO3, not a pip package.
+# PyO3 is declared in fsfi_engine/Cargo.toml; it is compiled into the extension
+# when you build with maturin (links against your Python interpreter).
+#
+# Build / install:
+#   cd fsfi_engine && maturin develop
+#   # release wheel (e.g. CI/Docker):
+#   maturin build --release && pip install target/wheels/fsfi_engine-*.whl
+#
+# Dev-only helper (optional): pip install "maturin>=1,<2"
+#
+# ---------------------------------------------------------------------------
+# Django core
+# ---------------------------------------------------------------------------
+Django>=5.2,<5.3
+
+# ---------------------------------------------------------------------------
+# REST API, CORS, filtering (see rwanda_project/settings.py INSTALLED_APPS)
+# ---------------------------------------------------------------------------
+djangorestframework>=3.15,<3.16
+django-cors-headers>=4.6,<5
+django-filter>=24.3,<25
+
+# ---------------------------------------------------------------------------
+# Configuration
+# ---------------------------------------------------------------------------
+python-dotenv>=1.0,<2
+
+# ---------------------------------------------------------------------------
+# PostgreSQL (production; set DB_ENGINE=django.db.backends.postgresql in .env)
+# ---------------------------------------------------------------------------
+psycopg[binary]>=3.2,<4
+
+# ---------------------------------------------------------------------------
+# WSGI server (production)
+# ---------------------------------------------------------------------------
+gunicorn>=23.0,<24
+
+# ---------------------------------------------------------------------------
+# Excel import / mapping (management commands + API uploads)
+# ---------------------------------------------------------------------------
+openpyxl>=3.1,<4
+
+# ---------------------------------------------------------------------------
+# HTTP client (e.g. fetch_rwanda_observed management command)
+# ---------------------------------------------------------------------------
+requests>=2.32,<3
