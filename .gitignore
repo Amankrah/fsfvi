@@ -83,6 +83,9 @@ staticfiles/
 .DS_Store
 Thumbs.db
 
+# Local deployment runbook (not tracked)
+deployment.md
+
 # Environment files
 .env
 .env.local

@@ -79,7 +79,13 @@ python manage.py set_password --username admin --password "your-secure-password"
 
 ## World Bank JSON files in this folder (`wb_new_data.json`, `wb_additional_data.json`)
 
-These two files sit at **`rwanda_backend/wb_new_data.json`** and **`rwanda_backend/wb_additional_data.json`**. They are **reference exports** of World Bank–style data (indicator metadata + numeric arrays). **No Django management command currently reads them automatically.**
+These two files sit at **`rwanda_backend/wb_new_data.json`** and **`rwanda_backend/wb_additional_data.json`**. They are **reference exports** of World Bank–style data (indicator metadata + numeric arrays). Merge them into the app’s reference file with:
+
+```bash
+python manage.py merge_wb_reference_exports --apply
+```
+
+That updates **`apps/fsfvi_data/data/reference_distributions.json`** (a `.json.bak` backup is written first). Use before `compute_benchmark_sample` if you want those pools in percentile benchmarks; **`import_indicator_parameters` still overwrites benchmarks** when you run it afterward (see pipeline guide).
 
 | File | Shape (summary) | Typical use |
 |------|-----------------|-------------|
@@ -92,7 +98,7 @@ These two files sit at **`rwanda_backend/wb_new_data.json`** and **`rwanda_backe
 
 2. **Benchmark percentiles (global reference)** for `compute_benchmark_sample` come from **`apps/fsfvi_data/data/reference_distributions.json`**, documented in **`apps/fsfvi_data/data/REFERENCE_DATA_MAPPING.md`**. That JSON uses FSFI codes under `indicators` with `values` arrays. You can think of `wb_new_data.json` / `wb_additional_data.json` as **sibling or source material** when regenerating or validating `reference_distributions.json`, but the pipeline **as shipped** reads **`reference_distributions.json`**, not the `wb_*.json` root files.
 
-3. To use your `wb_*.json` data inside Django you would add a **new command or ETL script** that parses them and writes either `reference_distributions.json` or directly updates `IndicatorData` / benchmarks. That is not implemented in the current codebase.
+3. **`merge_wb_reference_exports`** (above) loads both JSON files into `reference_distributions.json`. They do **not** replace `fetch_rwanda_observed` (Rwanda year series still comes from the World Bank API or interpolation).
 
 ---
 
@@ -126,6 +132,7 @@ Place the IFPRI Excel files where the commands can see them (paths below assume 
 | | `import_indicator_parameters <xlsx>` | IFPRI parameters Excel → indicators + `IndicatorData` |
 | | `fetch_rwanda_observed` | World Bank API → observed values + interpolation |
 | | `compute_observed_imputed` | Impute missing observed values |
+| | `merge_wb_reference_exports` | Merge `wb_new_data.json` + `wb_additional_data.json` into `reference_distributions.json` |
 | | `compute_benchmark_sample` | 10th/90th benchmarks from `reference_distributions.json` |
 | | `seed_indicators` | Seed 37 indicators without Excel |
 | **assessments** | `run_assessments_all_years` | Run FSFSI assessments via Rust |
