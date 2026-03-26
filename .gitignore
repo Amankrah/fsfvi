@@ -77,6 +77,9 @@ pids/
 media/uploaded_csv/
 staticfiles/
 
+# Claude Code / local AI config (machine-specific)
+.claude/
+
 # IDE and Editor files
 .vscode/
 .idea/
@@ -88,6 +91,10 @@ Thumbs.db
 
 # Local deployment runbook (not tracked)
 deployment.md
+
+# AWS / SSH private keys (never commit)
+*.pem
+*.ppk
 
 # Environment files
 .env

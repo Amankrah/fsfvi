@@ -4,6 +4,8 @@ Django REST API and data layer for the **Food Systems Financial Intelligence (FS
 
 For a **longer step-by-step data pipeline** (Excel paths, assessment details, weighting notes), see the repo root guide: **`RWANDA_BACKEND_PIPELINE_GUIDE.md`**.
 
+For **production deployment** (AWS EC2, nginx, TLS, travel/SSH vs CORS), see **`docs/PRODUCTION_DEPLOYMENT.md`**.
+
 ---
 
 ## Prerequisites
@@ -54,17 +56,19 @@ python manage.py runserver
 
 ### Important environment variables
 
-Create a `.env` in `rwanda_backend` (loaded by `python-dotenv` in `rwanda_project/settings.py`) or export in the shell:
+Create a `.env` in `rwanda_backend` (loaded **before** Django starts via `rwanda_project/env_bootstrap.py` from `manage.py` / `wsgi.py` / `asgi.py`, and again from `settings.py`). Copy **`rwanda_backend/.env.example`** to `.env`. Use **`DJANGO_SETTINGS_MODULE=rwanda_project.settings`** for local dev and **`rwanda_project.settings_production`** on the server (see `settings_production.py`). You can export variables in the shell instead of `.env` (shell wins over `.env`).
 
 | Variable | Purpose |
 |----------|---------|
+| `DJANGO_SETTINGS_MODULE` | `rwanda_project.settings` (dev) or `rwanda_project.settings_production` (EC2) |
 | `DJANGO_SECRET_KEY` | Production: long random string |
 | `DJANGO_DEBUG` | `False` in production |
 | `DJANGO_ALLOWED_HOSTS` | Comma-separated hosts |
 | `FSFI_JWT_SECRET` | Must match what the engine uses for tokens (min ~32 chars) |
 | `FSFI_ENCRYPTION_KEY` | 32-character key for crypto helpers in Rust |
 | `DB_ENGINE`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT` | Use `django.db.backends.postgresql` + credentials in production |
-| `CORS_ALLOWED_ORIGINS` | e.g. `http://localhost:3001` for the Next.js app |
+| `CORS_ALLOWED_ORIGINS` | Dev: `http://localhost:3000,http://localhost:3001`. Production: every **https://** origin that serves the UI (e.g. `https://rwanda.fsfvi.ai,https://fsfvi.ai`). Required explicitly in `settings_production`. |
+| `CSRF_TRUSTED_ORIGINS` | Optional in dev (defaults to same as CORS). Production: match CORS origins. |
 
 ---
 

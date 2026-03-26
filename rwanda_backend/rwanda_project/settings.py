@@ -20,7 +20,7 @@ SECRET_KEY = os.getenv(
     "django-insecure-change-this-in-production-minimum-50-chars-long!!!!",
 )
 DEBUG = os.getenv("DJANGO_DEBUG", "True").lower() == "true"
-ALLOWED_HOSTS = os.getenv("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
+ALLOWED_HOSTS = [h.strip() for h in os.getenv("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",") if h.strip()]
 
 # FSFI Engine Configuration (Rust crate)
 FSFI_JWT_SECRET = os.getenv("FSFI_JWT_SECRET", "change-this-jwt-secret-in-production-min-32-chars!!")
@@ -141,9 +141,17 @@ REST_FRAMEWORK = {
     "DATETIME_FORMAT": "%Y-%m-%dT%H:%M:%S%z",
 }
 
-# CORS
-CORS_ALLOWED_ORIGINS = os.getenv(
-    "CORS_ALLOWED_ORIGINS",
-    "http://localhost:3000,http://localhost:3001",
-).split(",")
+# CORS / CSRF (browser origins — include every host:port the Next.js app uses, e.g. https://rwanda.fsfvi.ai)
+_cors_default = "http://localhost:3000,http://localhost:3001"
+CORS_ALLOWED_ORIGINS = [
+    o.strip()
+    for o in os.getenv("CORS_ALLOWED_ORIGINS", _cors_default).split(",")
+    if o.strip()
+]
 CORS_ALLOW_CREDENTIALS = True
+_csrf_dev = os.getenv("CSRF_TRUSTED_ORIGINS", "").strip()
+CSRF_TRUSTED_ORIGINS = (
+    [o.strip() for o in _csrf_dev.split(",") if o.strip()]
+    if _csrf_dev
+    else list(CORS_ALLOWED_ORIGINS)
+)

@@ -3,10 +3,12 @@
 import os
 import sys
 
+import rwanda_project.env_bootstrap  # noqa: F401 — load .env before settings module
+
 
 def main():
     """Run administrative tasks."""
-    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'rwanda_project.settings')
+    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "rwanda_project.settings")
     try:
         from django.core.management import execute_from_command_line
     except ImportError as exc:
