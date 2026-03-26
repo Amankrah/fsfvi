@@ -148,9 +148,10 @@ Run `python manage.py help` or `python manage.py <command> --help` for flags.
 ## Production notes
 
 - Serve with **gunicorn** (see `requirements.txt`), e.g. `gunicorn rwanda_project.wsgi:application --bind 0.0.0.0:8000`.
-- Use **PostgreSQL** and set `DB_*` env vars.
+- Use **`rwanda_project.settings_production`** (`DJANGO_SETTINGS_MODULE`) and env vars; **SQLite** on a single host is fine (`DB_NAME` path), or use **PostgreSQL** with `DB_*`.
 - Set `DJANGO_DEBUG=False`, strong `DJANGO_SECRET_KEY`, and restrict `ALLOWED_HOSTS` / `CORS_ALLOWED_ORIGINS`.
 - Build the engine in release mode for deployment: `maturin build --release` and install the wheel into the same venv as Django.
+- **Schema** `migrations/*.py` files stay in Git for every environment; **`db.sqlite3`** is local/server-only (see `../docs/domain-and-environments.md`).
 
 ---
 
