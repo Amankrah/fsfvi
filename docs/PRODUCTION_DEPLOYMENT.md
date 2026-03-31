@@ -536,53 +536,59 @@ See comments in that file for **TLS**, **headers**, **rate limits**, and **`X-Fo
 
 ## Phase 5 — systemd (Gunicorn + Next.js)
 
-### Gunicorn (example)
+### Before you start
 
-`/etc/systemd/system/fsfvi-gunicorn.service`:
+1. **`rwanda_backend`**: venv exists, **`python manage.py migrate`** and **`collectstatic`** already run.
+2. **`rwanda-frontend`**: **`npm ci`** and **`npm run build`** already succeeded (`.next/` present).
+3. **`.env`**: production values; readable by the service user (`fsfvi` or `ubuntu`).
+4. **SQLite** at **`DB_NAME`**: parent directory writable by the Gunicorn user (e.g. **`sudo chown fsfvi:fsfvi /var/lib/fsfvi`**).
+5. **Process user** below is **`fsfvi`**. If everything under **`/opt/fsfvi/app`** is owned by **`ubuntu`**, replace **`User=`** / **`Group=`** with **`ubuntu`** in both units (and match SQLite ownership).
 
-```ini
-[Unit]
-Description=FSFI Django (Gunicorn)
-After=network.target
+### Install unit files (prefer **`cp`** — avoids broken heredocs)
 
-[Service]
-User=fsfvi
-Group=fsfvi
-WorkingDirectory=/opt/fsfvi/app/rwanda_backend
-EnvironmentFile=/opt/fsfvi/app/rwanda_backend/.env
-ExecStart=/opt/fsfvi/app/rwanda_backend/venv/bin/gunicorn \
-  --bind unix:/run/fsfvi/gunicorn.sock \
-  --workers 5 \
-  --threads 2 \
-  --timeout 120 \
-  rwanda_project.wsgi:application
-RuntimeDirectory=fsfvi
-Restart=on-failure
+Multi-line **`tee << 'EOF'`** pastes often corrupt units (e.g. **`EOF` glued to `WantedBy`**). Use the committed files:
 
-[Install]
-WantedBy=multi-user.target
+**`deploy/systemd/fsfvi-gunicorn.service`**  
+**`deploy/systemd/fsfvi-frontend.service`**
+
+```bash
+sudo cp /opt/fsfvi/app/deploy/systemd/fsfvi-gunicorn.service /etc/systemd/system/
+sudo cp /opt/fsfvi/app/deploy/systemd/fsfvi-frontend.service /etc/systemd/system/
 ```
 
-Ensure **nginx** can read the socket (`www-data` in `fsfvi` group or `chmod`).
+If Gunicorn must run as **`ubuntu`** (not **`fsfvi`**), fix both units once:
 
-### Next.js (`fsfvi-frontend.service` example)
-
-```ini
-[Service]
-User=fsfvi
-WorkingDirectory=/opt/fsfvi/app/rwanda-frontend
-Environment=NODE_ENV=production
-Environment=PORT=3000
-ExecStart=/usr/bin/npm start
-Restart=always
+```bash
+sudo sed -i 's/^User=fsfvi/User=ubuntu/; s/^Group=fsfvi/Group=ubuntu/' /etc/systemd/system/fsfvi-gunicorn.service /etc/systemd/system/fsfvi-frontend.service
 ```
+
+If **`npm`** is not **`/usr/bin/npm`**, set **`ExecStart=`** in **`fsfvi-frontend.service`** to **`$(command -v npm)`** output (edit that file only).
+
+**3. Enable and start**
 
 ```bash
 sudo systemctl daemon-reload
 sudo systemctl enable --now fsfvi-gunicorn fsfvi-frontend
+sudo systemctl status fsfvi-gunicorn fsfvi-frontend --no-pager
 ```
 
-*(Supervisor is an alternative; systemd is used here for parity with existing deployment notes.)*
+**4. nginx ↔ socket** (so **`www-data`** can proxy to Gunicorn):
+
+```bash
+sudo usermod -aG fsfvi www-data
+sudo systemctl restart nginx
+```
+
+**5. Logs if something fails**
+
+```bash
+journalctl -u fsfvi-gunicorn -n 80 --no-pager
+journalctl -u fsfvi-frontend -n 80 --no-pager
+```
+
+Workers **`3`** reduces SQLite lock contention vs **`5`**; raise after moving to Postgres if needed.
+
+*(Supervisor is an alternative; systemd matches common Ubuntu EC2 setups.)*
 
 ---
 
@@ -641,6 +647,8 @@ See **`RWANDA_BACKEND_PIPELINE_GUIDE.md`**: `import_budget_mapping`, `import_ind
 | **`target/release/.cargo-lock` Permission denied** | **`maturin`** run as a different user than the one that created **`fsfi_engine/target/`**. Remove target and fix ownership: `sudo rm -rf /opt/fsfvi/app/rwanda_backend/fsfi_engine/target` and **`sudo chown -R fsfvi:fsfvi /opt/fsfvi/app`** (or align with **`ubuntu`** if you use only **`ubuntu`**), then rebuild as that user with **`source ~/.cargo/env`**. |
 | **`chmod` .env Operation not permitted** | **`.env`** is **root-owned** (e.g. **`sudo nano .env`**). **`sudo chown ubuntu:ubuntu .env`** or **`fsfvi:fsfvi`**, then **`chmod 600 .env`**. |
 | **`unable to open database file`** (SQLite) | **`DB_NAME`** parent dir missing or wrong owner. **`sudo mkdir -p /var/lib/fsfvi`**. If you run Django as **`ubuntu`**: **`sudo chown ubuntu:ubuntu /var/lib/fsfvi`**. If Gunicorn runs as **`fsfvi`**, use **`sudo chown fsfvi:fsfvi /var/lib/fsfvi`** and run **`migrate`** as **`fsfvi`** (or **`sudo -u fsfvi ...`**) so the DB file is created with the right owner. |
+| **`fsfvi-gunicorn` activating / exit status 1** | **`sudo cat /etc/systemd/system/fsfvi-gunicorn.service`** — if you see garbage like **`EOFtedBy`**, the unit was corrupted by a bad paste. Reinstall: **`sudo cp /opt/fsfvi/app/deploy/systemd/fsfvi-gunicorn.service /etc/systemd/system/`** then **`daemon-reload`**. Then **`journalctl -u fsfvi-gunicorn -n 50`** for Python/env/SQLite errors. |
+| Next.js on **3001**, nginx expects **3000** | Repo **`package.json`** **`start`** must be **`next start`** (no **`--port 3001`**); **`git pull`**, **`npm run build`**, **`sudo systemctl restart fsfvi-frontend`**. Or temporarily point **`upstream fsfvi_nextjs`** to **`127.0.0.1:3001`**. |
 
 ---
 
@@ -672,6 +680,7 @@ sqlite3 /var/lib/fsfvi/db.sqlite3 ".backup /var/backups/fsfvi-$(date +%Y%m%d).sq
 | `.env` | `/opt/fsfvi/app/rwanda_backend/.env` |
 | SQLite | `/var/lib/fsfvi/db.sqlite3` (recommended) |
 | nginx template | `deploy/nginx/fsfvi.conf.example` |
+| systemd unit templates | `deploy/systemd/fsfvi-gunicorn.service`, `deploy/systemd/fsfvi-frontend.service` |
 | Security audit script (server) | `/usr/local/bin/fsfvi-security-check.sh` |
 | Domain / branding | `docs/domain-and-environments.md` |
 | Pipeline | `RWANDA_BACKEND_PIPELINE_GUIDE.md` |

@@ -1,0 +1,16 @@
+[Unit]
+Description=FSFI Django (Gunicorn)
+After=network.target
+
+[Service]
+User=fsfvi
+Group=fsfvi
+WorkingDirectory=/opt/fsfvi/app/rwanda_backend
+EnvironmentFile=/opt/fsfvi/app/rwanda_backend/.env
+ExecStart=/opt/fsfvi/app/rwanda_backend/venv/bin/gunicorn --bind unix:/run/fsfvi/gunicorn.sock --workers 3 --threads 2 --timeout 120 rwanda_project.wsgi:application
+RuntimeDirectory=fsfvi
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
