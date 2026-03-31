@@ -147,10 +147,11 @@ If you need **admin-only** or **partner-only** APIs, do **not** rely on IP allow
 ### Phase 1 (during)
 
 - [ ] OS updated; **UFW** (if used) allows **80/443**; SSH strategy matches [travel section](#access-and-firewalls-while-traveling-rwanda-and-changing-ips)
-- [ ] **fail2ban** for `sshd`
-- [ ] **Unattended security upgrades**
-- [ ] **SSH**: no root, no passwords, keys only
-- [ ] Optional: `security-check.sh` script + weekly cron
+- [ ] Optional: outbound blocks on mining-related ports **10128** / **3333** (see Phase 1.3)
+- [ ] **fail2ban** for `sshd`; `systemctl status fail2ban` healthy before `fail2ban-client status sshd`
+- [ ] **Unattended security upgrades** (`20auto-upgrades` + `50unattended-upgrades`); verify files with `cat` (no merged `EOF` lines)
+- [ ] **SSH**: no root, no passwords, keys only; **`systemctl restart ssh`** on Ubuntu (not `sshd`)
+- [ ] **`/usr/local/bin/fsfvi-security-check.sh`** + optional weekly cron; **`/etc/tmpfiles.d`** cleanup if used
 
 ### Post-deployment
 
@@ -163,12 +164,23 @@ If you need **admin-only** or **partner-only** APIs, do **not** rely on IP allow
 
 ## Phase 1 — Security hardening
 
-Complete **before** cloning the app or opening the service beyond tests.
+Complete **before** cloning the app or opening the service beyond tests. This phase mirrors a **Sasel-style** hardened deployment: UFW, fail2ban, unattended upgrades, SSH hardening, optional mining-port blocks, and **`fsfvi-security-check.sh`** — adapted for **Ubuntu** and this repo.
 
-### 1.1 SSH and updates
+### Copy-paste and heredocs (avoid silent corruption)
+
+Broken pastes in terminals caused **`EOF` merged into content** (e.g. `EOFttended-Upgrade...`), **commands pasted inside** a `<<'EOF'` block (ending up *inside* `/etc/ssh/sshd_config.d/hardening.conf`), and **typos** (`PermitRootLogin notion no`). Rules:
+
+1. The closing line must be **`EOF`** alone (or `'EOF'` if you used `<<'EOF'`), **no spaces before it**, **no text after it** on the same line.
+2. **Never** paste `sudo sshd -t` or `systemctl restart` **inside** the heredoc — run them **after** the `EOF` line.
+3. After each `tee`, run `sudo cat /path/to/file` and confirm the file looks correct.
+4. On **Ubuntu**, restart SSH with **`sudo systemctl restart ssh`**. The unit name **`sshd`** often does **not** exist (`Failed to restart sshd.service: Unit sshd.service not found`). Do **not** use `restart sshd || restart ssh` unless you know `sshd` exists.
+5. If **`fail2ban-client`** says **socket** errors, ensure the service is running: `sudo systemctl enable --now fail2ban` then `sudo systemctl restart fail2ban`.
+
+### 1.1 System updates
 
 ```bash
 sudo apt update && sudo DEBIAN_FRONTEND=noninteractive apt upgrade -y
+# Optional: reboot if kernel updated, then SSH back in
 ```
 
 ### 1.2 Install security packages
@@ -177,25 +189,35 @@ sudo apt update && sudo DEBIAN_FRONTEND=noninteractive apt upgrade -y
 sudo apt install -y fail2ban ufw unattended-upgrades apt-listchanges
 ```
 
-### 1.3 UFW (example — **adjust SSH rule** to your strategy)
+### 1.3 Firewall (UFW)
 
-**If** you use a **single IP** for SSH (replace with your IP):
+**Replace the IP** with yours (`curl -s ifconfig.me` on your laptop). Optional lines below match common hardening guides (mining pools / optional denylist) — **skip** if you prefer minimal rules.
 
 ```bash
 sudo ufw default deny incoming
 sudo ufw default allow outgoing
-sudo ufw allow from YOUR_IP_HERE to any port 22 proto tcp comment 'SSH admin'
+sudo ufw allow from YOUR_PUBLIC_IP to any port 22 proto tcp comment 'SSH admin'
 sudo ufw allow 80/tcp comment 'HTTP'
 sudo ufw allow 443/tcp comment 'HTTPS'
+
+# Optional (cryptominer incident patterns — from hardened playbooks)
+sudo ufw deny out to any port 10128 comment 'Block mining pool'
+sudo ufw deny out to any port 3333 comment 'Block mining pool'
+# Optional: deny known bad sources (maintain your own list or omit)
+# sudo ufw deny from 203.0.113.50 comment 'example block'
+
 sudo ufw --force enable
 sudo ufw status verbose
 ```
 
-If you use **SSM only**, you may **omit** port 22 entirely from UFW and from the security group.
+If you use **SSM only**, you may **omit** SSH from UFW.
 
-### 1.4 fail2ban (`/etc/fail2ban/jail.local`)
+### 1.4 fail2ban
 
-```ini
+Write the **whole** file in one `tee` (avoids truncated `jail.local`):
+
+```bash
+sudo tee /etc/fail2ban/jail.local > /dev/null << 'EOF'
 [DEFAULT]
 bantime = 86400
 findtime = 600
@@ -208,33 +230,127 @@ enabled = true
 port = ssh
 filter = sshd
 maxretry = 3
-```
+bantime = 86400
+findtime = 600
+EOF
 
-```bash
-sudo systemctl enable --now fail2ban
+sudo systemctl enable fail2ban
+sudo systemctl restart fail2ban
+sudo systemctl status fail2ban --no-pager
 sudo fail2ban-client status sshd
 ```
 
-### 1.5 Unattended upgrades
+### 1.5 Unattended security upgrades
 
-Enable `unattended-upgrades` for security pockets (same pattern as standard Ubuntu guides).
+Two files — note the **`EOF`** on its **own line** after `Automatic-Reboot` (a common break was `EOF` glued to the last setting).
+
+```bash
+sudo tee /etc/apt/apt.conf.d/20auto-upgrades > /dev/null << 'EOF'
+APT::Periodic::Update-Package-Lists "1";
+APT::Periodic::Unattended-Upgrade "1";
+APT::Periodic::Download-Upgradeable-Packages "1";
+APT::Periodic::AutocleanInterval "7";
+EOF
+
+sudo tee /etc/apt/apt.conf.d/50unattended-upgrades > /dev/null << 'EOF'
+Unattended-Upgrade::Allowed-Origins {
+    "${distro_id}:${distro_codename}";
+    "${distro_id}:${distro_codename}-security";
+    "${distro_id}ESMApps:${distro_codename}-apps-security";
+    "${distro_id}ESM:${distro_codename}-infra-security";
+};
+Unattended-Upgrade::AutoFixInterruptedDpkg "true";
+Unattended-Upgrade::MinimalSteps "true";
+Unattended-Upgrade::Remove-Unused-Kernel-Packages "true";
+Unattended-Upgrade::Remove-Unused-Dependencies "true";
+Unattended-Upgrade::Automatic-Reboot "false";
+EOF
+
+sudo systemctl enable unattended-upgrades
+sudo systemctl start unattended-upgrades
+```
 
 ### 1.6 SSH hardening
 
-Use **drop-in** `/etc/ssh/sshd_config.d/hardening.conf`:
-
-- `PermitRootLogin no`
-- `PasswordAuthentication no`
-- `PubkeyAuthentication yes`
-- `MaxAuthTries 3`
+**Only** configuration lines between `<<'EOF'` and **`EOF`** — then test and restart **ssh**:
 
 ```bash
+sudo tee /etc/ssh/sshd_config.d/hardening.conf > /dev/null << 'EOF'
+PermitRootLogin no
+PasswordAuthentication no
+PubkeyAuthentication yes
+MaxAuthTries 3
+ClientAliveInterval 300
+ClientAliveCountMax 2
+X11Forwarding no
+AllowTcpForwarding no
+AllowAgentForwarding no
+PermitEmptyPasswords no
+EOF
+
 sudo sshd -t && sudo systemctl restart ssh
 ```
 
-### 1.7 Optional security audit script
+If `sshd -t` **fails**, fix `hardening.conf` before restarting SSH. Recovery: **EC2 Serial Console** or **SSM**.
 
-Install a small script (e.g. `/usr/local/bin/fsfvi-security-check.sh`) that lists crontabs, suspicious processes, listening ports, and fail2ban status — schedule weekly.
+### 1.7 Security monitoring script (`/usr/local/bin/fsfvi-security-check.sh`)
+
+```bash
+sudo tee /usr/local/bin/fsfvi-security-check.sh > /dev/null << 'EOFSCRIPT'
+#!/bin/bash
+echo "=== FSFI security check $(date) ==="
+
+echo -e "\n--- Crontabs ---"
+for user in $(cut -f1 -d: /etc/passwd); do
+  crontab -u "$user" -l 2>/dev/null | grep -v "^#" | grep -v "^$" && echo "  ^ User: $user"
+done
+
+echo -e "\n--- Suspicious processes (heuristic) ---"
+ps aux | grep -E "(xmrig|mine|kdevtmpfsi|/dev/shm/|/var/tmp/\.)" | grep -v grep || echo "None matched"
+
+echo -e "\n--- High CPU ---"
+ps aux --sort=-%cpu | head -5
+
+echo -e "\n--- fail2ban (sshd) ---"
+sudo fail2ban-client status sshd 2>/dev/null || echo "fail2ban not responding"
+
+echo -e "\n--- Listening TCP ---"
+sudo ss -tlnp
+
+echo -e "\n--- UFW ---"
+sudo ufw status verbose 2>/dev/null | head -20
+
+echo "=== Done ==="
+EOFSCRIPT
+
+sudo chmod +x /usr/local/bin/fsfvi-security-check.sh
+```
+
+Optional weekly cron (as root or ubuntu):
+
+```bash
+(sudo crontab -l 2>/dev/null | grep -v fsfvi-security-check; echo "0 8 * * 1 /usr/local/bin/fsfvi-security-check.sh >> /var/log/fsfvi-security-check.log 2>&1") | sudo crontab -
+```
+
+### 1.8 Temp directory hygiene (optional)
+
+```bash
+sudo tee /etc/tmpfiles.d/fsfvi-tmp-clean.conf > /dev/null << 'EOF'
+D /tmp 1777 root root 1d
+D /var/tmp 1777 root root 7d
+D /dev/shm 1777 root root 1d
+EOF
+```
+
+### 1.9 Verify Phase 1
+
+```bash
+sudo /usr/local/bin/fsfvi-security-check.sh
+sudo ufw status verbose
+sudo fail2ban-client status sshd
+```
+
+✅ Then continue to **Phase 2**.
 
 ---
 
@@ -249,7 +365,24 @@ sudo apt install -y \
   sqlite3 jq htop
 ```
 
-Install **Rust** (for `fsfi_engine`): [rustup.rs](https://rustup.rs/)
+Install **Rust** (required before **`maturin build`**). Rustup installs under **`~/.cargo`** for the **current user** — it does **not** require `sudo`.
+
+- **If your prompt is `fsfvi@...`** (you are already `fsfvi`): **do not use `sudo`** (it will fail). Run:
+
+```bash
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+source ~/.cargo/env
+cargo --version && rustc --version
+```
+
+- **If your prompt is `ubuntu@...`**: same install, but run it **as `fsfvi`**:
+
+```bash
+sudo -u fsfvi bash -c "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y"
+sudo -u fsfvi bash -c 'source "$HOME/.cargo/env" && cargo --version && rustc --version'
+```
+
+In any **new** `fsfvi` shell, run `source ~/.cargo/env` before **`maturin`** (or add that line to `~/.bashrc`). See [rustup.rs](https://rustup.rs/).
 
 ### 2.2 Node.js (LTS)
 
@@ -266,7 +399,8 @@ sudo timedatectl set-timezone Africa/Kigali
 ```bash
 sudo useradd -m -s /bin/bash fsfvi || true
 sudo mkdir -p /opt/fsfvi/app /var/lib/fsfvi
-sudo chown fsfvi:fsfvi /opt/fsfvi /var/lib/fsfvi
+# -R is required: without it, /opt/fsfvi/app stays root-owned and git clone fails
+sudo chown -R fsfvi:fsfvi /opt/fsfvi /var/lib/fsfvi
 ```
 
 ---
@@ -275,17 +409,45 @@ sudo chown fsfvi:fsfvi /opt/fsfvi /var/lib/fsfvi
 
 ### 3.1 Clone
 
+**Do not** paste `sudo -u fsfvi -i` and the next lines as separate steps unless you run `cd`, `git clone`, and `cd app` **inside** the new shell.
+
+The command below uses **`sudo`**, so run it only when your shell prompt is **`ubuntu@...`** (the default EC2 admin user). If your prompt is **`fsfvi@...`**, skip to the non-`sudo` clone below — **`fsfvi` has no sudo** and `sudo -u fsfvi ...` from inside `fsfvi` will always fail.
+
 ```bash
-sudo -u fsfvi -i
-cd /opt/fsfvi
-git clone https://github.com/Amankrah/fsfvi.git app
-cd app
+sudo -u fsfvi bash -c 'cd /opt/fsfvi && git clone https://github.com/Amankrah/fsfvi.git app'
 ```
+
+Verify:
+
+```bash
+ls /opt/fsfvi/app/rwanda_backend
+```
+
+If you are **already** logged in as `fsfvi`, you **cannot** use `sudo` (not in sudoers — that is normal). Run:
+
+```bash
+cd /opt/fsfvi && git clone https://github.com/Amankrah/fsfvi.git app
+```
+
+If you see **`[sudo] password for fsfvi`**, you are still logged in as **`fsfvi`**. Type **`exit`** until the prompt is **`ubuntu@...`**, or use another SSH session as **`ubuntu`**. **`fsfvi` cannot sudo** — there is no valid password for that.
+
+If clone fails with **`Permission denied`** under `/opt/fsfvi/app/.git`, the tree was probably created as **root** without recursive `chown`. As **`ubuntu`**:
+
+```bash
+sudo rm -rf /opt/fsfvi/app
+sudo mkdir -p /opt/fsfvi/app
+sudo chown -R fsfvi:fsfvi /opt/fsfvi /var/lib/fsfvi
+```
+
+Then clone again as **`fsfvi`** (command above) or from **`ubuntu`**: `sudo -u fsfvi bash -c 'cd /opt/fsfvi && git clone https://github.com/Amankrah/fsfvi.git app'`.
 
 ### 3.2 Backend — Python venv, Rust engine
 
+Run as **`fsfvi`** (no `sudo` if you are already `fsfvi`). **Rust must be installed** ([Phase 2.1](#21-packages)); in this shell run `source ~/.cargo/env` so **`cargo`** is on `PATH` before **`maturin build`**.
+
 ```bash
 cd /opt/fsfvi/app/rwanda_backend
+source ~/.cargo/env   # if cargo: not found, install rustup first (Phase 2.1)
 python3 -m venv venv
 source venv/bin/activate
 pip install --upgrade pip
@@ -294,10 +456,14 @@ pip install 'maturin>=1,<2' gunicorn
 
 cd fsfi_engine
 maturin build --release
-pip install target/wheels/fsfi_engine-*.whl
+pip install "$(ls target/wheels/fsfi_engine-*.whl | head -n1)"
 cd ..
-python -c "import fsfi_engine; print('fsfi_engine OK')"
+python -c "import fsfi_engine; print(fsfi_engine.__file__)"
 ```
+
+The last line should print a path ending in **`.so`** (built extension). If **`maturin`** errors with **Cargo metadata failed** / **cargo in your PATH**, Rust is missing or `~/.cargo/env` was not sourced.
+
+Run **`maturin build`** as the **same Linux user** that owns **`/opt/fsfvi/app`** and **`~/.cargo`** (usually **`fsfvi`**). If **`target/.cargo-lock` Permission denied**, another user owns **`fsfi_engine/target/`**: `sudo rm -rf fsfi_engine/target` then **`sudo chown -R fsfvi:fsfvi /opt/fsfvi/app`** (or **`ubuntu:ubuntu`** if you deploy only as **`ubuntu`**) and rebuild as that user.
 
 ### 3.3 Backend — `.env` (production)
 
@@ -316,15 +482,23 @@ DB_NAME=/var/lib/fsfvi/db.sqlite3
 
 `chmod 600 .env`
 
+Before **`migrate`**, ensure **`DB_NAME`**’s parent directory exists and is writable by the user running Django, e.g. **`sudo mkdir -p /var/lib/fsfvi`** and **`sudo chown ubuntu:ubuntu /var/lib/fsfvi`** (or **`fsfvi:fsfvi`** if the app runs as **`fsfvi`** — then run **`migrate`** as that user).
+
+Edit **`.env` without `sudo nano`** (use **`nano .env`** as the user that owns the repo — e.g. **`fsfvi`** or **`ubuntu`**). **`sudo nano`** creates a **root-owned** file; then **`chmod`** as a normal user fails with **Operation not permitted**. Fix: `sudo chown ubuntu:ubuntu .env` or `sudo chown fsfvi:fsfvi .env`, then **`chmod 600 .env`**.
+
 **Django** loads **`env_bootstrap`** before settings — see `rwanda_project/env_bootstrap.py`.
 
 ### 3.4 Migrate, collectstatic, user
 
 ```bash
+# If DB_NAME is under /var/lib/fsfvi (recommended):
+sudo mkdir -p /var/lib/fsfvi
+sudo chown ubuntu:ubuntu /var/lib/fsfvi   # match the user that runs migrate / gunicorn
+
 source venv/bin/activate
 python manage.py migrate --noinput
 python manage.py collectstatic --noinput
-python manage.py register_user --username admin --email admin@example.gov.rw --full-name "Admin" --role admin --admin --password '<12+chars>'
+python manage.py register_user --username admin --email admin@example.gov.rw --full-name "Admin" --role admin --admin --password 'DevAdminPass123!'
 ```
 
 ### 3.5 Frontend — build
@@ -452,10 +626,21 @@ See **`RWANDA_BACKEND_PIPELINE_GUIDE.md`**: `import_budget_mapping`, `import_ind
 
 | Symptom | Checks |
 |---------|--------|
+| `Unit sshd.service not found` | On **Ubuntu**, SSH is **`ssh`**: `sudo systemctl restart ssh` (not `sshd`). |
+| `Failed to access socket path: .../fail2ban.sock` | `sudo systemctl enable --now fail2ban` then `sudo systemctl restart fail2ban`; check `journalctl -u fail2ban`. |
+| `sshd -t` fails after editing `hardening.conf` | Fix typos (`PermitRootLogin no`, not `notion no`). See [Phase 1.6 SSH hardening](#16-ssh-hardening) and the heredoc rules above. |
 | HTTP 502 | Gunicorn up? Socket permissions? `nginx -t` |
 | CORS errors | `CORS_ALLOWED_ORIGINS` / `CSRF_TRUSTED_ORIGINS` match browser URL |
 | “Database is locked” | SQLite timeout in `settings_production`; reduce Gunicorn workers or move to Postgres later |
 | SSH refused | Security group + UFW + your IP / SSM |
+| `fsfvi is not in the sudoers file` | Expected when logged in as **`fsfvi`**. Do **not** use `sudo` (including `sudo -u fsfvi ...`). Use **`exit`** to return to **`ubuntu`**, or run clone/commands **without** `sudo` as **`fsfvi`** (see [Phase 3.1 Clone](#31-clone)). |
+| `[sudo] password for fsfvi` | Same: **`fsfvi` has no sudo**. **`exit`** to **`ubuntu@...`** and run admin commands there. |
+| `cd: app: No such file or directory` | Clone never ran or wrong directory. From **`ubuntu`**: `sudo -u fsfvi bash -c 'cd /opt/fsfvi && git clone https://github.com/Amankrah/fsfvi.git app'` — see [Phase 3.1 Clone](#31-clone). |
+| `/opt/fsfvi/app/.git: Permission denied` | **`app`** was root-owned. As **`ubuntu`**: `sudo rm -rf /opt/fsfvi/app && sudo mkdir -p /opt/fsfvi/app && sudo chown -R fsfvi:fsfvi /opt/fsfvi /var/lib/fsfvi`, then clone again. Ensure deploy step uses **`chown -R`** (see [Phase 2.4](#24-deploy-user-and-directories)). |
+| `Cargo metadata failed` / **cargo** not in `PATH` | Install **rustup** for **`fsfvi`** ([Phase 2.1](#21-packages)), then **`source ~/.cargo/env`** before **`maturin build`**. |
+| **`target/release/.cargo-lock` Permission denied** | **`maturin`** run as a different user than the one that created **`fsfi_engine/target/`**. Remove target and fix ownership: `sudo rm -rf /opt/fsfvi/app/rwanda_backend/fsfi_engine/target` and **`sudo chown -R fsfvi:fsfvi /opt/fsfvi/app`** (or align with **`ubuntu`** if you use only **`ubuntu`**), then rebuild as that user with **`source ~/.cargo/env`**. |
+| **`chmod` .env Operation not permitted** | **`.env`** is **root-owned** (e.g. **`sudo nano .env`**). **`sudo chown ubuntu:ubuntu .env`** or **`fsfvi:fsfvi`**, then **`chmod 600 .env`**. |
+| **`unable to open database file`** (SQLite) | **`DB_NAME`** parent dir missing or wrong owner. **`sudo mkdir -p /var/lib/fsfvi`**. If you run Django as **`ubuntu`**: **`sudo chown ubuntu:ubuntu /var/lib/fsfvi`**. If Gunicorn runs as **`fsfvi`**, use **`sudo chown fsfvi:fsfvi /var/lib/fsfvi`** and run **`migrate`** as **`fsfvi`** (or **`sudo -u fsfvi ...`**) so the DB file is created with the right owner. |
 
 ---
 
@@ -487,6 +672,7 @@ sqlite3 /var/lib/fsfvi/db.sqlite3 ".backup /var/backups/fsfvi-$(date +%Y%m%d).sq
 | `.env` | `/opt/fsfvi/app/rwanda_backend/.env` |
 | SQLite | `/var/lib/fsfvi/db.sqlite3` (recommended) |
 | nginx template | `deploy/nginx/fsfvi.conf.example` |
+| Security audit script (server) | `/usr/local/bin/fsfvi-security-check.sh` |
 | Domain / branding | `docs/domain-and-environments.md` |
 | Pipeline | `RWANDA_BACKEND_PIPELINE_GUIDE.md` |
 

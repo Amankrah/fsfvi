@@ -10,7 +10,7 @@ Based on Rwanda's budget-to-food-system-indicators mapping:
 import uuid
 
 from django.db import models
-
+  
 from apps.authentication.models import GovernmentUser
 
 

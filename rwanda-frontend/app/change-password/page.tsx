@@ -31,7 +31,10 @@ export default function ChangePasswordPage() {
 
     setIsLoading(true);
     try {
-      await authAPI.changePassword(currentPassword, newPassword);
+      await authAPI.changePassword({
+        current_password: currentPassword,
+        new_password: newPassword,
+      });
       router.push('/dashboard');
     } catch {
       setError('Failed to change password. Please check your current password.');
