@@ -15,3 +15,13 @@ export interface RwandaFiscalYear {
   start_date: string;   // "2025-07-01"
   end_date: string;     // "2026-06-30"
 }
+
+/** In-app notification item (AlertContext). */
+export interface Alert {
+  id: string;
+  read: boolean;
+  title?: string;
+  message?: string;
+  severity?: 'info' | 'warning' | 'error';
+  createdAt?: string;
+}

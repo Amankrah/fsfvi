@@ -45,7 +45,10 @@ export function TwoFactorForm({ tempToken, username, onBack }: TwoFactorFormProp
     setIsLoading(true);
 
     try {
-      const response = await authAPI.verify2FA(tempToken, fullCode);
+      const response = await authAPI.verify2FA({
+        temp_token: tempToken,
+        code: fullCode,
+      });
       if (response.user.is_temporary_password) {
         router.push('/change-password');
       } else {
