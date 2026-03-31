@@ -132,7 +132,13 @@ Weights \(\{\omega_i\}\) determine each indicator's contribution to the system F
 
 ### 5.1 Equal Weighting
 
-All 8 components receive equal weight \(\omega_c = 1/8 = 0.125\). Within each component, all indicators share equally. This is the simplest baseline.
+Every indicator receives the same weight regardless of which component it belongs to:
+
+$$\omega_i^{equal} = \frac{1}{N} = \frac{1}{37} \approx 0.027 \quad \forall\, i$$
+
+**Important:** this is equal weight **per indicator**, not per component. Since the 8 components contain different numbers of indicators, components with more indicators contribute proportionally more to FSFSI under equal weighting. For example, a component with 7 indicators contributes \(7/37 \approx 18.9\%\) while one with 3 contributes \(3/37 \approx 8.1\%\).
+
+This differs from non-equal methods (Expert, Financial, Network, Hybrid), which first assign a component-level weight \(\omega_c\) and then distribute it equally across the component's indicators.
 
 ### 5.2 Expert / AHP Weighting
 
@@ -180,11 +186,13 @@ The overall FSFSI is the **weighted sum of all indicator stresses**:
 
 $$\text{FSFSI} = \sum_{i=1}^{37} \omega_i \cdot \delta_i \cdot e^{-\alpha_i f_i}$$
 
-Since weights \(\omega_i\) are assigned at component level and split equally within components, this is equivalent to:
+For **non-equal weighting methods** (Expert, Financial, Network, Hybrid), weights are assigned at component level first, then split equally within each component, making this equivalent to:
 
 $$\text{FSFSI} = \sum_{c=1}^{8} \omega_c \cdot \left(\frac{1}{n_c} \sum_{i \in c} \delta_i \cdot e^{-\alpha_i f_i}\right)$$
 
-where \(n_c\) is the number of indicators in component \(c\).
+where \(n_c\) is the number of indicators in component \(c\) and \(\omega_c\) is the component weight from the selected method.
+
+For **equal weighting**, every indicator gets \(\omega_i = 1/N\) directly (no component-level step), so components with more indicators contribute more total weight.
 
 **Interpretation:**
 - \(\text{FSFSI} = 0\): No financial stress — all indicators at benchmark, regardless of investment
