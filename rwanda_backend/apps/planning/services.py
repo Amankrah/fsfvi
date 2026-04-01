@@ -863,6 +863,7 @@ def mtef_for_assessment(
     assessment_id: str,
     target_improvement_percent: float = 20,
     yearly_budget_growth_rate: float = 0.05,
+    target_curve: str = "linear",
     weighting_method: str = "hybrid",
     scenario: str = "normal_operations",
 ) -> dict:
@@ -924,6 +925,14 @@ def mtef_for_assessment(
 
     avg_rho_down = sum(cd["rho_down"] for cd in comp_data.values()) / len(comp_data) if comp_data else 0.15
 
+    target_year_3 = cumulative * (1 - target_improvement_percent / 100)
+
+    # MTEF policy targets remain linear for fiscal accountability; operational
+    # targets can follow a configurable curve to reflect implementation pacing.
+    curve = (target_curve or "linear").strip().lower()
+    if curve not in {"linear", "smoothstep", "frontloaded"}:
+        curve = "linear"
+
     # Process each MTEF year using FSFSI formula with optimal allocations
     prev_cum_system = cumulative
     for year_idx, year_key in enumerate(["year_1_plan", "year_2_plan", "year_3_plan"]):
@@ -965,13 +974,22 @@ def mtef_for_assessment(
         for comp_name in list(yp.get("component_allocations", {}).keys()):
             yp["component_allocations"][comp_name] *= budget_scale
 
-        # Stamp year target
+        # Stamp policy + operational year targets
         year_num = year_idx + 1
-        linear_target = cumulative * (1 - target_improvement_percent / 100 * year_num / 3)
-        yp["target_fsfvi"] = round(linear_target, 4)
+        policy_target = cumulative * (1 - target_improvement_percent / 100 * year_num / 3)
+        progress = _progress_fraction(year_num, 3, curve)
+        operational_target = cumulative - (cumulative - target_year_3) * progress
+
+        yp["policy_target_fsfvi"] = round(policy_target, 4)
+        yp["operational_target_fsfvi"] = round(operational_target, 4)
+        yp["target_fsfvi"] = yp["policy_target_fsfvi"]  # backwards compatibility
+        yp["on_track_policy"] = yp["projected_fsfvi"] <= yp["policy_target_fsfvi"]
+        yp["on_track_operational"] = yp["projected_fsfvi"] <= yp["operational_target_fsfvi"]
 
     # Scale target and baseline budget
-    result["target_fsfvi_year_3"] = round(cumulative * (1 - target_improvement_percent / 100), 4)
+    result["target_fsfvi_year_3"] = round(target_year_3, 4)
+    result["policy_target_definition"] = "linear_3y"
+    result["operational_target_curve"] = curve
     if "baseline_budget" in result:
         result["baseline_budget"] *= budget_scale
 

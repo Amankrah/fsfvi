@@ -14,6 +14,19 @@ interface MtefSummaryCardsProps {
 export function MtefSummaryCards({ plan }: MtefSummaryCardsProps) {
   const { t } = useLanguage();
   const { year_1_plan, year_2_plan, year_3_plan, target_fsfvi_year_3, fiscal_implications } = plan;
+  const curve = plan.operational_target_curve ?? 'linear';
+
+  const policyTarget = (year: typeof year_1_plan) =>
+    year.policy_target_fsfvi ?? year.target_fsfvi;
+
+  const operationalTarget = (year: typeof year_1_plan) =>
+    year.operational_target_fsfvi ?? policyTarget(year);
+
+  const policyOnTrack = (year: typeof year_1_plan) =>
+    year.on_track_policy ?? year.projected_fsfvi <= policyTarget(year);
+
+  const operationalOnTrack = (year: typeof year_1_plan) =>
+    year.on_track_operational ?? year.projected_fsfvi <= operationalTarget(year);
 
   return (
     <div className="space-y-4">
@@ -31,6 +44,17 @@ export function MtefSummaryCards({ plan }: MtefSummaryCardsProps) {
           <CardContent>
             <p className="text-2xl font-bold text-[var(--rw-blue)]">{formatScore(year_1_plan.projected_fsfvi)}</p>
             <p className="text-xs text-gray-500">Projected FSFSI</p>
+            <p className="text-xs text-gray-500 mt-1">Policy target: {formatScore(policyTarget(year_1_plan))}</p>
+            <p className="text-xs text-gray-500">Operational target: {formatScore(operationalTarget(year_1_plan))}</p>
+            <p className="text-[11px] mt-1">
+              <span className={policyOnTrack(year_1_plan) ? 'text-green-700' : 'text-amber-700'}>
+                Policy: {policyOnTrack(year_1_plan) ? 'On track' : 'Off track'}
+              </span>
+              {' · '}
+              <span className={operationalOnTrack(year_1_plan) ? 'text-green-700' : 'text-amber-700'}>
+                Operational: {operationalOnTrack(year_1_plan) ? 'On track' : 'Off track'}
+              </span>
+            </p>
             <p className="text-sm text-gray-700 mt-1">{formatRWFCompact(year_1_plan.total_budget)}</p>
           </CardContent>
         </Card>
@@ -44,6 +68,17 @@ export function MtefSummaryCards({ plan }: MtefSummaryCardsProps) {
           <CardContent>
             <p className="text-2xl font-bold text-[var(--rw-blue)]">{formatScore(year_2_plan.projected_fsfvi)}</p>
             <p className="text-xs text-gray-500">Projected FSFSI</p>
+            <p className="text-xs text-gray-500 mt-1">Policy target: {formatScore(policyTarget(year_2_plan))}</p>
+            <p className="text-xs text-gray-500">Operational target: {formatScore(operationalTarget(year_2_plan))}</p>
+            <p className="text-[11px] mt-1">
+              <span className={policyOnTrack(year_2_plan) ? 'text-green-700' : 'text-amber-700'}>
+                Policy: {policyOnTrack(year_2_plan) ? 'On track' : 'Off track'}
+              </span>
+              {' · '}
+              <span className={operationalOnTrack(year_2_plan) ? 'text-green-700' : 'text-amber-700'}>
+                Operational: {operationalOnTrack(year_2_plan) ? 'On track' : 'Off track'}
+              </span>
+            </p>
             <p className="text-sm text-gray-700 mt-1">{formatRWFCompact(year_2_plan.total_budget)}</p>
           </CardContent>
         </Card>
@@ -57,10 +92,24 @@ export function MtefSummaryCards({ plan }: MtefSummaryCardsProps) {
           <CardContent>
             <p className="text-2xl font-bold text-[var(--rw-green)]">{formatScore(year_3_plan.projected_fsfvi)}</p>
             <p className="text-xs text-gray-500">{t('planning.mtef_year3_target_label')}: {formatScore(target_fsfvi_year_3)}</p>
+            <p className="text-xs text-gray-500 mt-1">Policy target: {formatScore(policyTarget(year_3_plan))}</p>
+            <p className="text-xs text-gray-500">Operational target: {formatScore(operationalTarget(year_3_plan))}</p>
+            <p className="text-[11px] mt-1">
+              <span className={policyOnTrack(year_3_plan) ? 'text-green-700' : 'text-amber-700'}>
+                Policy: {policyOnTrack(year_3_plan) ? 'On track' : 'Off track'}
+              </span>
+              {' · '}
+              <span className={operationalOnTrack(year_3_plan) ? 'text-green-700' : 'text-amber-700'}>
+                Operational: {operationalOnTrack(year_3_plan) ? 'On track' : 'Off track'}
+              </span>
+            </p>
             <p className="text-sm text-gray-700 mt-1">{formatRWFCompact(year_3_plan.total_budget)}</p>
           </CardContent>
         </Card>
       </div>
+      <p className="text-xs text-gray-500">
+        Policy target follows a linear 3-year fiscal commitment line; operational target uses the selected `{curve}` pacing curve.
+      </p>
 
       <Card>
         <CardHeader className="pb-2">

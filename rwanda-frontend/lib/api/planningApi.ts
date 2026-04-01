@@ -128,6 +128,7 @@ export const planningAPI = {
     assessmentId: string,
     improvementPercent: number = 20,
     growthRate: number = 0.05,
+    targetCurve: 'linear' | 'smoothstep' | 'frontloaded' = 'linear',
     weightingMethod: string = 'hybrid',
     scenario: string = 'normal_operations',
   ): Promise<MtefPlan> => {
@@ -137,6 +138,7 @@ export const planningAPI = {
         params: {
           improvement_percent: improvementPercent,
           growth_rate: growthRate,
+          target_curve: targetCurve,
           weighting_method: weightingMethod,
           scenario,
         },

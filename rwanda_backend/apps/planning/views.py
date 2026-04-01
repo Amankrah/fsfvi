@@ -177,6 +177,7 @@ class AssessmentMtefView(APIView):
     def get(self, request, assessment_id):
         improvement = float(request.query_params.get("improvement_percent", 20))
         growth_rate = float(request.query_params.get("growth_rate", 0.05))
+        target_curve = request.query_params.get("target_curve", "linear")
         weighting_method = request.query_params.get("weighting_method", "hybrid")
         scenario = request.query_params.get("scenario", "normal_operations")
 
@@ -185,6 +186,7 @@ class AssessmentMtefView(APIView):
                 str(assessment_id),
                 target_improvement_percent=improvement,
                 yearly_budget_growth_rate=growth_rate,
+                target_curve=target_curve,
                 weighting_method=weighting_method,
                 scenario=scenario,
             )

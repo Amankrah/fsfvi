@@ -92,8 +92,13 @@ export interface MultiYearStrategicPlan {
 export interface MtefYearPlan {
   year: number;
   total_budget: number;
+  /** Backward-compatible alias for policy target (linear 3-year MTEF line). */
   target_fsfvi: number;
+  policy_target_fsfvi?: number;
+  operational_target_fsfvi?: number;
   projected_fsfvi: number;
+  on_track_policy?: boolean;
+  on_track_operational?: boolean;
   component_allocations: Record<string, number>;
   key_interventions: string[];
 }
@@ -102,6 +107,8 @@ export interface MtefPlan {
   baseline_year: number;
   baseline_fsfvi: number;
   target_fsfvi_year_3: number;
+  policy_target_definition?: string;
+  operational_target_curve?: 'linear' | 'smoothstep' | 'frontloaded' | string;
   baseline_budget: number;
   year_1_plan: MtefYearPlan;
   year_2_plan: MtefYearPlan;

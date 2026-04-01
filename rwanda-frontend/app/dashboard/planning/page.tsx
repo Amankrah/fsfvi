@@ -225,6 +225,7 @@ export default function PlanningPage() {
               assessment.id,
               mtefImprovementPercent,
               Number(full.yearly_budget_growth_rate),
+              (full.target_curve as 'linear' | 'smoothstep' | 'frontloaded') || 'linear',
               full.weighting_method || 'hybrid',
               full.scenario || 'normal_operations',
             );
@@ -337,6 +338,7 @@ export default function PlanningPage() {
           assessment.id,
           mtefImprovementPercent,
           mtefGrowthRate,
+          targetCurve,
           weightingMethod,
           scenario,
         ),
