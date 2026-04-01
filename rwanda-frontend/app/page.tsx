@@ -207,6 +207,74 @@ export default function LandingPage() {
             <PartnerLogo image={ifpriLogo} label="IFPRI" href="https://www.ifpri.org/" />
             <PartnerLogo image={mcgillLogo} label="McGill University" href="https://www.mcgill.ca/" />
           </div>
+
+          {/* Attribution */}
+          <div className="mt-14 pt-10 border-t border-gray-100">
+            <p className="text-center text-xs font-semibold uppercase tracking-widest text-gray-400 mb-2">
+              About FSFI
+            </p>
+            <p className="text-center text-sm text-gray-500 max-w-2xl mx-auto mb-10">
+              The <span className="font-semibold text-gray-700">Food Systems Financial Intelligence (FSFI)</span> initiative
+              was established to help countries align their financial commitments and investments
+              with food systems transformation goals.
+            </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-3xl mx-auto">
+              {[
+                {
+                  name: 'John Ulimwengu',
+                  affiliation: 'IFPRI',
+                  href: 'https://www.ifpri.org/profile/john-ulimwengu/',
+                  initials: 'JU',
+                  color: 'bg-[var(--rw-blue)]/10 text-[var(--rw-blue)]',
+                },
+                {
+                  name: 'Emmanuel A. Kwofie',
+                  affiliation: 'McGill University',
+                  href: 'https://www.eakwofie.com/',
+                  initials: 'EK',
+                  color: 'bg-[var(--rw-green)]/10 text-[var(--rw-green)]',
+                },
+                {
+                  name: 'Ebenezer M. Kwofie',
+                  affiliation: 'McGill University',
+                  href: 'https://www.mcgill.ca/bioeng/kwofie-ebenezer-miezah',
+                  initials: 'EK',
+                  color: 'bg-[var(--rw-yellow)]/20 text-amber-700',
+                },
+              ].map((person) => (
+                <a
+                  key={person.name}
+                  href={person.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="group flex flex-col items-center text-center p-5 rounded-xl border border-gray-100 bg-gray-50 hover:border-[var(--rw-blue)]/30 hover:bg-white hover:shadow-sm transition-all"
+                >
+                  <div className={`w-12 h-12 rounded-full flex items-center justify-center text-sm font-bold mb-3 ${person.color}`}>
+                    {person.initials}
+                  </div>
+                  <p className="text-sm font-semibold text-gray-800 group-hover:text-[var(--rw-blue)] transition-colors leading-tight">
+                    {person.name}
+                  </p>
+                  <p className="text-xs text-gray-400 mt-1">{person.affiliation}</p>
+                </a>
+              ))}
+            </div>
+
+            <p className="text-center text-xs text-gray-400 mt-8">
+              This platform was developed under an{' '}
+              <span className="font-medium text-gray-500">IFAD grant</span> through{' '}
+              <a
+                href="https://www.akademiya2063.org/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-medium text-gray-600 hover:text-[var(--rw-blue)] transition-colors underline underline-offset-2"
+              >
+                AKADEMIYA2063
+              </a>
+              .
+            </p>
+          </div>
         </div>
       </section>
 
@@ -245,7 +313,17 @@ export default function LandingPage() {
               <Link href="/login" className="hover:text-white transition-colors">{t('auth.sign_in')}</Link>
             </div>
           </div>
-          <div className="mt-8 pt-6 border-t border-white/10 text-center">
+          <div className="mt-8 pt-6 border-t border-white/10 text-center space-y-2">
+            <p className="text-xs text-gray-500">
+              FSFI established by{' '}
+              <a href="https://www.ifpri.org/profile/john-ulimwengu/" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white transition-colors">John Ulimwengu</a>
+              {' '}(IFPRI),{' '}
+              <a href="https://www.eakwofie.com/" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white transition-colors">Emmanuel A. Kwofie</a>
+              {' '}&amp;{' '}
+              <a href="https://www.mcgill.ca/bioeng/kwofie-ebenezer-miezah" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white transition-colors">Ebenezer M. Kwofie</a>
+              {' '}(McGill University) — IFAD grant via{' '}
+              <a href="https://www.akademiya2063.org/" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white transition-colors">AKADEMIYA2063</a>.
+            </p>
             <p className="text-xs text-gray-500">
               &copy; {new Date().getFullYear()} {t('app.republic')}. {t('about_page.footer_line')}.
             </p>
