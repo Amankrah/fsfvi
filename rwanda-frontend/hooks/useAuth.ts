@@ -49,5 +49,19 @@ export function useAuth(requireAuth: boolean = true) {
     router.push('/login');
   };
 
-  return { user, isLoading, isAuthenticated, logout };
+  const refreshUser = async (): Promise<UserResponse | null> => {
+    if (!authAPI.isAuthenticated()) return null;
+    try {
+      const fresh = await authAPI.verifyToken();
+      setUser(fresh);
+      return fresh;
+    } catch {
+      setIsAuthenticated(false);
+      setUser(null);
+      if (requireAuth) router.push('/login');
+      return null;
+    }
+  };
+
+  return { user, isLoading, isAuthenticated, logout, refreshUser };
 }

@@ -1,14 +1,13 @@
 """
 JWT Authentication Backend.
 
-Calls Rust fsfi_engine for JWT verification — Django only looks up the user.
+JWT verification via `rust_crypto` → Rust `fsfi_engine` (`jwt.rs`).
 """
-
-import json
 
 from django.conf import settings
 from rest_framework import authentication, exceptions
 
+from . import rust_crypto
 from .models import GovernmentUser
 
 
@@ -30,10 +29,7 @@ class RustJWTAuthentication(authentication.BaseAuthentication):
         token = parts[1]
 
         try:
-            import fsfi_engine
-
-            claims_json = fsfi_engine.py_verify_token(token, settings.FSFI_JWT_SECRET)
-            claims = json.loads(claims_json)
+            claims = rust_crypto.verify_token_json(token, settings.FSFI_JWT_SECRET)
         except Exception as e:
             raise exceptions.AuthenticationFailed(f"Invalid token: {e}")
 

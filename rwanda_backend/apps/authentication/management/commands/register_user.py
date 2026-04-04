@@ -92,8 +92,6 @@ class Command(BaseCommand):
             password_confirm = getpass.getpass("Confirm password: ")
             if password != password_confirm:
                 raise CommandError("Passwords do not match")
-        if len(password) < 12:
-            raise CommandError("Password must be at least 12 characters (government security requirement)")
 
         # Get role
         role = options["role"]
@@ -140,5 +138,7 @@ class Command(BaseCommand):
 
             self.stdout.write(self.style.HTTP_INFO("\nUser can now log in at /api/auth/login/\n"))
 
+        except ValueError as e:
+            raise CommandError(str(e))
         except Exception as e:
             raise CommandError(f"Failed to create user: {e}")

@@ -64,6 +64,29 @@ export interface PasswordChangeRequest {
   new_password: string;
 }
 
+/** POST /api/auth/2fa/setup/ — aligns with Django + Rust `mfa.rs` (otpauth URL + backup codes). */
+export interface MfaSetupResponse {
+  secret: string;
+  qr_code_url: string;
+  backup_codes: string[];
+}
+
+/** POST /api/auth/2fa/enable/ */
+export interface MfaEnableResponse {
+  backup_codes: string[];
+  message: string;
+}
+
+/** POST /api/auth/2fa/disable/ */
+export interface MfaDisableResponse {
+  message: string;
+}
+
+/** POST /api/auth/change-password/ */
+export interface PasswordChangeResponse {
+  message: string;
+}
+
 export interface TokenVerifyResponse {
   valid: boolean;
   user: UserResponse;

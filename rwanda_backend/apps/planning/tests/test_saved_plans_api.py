@@ -37,7 +37,7 @@ class SavedPlansApiTests(TestCase):
         self.user = GovernmentUser.objects.create_user(
             username="plan_tester",
             email="plan_tester@gov.rw",
-            password="testpass123",
+            password="PlanTester@Secure123",
         )
         self.client.force_authenticate(user=self.user)
         self.assessment = AssessmentResult.objects.create(

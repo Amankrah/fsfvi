@@ -14,6 +14,10 @@ import type {
   TwoFactorRequest,
   TwoFactorResponse,
   PasswordChangeRequest,
+  PasswordChangeResponse,
+  MfaSetupResponse,
+  MfaEnableResponse,
+  MfaDisableResponse,
   UserResponse,
 } from '@/lib/types/auth';
 
@@ -85,8 +89,13 @@ export const authAPI = {
     const data = response.data;
 
     if (!data.requires_two_fa && data.token) {
-      // Store token and user if 2FA not required
-      localStorage.setItem(TOKEN_KEY, JSON.stringify({ token: data.token }));
+      localStorage.setItem(
+        TOKEN_KEY,
+        JSON.stringify({
+          token: data.token,
+          refresh_token: data.refresh_token ?? '',
+        })
+      );
       localStorage.setItem(USER_KEY, JSON.stringify(data.user));
     }
 
@@ -102,8 +111,13 @@ export const authAPI = {
     const response = await authClient.post<TwoFactorResponse>('/2fa/verify/', request);
     const data = response.data;
 
-    // Store token and user after successful 2FA
-    localStorage.setItem(TOKEN_KEY, JSON.stringify({ token: data.token }));
+    localStorage.setItem(
+      TOKEN_KEY,
+      JSON.stringify({
+        token: data.token,
+        refresh_token: data.refresh_token ?? '',
+      })
+    );
     localStorage.setItem(USER_KEY, JSON.stringify(data.user));
 
     return data;
@@ -114,32 +128,28 @@ export const authAPI = {
    *
    * POST /api/auth/2fa/setup/
    */
-  setup2FA: async (): Promise<{ qr_code: string; secret: string }> => {
-    const response = await authClient.post<{ qr_code: string; secret: string }>(
-      '/2fa/setup/'
-    );
+  setup2FA: async (): Promise<MfaSetupResponse> => {
+    const response = await authClient.post<MfaSetupResponse>('/2fa/setup/');
     return response.data;
   },
 
   /**
-   * Enable 2FA after setup
-   *
+   * Enable 2FA after setup (confirms TOTP against Rust `verify_totp_encrypted`).
    * POST /api/auth/2fa/enable/
    */
-  enable2FA: async (code: string): Promise<{ success: boolean }> => {
-    const response = await authClient.post<{ success: boolean }>('/2fa/enable/', {
+  enable2FA: async (code: string): Promise<MfaEnableResponse> => {
+    const response = await authClient.post<MfaEnableResponse>('/2fa/enable/', {
       code,
     });
     return response.data;
   },
 
   /**
-   * Disable 2FA
-   *
+   * Disable 2FA (TOTP required).
    * POST /api/auth/2fa/disable/
    */
-  disable2FA: async (code: string): Promise<{ success: boolean }> => {
-    const response = await authClient.post<{ success: boolean }>('/2fa/disable/', {
+  disable2FA: async (code: string): Promise<MfaDisableResponse> => {
+    const response = await authClient.post<MfaDisableResponse>('/2fa/disable/', {
       code,
     });
     return response.data;
@@ -180,8 +190,10 @@ export const authAPI = {
    *
    * POST /api/auth/change-password/
    */
-  changePassword: async (request: PasswordChangeRequest): Promise<{ success: boolean }> => {
-    const response = await authClient.post<{ success: boolean }>(
+  changePassword: async (
+    request: PasswordChangeRequest
+  ): Promise<PasswordChangeResponse> => {
+    const response = await authClient.post<PasswordChangeResponse>(
       '/change-password/',
       request
     );
@@ -227,5 +239,18 @@ export const authAPI = {
     return null;
   },
 };
+
+/** Parse DRF / Rust auth error body for display. */
+export function getAuthErrorMessage(error: unknown, fallback: string): string {
+  if (error && typeof error === 'object' && 'response' in error) {
+    const data = (error as { response?: { data?: Record<string, unknown> } }).response
+      ?.data;
+    if (data && typeof data === 'object') {
+      if (typeof data.error === 'string') return data.error;
+      if (typeof data.detail === 'string') return data.detail;
+    }
+  }
+  return fallback;
+}
 
 export default authAPI;

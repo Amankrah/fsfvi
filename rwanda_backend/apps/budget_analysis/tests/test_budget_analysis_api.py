@@ -16,7 +16,7 @@ class BudgetAnalysisFinancialApiTests(TestCase):
         self.user = GovernmentUser.objects.create_user(
             username="budget_fin",
             email="budget_fin@gov.rw",
-            password="x",
+            password="BudgetFin@Secure123",
         )
         self.client.force_authenticate(user=self.user)
         self.ind = Indicator.objects.create(

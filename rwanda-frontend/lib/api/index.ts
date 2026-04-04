@@ -6,7 +6,7 @@
  * Backend: Rwanda Django backend (http://localhost:8000)
  */
 
-export { authAPI } from './authApi';
+export { authAPI, getAuthErrorMessage } from './authApi';
 export { assessmentAPI } from './assessmentApi';
 export { optimizationAPI } from './optimizationApi';
 export { planningAPI } from './planningApi';

@@ -403,6 +403,10 @@ sudo mkdir -p /opt/fsfvi/app /var/lib/fsfvi
 sudo chown -R fsfvi:fsfvi /opt/fsfvi /var/lib/fsfvi
 ```
 
+If you **do not** use a separate **`fsfvi`** account and run the app only as **`ubuntu`**, use **`sudo chown -R ubuntu:ubuntu /opt/fsfvi /var/lib/fsfvi`** instead, and run **`git pull`**, builds, and **`migrate`** as **`ubuntu`** consistently.
+
+> **Ownership hygiene:** Anything run with **`sudo`** in the repo (e.g. **`sudo npm run build`**, **`sudo vim`**) can create **root-owned** files. Then **`git pull`** as **`ubuntu`** or **`fsfvi`** fails with **`unable to unlink old '…': Permission denied`**. Fix by resetting ownership on the tree ([Maintenance](#maintenance), [Troubleshooting](#troubleshooting)).
+
 ---
 
 ## Phase 3 — Application deployment
@@ -503,9 +507,15 @@ python manage.py register_user --username admin --email admin@example.gov.rw --f
 
 ### 3.5 Frontend — build
 
+The **`rwanda-frontend`** tree (including **`node_modules`** and **`.next`**) must be written by the **same Linux user** that owns **`/opt/fsfvi/app`** — usually **`fsfvi`**. If you are SSH’d as **`ubuntu`**, run **`npm`** via **`sudo -u fsfvi`** (see [Builds while logged in as `ubuntu`](#builds-while-logged-in-as-ubuntu)). Do **not** run **`sudo npm …`**; that creates **root-owned** files and breaks the next **`git pull`** or **`npm ci`**.
+
 ```bash
+# If your shell is ubuntu@..., use:
+sudo -u fsfvi bash -lc 'cd /opt/fsfvi/app/rwanda-frontend && npm ci && npm run build'
+
+# If you are already fsfvi@...:
 cd /opt/fsfvi/app/rwanda-frontend
-cp .env.example .env.production.local
+cp .env.example .env.production.local   # once, if not present
 # NEXT_PUBLIC_RWANDA_API_URL=https://rwanda.fsfvi.ai
 # NEXT_PUBLIC_APP_URL=https://rwanda.fsfvi.ai
 npm ci
@@ -643,23 +653,68 @@ See **`RWANDA_BACKEND_PIPELINE_GUIDE.md`**: `import_budget_mapping`, `import_ind
 | `[sudo] password for fsfvi` | Same: **`fsfvi` has no sudo**. **`exit`** to **`ubuntu@...`** and run admin commands there. |
 | `cd: app: No such file or directory` | Clone never ran or wrong directory. From **`ubuntu`**: `sudo -u fsfvi bash -c 'cd /opt/fsfvi && git clone https://github.com/Amankrah/fsfvi.git app'` — see [Phase 3.1 Clone](#31-clone). |
 | `/opt/fsfvi/app/.git: Permission denied` | **`app`** was root-owned. As **`ubuntu`**: `sudo rm -rf /opt/fsfvi/app && sudo mkdir -p /opt/fsfvi/app && sudo chown -R fsfvi:fsfvi /opt/fsfvi /var/lib/fsfvi`, then clone again. Ensure deploy step uses **`chown -R`** (see [Phase 2.4](#24-deploy-user-and-directories)). |
+| **`git pull`**: `error: unable to unlink old '…': Permission denied` | Some tracked files are owned by **root** (e.g. after **`sudo npm run build`**) or by a **different** user than the one running **`git pull`**. As **`ubuntu`**, reset ownership to the account that should own the repo, then pull again:<br>**If the deploy user is `fsfvi`:** `sudo chown -R fsfvi:fsfvi /opt/fsfvi/app` then `cd /opt/fsfvi/app && sudo -u fsfvi git pull`<br>**If you use only `ubuntu`:** `sudo chown -R ubuntu:ubuntu /opt/fsfvi/app` then `cd /opt/fsfvi/app && git pull`<br>To **see** owners: `ls -la rwanda-frontend/app/page.tsx` (example). |
+| **`git pull`**: `Your local changes … would be overwritten by merge` | The server has **uncommitted edits** in tracked files (often docs edited on the host). **Preferred:** resolve as **`fsfvi`** — [Git while logged in as `ubuntu`](#git-while-logged-in-as-ubuntu). **Stash, then pull:** `sudo -u fsfvi git -C /opt/fsfvi/app stash` then `sudo -u fsfvi git -C /opt/fsfvi/app pull`. **Discard local edits** if GitHub is source of truth: `sudo -u fsfvi git -C /opt/fsfvi/app checkout -- path/to/file` per file, or **`sudo -u fsfvi git -C /opt/fsfvi/app reset --hard origin/main`** (loses **all** local changes and unpushed commits on that clone — use only if you mean it). |
+| **`fatal: detected dubious ownership in repository`** | You ran **`git`** as **`ubuntu`** but **`/opt/fsfvi/app`** is owned by **`fsfvi`** (or another user). Git refuses to avoid running hooks from an “untrusted” directory. **Fix (recommended):** run Git as the owner — see [Git while logged in as `ubuntu`](#git-while-logged-in-as-ubuntu). **Shortcut:** `sudo -u fsfvi git -C /opt/fsfvi/app stash` / **`pull`** / **`status`**. **Alternative:** as **`ubuntu`**, `git config --global --add safe.directory /opt/fsfvi/app` — only on **your** server you trust; then **`ubuntu`** may run **`git`** there without **`sudo -u fsfvi`**. |
 | `Cargo metadata failed` / **cargo** not in `PATH` | Install **rustup** for **`fsfvi`** ([Phase 2.1](#21-packages)), then **`source ~/.cargo/env`** before **`maturin build`**. |
 | **`target/release/.cargo-lock` Permission denied** | **`maturin`** run as a different user than the one that created **`fsfi_engine/target/`**. Remove target and fix ownership: `sudo rm -rf /opt/fsfvi/app/rwanda_backend/fsfi_engine/target` and **`sudo chown -R fsfvi:fsfvi /opt/fsfvi/app`** (or align with **`ubuntu`** if you use only **`ubuntu`**), then rebuild as that user with **`source ~/.cargo/env`**. |
 | **`chmod` .env Operation not permitted** | **`.env`** is **root-owned** (e.g. **`sudo nano .env`**). **`sudo chown ubuntu:ubuntu .env`** or **`fsfvi:fsfvi`**, then **`chmod 600 .env`**. |
 | **`unable to open database file`** (SQLite) | **`DB_NAME`** parent dir missing or wrong owner. **`sudo mkdir -p /var/lib/fsfvi`**. If you run Django as **`ubuntu`**: **`sudo chown ubuntu:ubuntu /var/lib/fsfvi`**. If Gunicorn runs as **`fsfvi`**, use **`sudo chown fsfvi:fsfvi /var/lib/fsfvi`** and run **`migrate`** as **`fsfvi`** (or **`sudo -u fsfvi ...`**) so the DB file is created with the right owner. |
 | **`fsfvi-gunicorn` activating / exit status 1** | **`sudo cat /etc/systemd/system/fsfvi-gunicorn.service`** — if you see garbage like **`EOFtedBy`**, the unit was corrupted by a bad paste. Reinstall: **`sudo cp /opt/fsfvi/app/deploy/systemd/fsfvi-gunicorn.service /etc/systemd/system/`** then **`daemon-reload`**. Then **`journalctl -u fsfvi-gunicorn -n 50`** for Python/env/SQLite errors. |
 | Next.js on **3001**, nginx expects **3000** | Repo **`package.json`** **`start`** must be **`next start`** (no **`--port 3001`**); **`git pull`**, **`npm run build`**, **`sudo systemctl restart fsfvi-frontend`**. Or temporarily point **`upstream fsfvi_nextjs`** to **`127.0.0.1:3001`**. |
+| **`npm ci` / `next build`**: **`EACCES`** on **`node_modules`** or **`.next`** | **`npm`** was run as **`ubuntu`** while **`rwanda-frontend`** is owned by **`fsfvi`**. Run as **`fsfvi`**: `sudo -u fsfvi bash -lc 'cd /opt/fsfvi/app/rwanda-frontend && npm ci && npm run build'`. If a past **`sudo npm`** left **root-owned** files: `sudo chown -R fsfvi:fsfvi /opt/fsfvi/app/rwanda-frontend`, then run **`npm`** again as **`fsfvi`** (never **`sudo npm`**). See [Builds while logged in as `ubuntu`](#builds-while-logged-in-as-ubuntu). |
 
 ---
 
 ## Maintenance
 
+### Repo ownership before `git pull`
+
+If **`git pull`** reports **`unable to unlink old … Permission denied`**, fix ownership once (as **`ubuntu`**), then pull as the **same** user that owns the tree:
+
+| Deploy model | Commands |
+|----------------|----------|
+| Dedicated **`fsfvi`** user (recommended in this doc) | `sudo chown -R fsfvi:fsfvi /opt/fsfvi/app` then `cd /opt/fsfvi/app && sudo -u fsfvi git pull` |
+| Everything as **`ubuntu`** | `sudo chown -R ubuntu:ubuntu /opt/fsfvi/app` then `cd /opt/fsfvi/app && git pull` |
+
+Avoid **`sudo git pull`** and **`sudo npm run build`** inside the repo; they mix **root-owned** files into the working tree and cause the same error on the next update.
+
+### Git while logged in as `ubuntu`
+
+If the clone is owned by **`fsfvi`** (typical), **always** prefix Git with **`sudo -u fsfvi`** when your shell is **`ubuntu@...`**:
+
 ```bash
-cd /opt/fsfvi/app && sudo -u fsfvi git pull
-cd rwanda_backend && source venv/bin/activate && pip install -r requirements.txt
-pip install target/wheels/fsfi_engine-*.whl  # after maturin build if Rust changed
-python manage.py migrate && python manage.py collectstatic --noinput
-cd ../rwanda-frontend && npm ci && npm run build
+sudo -u fsfvi git -C /opt/fsfvi/app status
+sudo -u fsfvi git -C /opt/fsfvi/app pull
+sudo -u fsfvi git -C /opt/fsfvi/app stash
+```
+
+Using plain **`git stash`** as **`ubuntu`** on an **`fsfvi`**-owned repo triggers **`detected dubious ownership`**. Either use the commands above or (less ideal) add **`safe.directory`** — see [Troubleshooting](#troubleshooting).
+
+### Builds while logged in as `ubuntu`
+
+When the app directory is **`fsfvi`**-owned, run **Python** and **Node** steps as **`fsfvi`** too — otherwise **`venv`**, **`npm ci`**, and **`next build`** hit **`EACCES`** on paths created by **`fsfvi`** (e.g. **`node_modules/.bin`**, **`.next/`**).
+
+```bash
+sudo -u fsfvi bash -lc 'cd /opt/fsfvi/app/rwanda_backend && source venv/bin/activate && pip install -r requirements.txt && python manage.py migrate --noinput && python manage.py collectstatic --noinput'
+
+sudo -u fsfvi bash -lc 'cd /opt/fsfvi/app/rwanda-frontend && npm ci && npm run build'
+```
+
+If you standardized on **`ubuntu`** owning **`/opt/fsfvi/app`**, run the same commands **without** **`sudo -u fsfvi`**.
+
+### Routine update
+
+The block below assumes **`fsfvi`** owns **`/opt/fsfvi/app`** and your shell is **`ubuntu@...`**. Every repo-touching step uses **`sudo -u fsfvi`** so it matches **Git**, **pip**, and **npm** ownership.
+
+```bash
+sudo -u fsfvi git -C /opt/fsfvi/app pull
+
+sudo -u fsfvi bash -lc 'cd /opt/fsfvi/app/rwanda_backend && source venv/bin/activate && pip install -r requirements.txt && python manage.py migrate --noinput && python manage.py collectstatic --noinput'
+# If **`fsfi_engine`** changed: as **`fsfvi`**, **`maturin build`** then **`pip install …/target/wheels/fsfi_engine-*.whl`** inside that same **`bash -lc`** before **`migrate`**.
+
+sudo -u fsfvi bash -lc 'cd /opt/fsfvi/app/rwanda-frontend && npm ci && npm run build'
+
 sudo systemctl restart fsfvi-gunicorn fsfvi-frontend && sudo systemctl reload nginx
 ```
 

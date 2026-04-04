@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { authAPI } from '@/lib/api/authApi';
+import { authAPI, getAuthErrorMessage } from '@/lib/api/authApi';
 import { RwandaLogo } from '@/components/rwanda/shared/RwandaLogo';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Lock, AlertCircle, CheckCircle } from 'lucide-react';
@@ -24,8 +24,8 @@ export default function ChangePasswordPage() {
       setError('Passwords do not match');
       return;
     }
-    if (newPassword.length < 8) {
-      setError('Password must be at least 8 characters');
+    if (newPassword.length < 12) {
+      setError(t('auth.password_policy_hint'));
       return;
     }
 
@@ -36,8 +36,8 @@ export default function ChangePasswordPage() {
         new_password: newPassword,
       });
       router.push('/dashboard');
-    } catch {
-      setError('Failed to change password. Please check your current password.');
+    } catch (e) {
+      setError(getAuthErrorMessage(e, t('auth.auth_failed')));
     } finally {
       setIsLoading(false);
     }
@@ -51,7 +51,7 @@ export default function ChangePasswordPage() {
             <RwandaLogo size="lg" />
           </div>
           <h1 className="text-2xl font-bold text-gray-900">{t('auth.change_password')}</h1>
-          <p className="text-sm text-gray-600 mt-1">You must change your password before continuing</p>
+          <p className="text-sm text-gray-600 mt-1">{t('auth.must_change_password')}</p>
         </div>
 
         <div className="bg-white shadow-xl rounded-2xl border border-gray-200 p-8">
@@ -79,6 +79,7 @@ export default function ChangePasswordPage() {
             </div>
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">{t('auth.new_password')}</label>
+              <p className="text-xs text-gray-500 mb-2">{t('auth.password_policy_hint')}</p>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
                 <input
@@ -86,7 +87,7 @@ export default function ChangePasswordPage() {
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   required
-                  minLength={8}
+                  minLength={12}
                   className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-[var(--rw-blue)] focus:border-transparent"
                   disabled={isLoading}
                 />

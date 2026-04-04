@@ -1,12 +1,10 @@
 """
 Authentication Views.
 
-All crypto operations (password verify, JWT, MFA) delegated to Rust fsfi_engine.
+All crypto operations (password verify, JWT, MFA) go through `rust_crypto`
+→ Rust `fsfi_engine` (`password.rs`, `mfa.rs`, `jwt.rs`).
 Django handles request/response, user lookup, and audit logging.
-Response shapes aligned with Rwanda frontend interfaces.
 """
-
-import json
 
 from django.conf import settings
 from django.utils import timezone
@@ -16,6 +14,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from . import rust_crypto
 from .models import AuditLog, GovernmentUser
 from .serializers import (
     Enable2FASerializer,
@@ -55,7 +54,6 @@ class LoginView(APIView):
         username = serializer.validated_data["username"]
         password = serializer.validated_data["password"]
 
-        # Look up user
         try:
             user = GovernmentUser.objects.get(username=username)
         except GovernmentUser.DoesNotExist:
@@ -64,7 +62,6 @@ class LoginView(APIView):
                 status=status.HTTP_401_UNAUTHORIZED,
             )
 
-        # Check account lock
         if user.locked_until and user.locked_until > timezone.now():
             log_auth_event(user, "login_locked", request, success=False)
             return Response(
@@ -72,24 +69,13 @@ class LoginView(APIView):
                 status=status.HTTP_423_LOCKED,
             )
 
-        # Check account status
         if user.status != "active":
             return Response(
                 {"error": "Account is not active"},
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        # Verify password via Rust engine
-        try:
-            import fsfi_engine
-
-            is_valid = fsfi_engine.py_verify_password(password, user.password_hash)
-        except Exception as e:
-            import logging
-            logging.getLogger(__name__).error(f"Password verify error: {e}")
-            is_valid = False
-
-        if not is_valid:
+        if not rust_crypto.verify_password(password, user.password_hash):
             user.failed_login_attempts += 1
             if user.failed_login_attempts >= 5:
                 user.locked_until = timezone.now() + timezone.timedelta(minutes=30)
@@ -101,11 +87,8 @@ class LoginView(APIView):
                 status=status.HTTP_401_UNAUTHORIZED,
             )
 
-        # Check if MFA is required
         if user.mfa_enabled:
-            import fsfi_engine
-
-            session_id = fsfi_engine.py_generate_session_id()
+            session_id = rust_crypto.generate_session_id()
             user.session_id = session_id
             user.save(update_fields=["session_id"])
             return Response({
@@ -115,25 +98,20 @@ class LoginView(APIView):
                 "message": "Please provide your 2FA code",
             })
 
-        # No MFA — complete login
         return self._complete_login(user, request)
 
     @staticmethod
     def _complete_login(user, request):
         """Generate tokens and return frontend-expected LoginResponse."""
-        import fsfi_engine
-
-        session_id = fsfi_engine.py_generate_session_id()
-        token_json = fsfi_engine.py_generate_token_pair(
+        session_id = rust_crypto.generate_session_id()
+        tokens = rust_crypto.generate_token_pair_json(
             str(user.id),
             user.username,
             user.role,
             session_id,
             settings.FSFI_JWT_SECRET,
         )
-        tokens = json.loads(token_json)
 
-        # Update user state
         user.last_login = timezone.now()
         user.failed_login_attempts = 0
         user.locked_until = None
@@ -155,11 +133,7 @@ class LoginView(APIView):
 
 
 class MfaVerifyView(APIView):
-    """POST /api/auth/2fa/verify — Verify 2FA code after login.
-
-    Accepts: { temp_token, code } matching frontend verify2FA call.
-    Returns TwoFAVerifyResponse: { token, user }
-    """
+    """POST /api/auth/2fa/verify — Verify 2FA code after login."""
 
     permission_classes = [AllowAny]
     authentication_classes = []
@@ -186,10 +160,8 @@ class MfaVerifyView(APIView):
                 status=status.HTTP_401_UNAUTHORIZED,
             )
 
-        import fsfi_engine
-
         if is_backup:
-            idx = fsfi_engine.py_verify_backup_code(code, user.backup_code_hashes)
+            idx = rust_crypto.verify_backup_code(code, user.backup_code_hashes)
             if idx is not None:
                 hashes = list(user.backup_code_hashes)
                 hashes.pop(idx)
@@ -199,8 +171,10 @@ class MfaVerifyView(APIView):
             else:
                 valid = False
         else:
-            valid = fsfi_engine.py_verify_totp_encrypted(
-                user.mfa_secret, code, settings.FSFI_ENCRYPTION_KEY,
+            valid = rust_crypto.verify_totp_encrypted(
+                user.mfa_secret,
+                code,
+                settings.FSFI_ENCRYPTION_KEY,
             )
 
         if not valid:
@@ -212,16 +186,14 @@ class MfaVerifyView(APIView):
 
         log_auth_event(user, "mfa_verified", request)
 
-        # Complete login — generate tokens
-        session_id = fsfi_engine.py_generate_session_id()
-        token_json = fsfi_engine.py_generate_token_pair(
+        session_id = rust_crypto.generate_session_id()
+        tokens = rust_crypto.generate_token_pair_json(
             str(user.id),
             user.username,
             user.role,
             session_id,
             settings.FSFI_JWT_SECRET,
         )
-        tokens = json.loads(token_json)
 
         user.last_login = timezone.now()
         user.failed_login_attempts = 0
@@ -241,10 +213,7 @@ class MfaVerifyView(APIView):
 
 
 class MfaSetupView(APIView):
-    """POST /api/auth/2fa/setup — Start 2FA setup for the authenticated user.
-
-    Returns TwoFASetupResponse: { secret, qr_code_url, backup_codes }
-    """
+    """POST /api/auth/2fa/setup — Start 2FA setup for the authenticated user."""
 
     permission_classes = [IsAuthenticated]
 
@@ -257,17 +226,12 @@ class MfaSetupView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        import fsfi_engine
-
-        setup_json = fsfi_engine.py_setup_mfa(
+        setup = rust_crypto.setup_mfa(
             user.username,
             settings.FSFI_MFA_ISSUER,
             settings.FSFI_ENCRYPTION_KEY,
         )
-        setup = json.loads(setup_json)
 
-        # Store encrypted secret and backup code hashes temporarily
-        # MFA is not fully enabled until /2fa/enable confirms with a valid code
         user.mfa_secret = setup["encrypted_secret"]
         user.backup_code_hashes = setup["backup_code_hashes"]
         user.save(update_fields=["mfa_secret", "backup_code_hashes"])
@@ -275,18 +239,15 @@ class MfaSetupView(APIView):
         log_auth_event(user, "mfa_setup_started", request)
 
         return Response({
-            "secret": setup.get("plain_secret", ""),
+            # Plain TOTP secret for manual entry (matches `MfaSetup.secret` in mfa.rs)
+            "secret": setup.get("secret", ""),
             "qr_code_url": setup["otpauth_url"],
             "backup_codes": setup["backup_codes"],
         })
 
 
 class Enable2FAView(APIView):
-    """POST /api/auth/2fa/enable — Confirm 2FA setup with a valid TOTP code.
-
-    Accepts: { code }
-    Returns: { backup_codes }
-    """
+    """POST /api/auth/2fa/enable — Confirm 2FA setup with a valid TOTP code."""
 
     permission_classes = [IsAuthenticated]
 
@@ -309,10 +270,10 @@ class Enable2FAView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        import fsfi_engine
-
-        valid = fsfi_engine.py_verify_totp_encrypted(
-            user.mfa_secret, code, settings.FSFI_ENCRYPTION_KEY,
+        valid = rust_crypto.verify_totp_encrypted(
+            user.mfa_secret,
+            code,
+            settings.FSFI_ENCRYPTION_KEY,
         )
 
         if not valid:
@@ -333,10 +294,7 @@ class Enable2FAView(APIView):
 
 
 class Disable2FAView(APIView):
-    """POST /api/auth/2fa/disable — Disable 2FA with a valid TOTP code.
-
-    Accepts: { code }
-    """
+    """POST /api/auth/2fa/disable — Disable 2FA with a valid TOTP code."""
 
     permission_classes = [IsAuthenticated]
 
@@ -353,10 +311,10 @@ class Disable2FAView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        import fsfi_engine
-
-        valid = fsfi_engine.py_verify_totp_encrypted(
-            user.mfa_secret, code, settings.FSFI_ENCRYPTION_KEY,
+        valid = rust_crypto.verify_totp_encrypted(
+            user.mfa_secret,
+            code,
+            settings.FSFI_ENCRYPTION_KEY,
         )
 
         if not valid:
@@ -376,10 +334,7 @@ class Disable2FAView(APIView):
 
 
 class VerifyTokenView(APIView):
-    """GET /api/auth/verify — Verify current token and return user profile.
-
-    Returns UserResponse (used by frontend useAuth hook on page load).
-    """
+    """GET /api/auth/verify — Verify current token and return user profile."""
 
     permission_classes = [IsAuthenticated]
 
@@ -400,10 +355,7 @@ class RefreshTokenView(APIView):
         token = serializer.validated_data["refresh_token"]
 
         try:
-            import fsfi_engine
-
-            claims_json = fsfi_engine.py_verify_token(token, settings.FSFI_JWT_SECRET)
-            claims = json.loads(claims_json)
+            claims = rust_crypto.verify_token_json(token, settings.FSFI_JWT_SECRET)
         except Exception:
             return Response(
                 {"error": "Invalid refresh token"},
@@ -424,9 +376,8 @@ class RefreshTokenView(APIView):
                 status=status.HTTP_401_UNAUTHORIZED,
             )
 
-        # Generate new token pair
-        session_id = fsfi_engine.py_generate_session_id()
-        token_json = fsfi_engine.py_generate_token_pair(
+        session_id = rust_crypto.generate_session_id()
+        tokens = rust_crypto.generate_token_pair_json(
             str(user.id),
             user.username,
             user.role,
@@ -437,7 +388,6 @@ class RefreshTokenView(APIView):
         user.session_id = session_id
         user.save(update_fields=["session_id"])
 
-        tokens = json.loads(token_json)
         return Response({
             "token": tokens["access_token"],
             "refresh_token": tokens["refresh_token"],
@@ -458,7 +408,7 @@ class LogoutView(APIView):
 
 
 class PasswordChangeView(APIView):
-    """POST /api/auth/change-password — Change password."""
+    """POST /api/auth/change-password — Change password (Rust Argon2id + policy)."""
 
     permission_classes = [IsAuthenticated]
 
@@ -468,10 +418,7 @@ class PasswordChangeView(APIView):
 
         user = request.user
 
-        import fsfi_engine
-
-        # Verify current password
-        if not fsfi_engine.py_verify_password(
+        if not rust_crypto.verify_password(
             serializer.validated_data["current_password"],
             user.password_hash,
         ):
@@ -480,24 +427,28 @@ class PasswordChangeView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Validate new password strength
         try:
-            fsfi_engine.py_validate_password_strength(
+            rust_crypto.validate_password_strength(
                 serializer.validated_data["new_password"]
             )
-        except Exception as e:
+        except ValueError as e:
             return Response(
                 {"error": str(e)},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Hash and save new password
-        user.password_hash = fsfi_engine.py_hash_password(
+        user.password_hash = rust_crypto.hash_password(
             serializer.validated_data["new_password"]
         )
         user.password_changed_at = timezone.now()
         user.is_temporary_password = False
-        user.save(update_fields=["password_hash", "password_changed_at", "is_temporary_password"])
+        user.set_unusable_password()
+        user.save(update_fields=[
+            "password_hash",
+            "password_changed_at",
+            "is_temporary_password",
+            "password",
+        ])
 
         log_auth_event(user, "password_changed", request)
 

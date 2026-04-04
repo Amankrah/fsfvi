@@ -1,7 +1,7 @@
 """
 Authentication Models for Rwanda FSFI.
 
-Password hashing + JWT + MFA handled by Rust engine.
+Password hashing + JWT + MFA: use `rust_crypto` → Rust `fsfi_engine`.
 Django manages user data persistence.
 """
 
@@ -33,15 +33,19 @@ class GovernmentUserManager(BaseUserManager):
         if not email:
             raise ValueError("Email is required")
 
-        # Import Rust engine for password hashing
-        import fsfi_engine
+        from . import rust_crypto
 
         email = self.normalize_email(email)
         user = self.model(username=username, email=email, **extra_fields)
 
         if password:
-            user.password_hash = fsfi_engine.py_hash_password(password)
+            rust_crypto.validate_password_strength(password)
+            user.password_hash = rust_crypto.hash_password(password)
+        else:
+            user.password_hash = ""
 
+        # AbstractBaseUser `password` column: unusable placeholder; API auth uses `password_hash` (Rust).
+        user.set_unusable_password()
         user.save(using=self._db)
         return user
 

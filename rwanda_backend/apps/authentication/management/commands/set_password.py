@@ -35,19 +35,19 @@ class Command(BaseCommand):
             password_confirm = getpass.getpass("Confirm new password: ")
             if password != password_confirm:
                 raise CommandError("Passwords do not match")
-        if len(password) < 12:
-            raise CommandError("Password must be at least 12 characters")
-
-        import fsfi_engine
+        from apps.authentication import rust_crypto
 
         try:
-            fsfi_engine.py_validate_password_strength(password)
-        except Exception as e:
+            rust_crypto.validate_password_strength(password)
+        except ValueError as e:
             raise CommandError(f"Password does not meet strength rules: {e}")
 
-        user.password_hash = fsfi_engine.py_hash_password(password)
+        user.password_hash = rust_crypto.hash_password(password)
         user.password_changed_at = None  # allow first-login flow if desired
         user.is_temporary_password = False
-        user.save(update_fields=["password_hash", "password_changed_at", "is_temporary_password"])
+        user.set_unusable_password()
+        user.save(
+            update_fields=["password_hash", "password_changed_at", "is_temporary_password", "password"]
+        )
 
         self.stdout.write(self.style.SUCCESS(f"Password for user '{username}' has been reset successfully."))
