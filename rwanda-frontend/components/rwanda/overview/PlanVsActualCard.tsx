@@ -13,6 +13,8 @@ import {
   Target,
   Calendar,
 } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { overviewPanelClass } from '@/components/rwanda/overview/panelStyles';
 
 interface PlanVsActualCardProps {
   plan: SavedStrategicPlanFull;
@@ -111,11 +113,13 @@ export function PlanVsActualCard({ plan, actuals }: PlanVsActualCardProps) {
   const StatusIcon = currentStatus.icon;
 
   return (
-    <Card className="border-[var(--rw-blue)]/20">
+    <Card className={cn(overviewPanelClass, 'border-slate-200/80 ring-[var(--rw-blue)]/10')}>
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center space-x-2 text-base">
-            <Target className="h-5 w-5 text-[var(--rw-blue)]" />
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--rw-blue)]/10 text-[var(--rw-blue)] ring-1 ring-[var(--rw-blue)]/15">
+              <Target className="h-5 w-5" />
+            </span>
             <span>{t('overview.plan_vs_actual') || 'Plan vs Actual Tracking'}</span>
           </CardTitle>
           <div className={`flex items-center space-x-1.5 px-2.5 py-1 rounded-full ${currentStatus.bg}`}>

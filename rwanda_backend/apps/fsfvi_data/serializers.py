@@ -62,9 +62,19 @@ class IndicatorDataInputSerializer(serializers.Serializer):
     indicator_id = serializers.UUIDField()
     fiscal_year = serializers.IntegerField(min_value=2015, max_value=2050)
     records_count = serializers.IntegerField(min_value=0, default=0, required=False)
-    gross_lcu_bn = serializers.DecimalField(max_digits=15, decimal_places=4, min_value=0)
-    weighted_lcu_bn = serializers.DecimalField(max_digits=15, decimal_places=4, min_value=0)
-    share_weighted_percent = serializers.DecimalField(max_digits=8, decimal_places=4, min_value=0, max_value=100, required=False)
+    gross_lcu_bn = serializers.DecimalField(
+        max_digits=15, decimal_places=4, min_value=Decimal("0")
+    )
+    weighted_lcu_bn = serializers.DecimalField(
+        max_digits=15, decimal_places=4, min_value=Decimal("0")
+    )
+    share_weighted_percent = serializers.DecimalField(
+        max_digits=8,
+        decimal_places=4,
+        min_value=Decimal("0"),
+        max_value=Decimal("100"),
+        required=False,
+    )
     observed_value = serializers.DecimalField(max_digits=15, decimal_places=4, allow_null=True, required=False)
     benchmark_value = serializers.DecimalField(max_digits=15, decimal_places=4, allow_null=True, required=False)
     benchmark_used_type = serializers.CharField(max_length=100, allow_blank=True, required=False)

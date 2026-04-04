@@ -22,6 +22,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import type { StressLevel } from '@/lib/utils/formatters';
+import { overviewPanelClass } from '@/components/rwanda/overview/panelStyles';
 
 type TrendView = 'fsfsi' | 'components' | 'heatmap';
 
@@ -85,9 +86,9 @@ export function NationalOverview() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
+      <div className="flex min-h-[400px] flex-col items-center justify-center rounded-2xl border border-slate-200/60 bg-white/60 px-6 py-16 ring-1 ring-slate-900/[0.03]">
         <Loader2 className="h-8 w-8 animate-spin text-[var(--rw-blue)]" />
-        <span className="ml-3 text-gray-600">Loading dashboard...</span>
+        <span className="mt-3 text-sm text-slate-600">Loading dashboard...</span>
       </div>
     );
   }
@@ -97,18 +98,22 @@ export function NationalOverview() {
   if (error || !dashboardData || isEmpty) {
     return (
       <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">{t('overview.national_fsfi')}</h1>
-            <p className="text-sm text-gray-600 mt-1">{fiscalYear.label}</p>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div className="relative min-w-0">
+            <p className="text-xs font-semibold uppercase tracking-wider text-[var(--rw-blue)]">{fiscalYear.label}</p>
+            <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
+              {t('overview.national_fsfi')}
+            </h1>
+            <div className="mt-3 h-1.5 w-24 rounded-full bg-gradient-to-r from-[var(--rw-blue)] to-[var(--rw-green)] shadow-sm shadow-[var(--rw-blue)]/20" />
           </div>
           <FiscalYearSelector />
         </div>
-        <div className="flex flex-col items-center justify-center min-h-[400px] text-center">
-          <AlertTriangle className="h-12 w-12 text-yellow-500 mb-4" />
-          <h2 className="text-lg font-semibold text-gray-900 mb-2">No Assessment Data</h2>
-          <p className="text-gray-600 max-w-md">
-            {error || 'No assessment data available for this fiscal year. Select a different fiscal year or run an assessment to see dashboard data.'}
+        <div className="flex min-h-[400px] flex-col items-center justify-center rounded-2xl border border-slate-200/70 bg-white/80 px-6 py-14 text-center ring-1 ring-slate-900/[0.04]">
+          <AlertTriangle className="mb-4 h-12 w-12 text-amber-500" />
+          <h2 className="mb-2 text-lg font-semibold text-slate-900">No Assessment Data</h2>
+          <p className="max-w-md text-slate-600">
+            {error ||
+              'No assessment data available for this fiscal year. Select a different fiscal year or run an assessment to see dashboard data.'}
           </p>
         </div>
       </div>
@@ -126,18 +131,21 @@ export function NationalOverview() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">{t('overview.national_fsfi')}</h1>
-          <p className="text-sm text-gray-600 mt-1">{fiscalYear.label}</p>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div className="relative min-w-0">
+          <p className="text-xs font-semibold uppercase tracking-wider text-[var(--rw-blue)]">{fiscalYear.label}</p>
+          <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
+            {t('overview.national_fsfi')}
+          </h1>
+          <div className="mt-3 h-1.5 w-24 rounded-full bg-gradient-to-r from-[var(--rw-blue)] to-[var(--rw-green)] shadow-sm shadow-[var(--rw-blue)]/20" />
         </div>
         <FiscalYearSelector />
       </div>
 
       {/* Key Metrics Row */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {/* FSFSI Score — Cumulative is the headline */}
-        <Card className="border-l-4 border-l-[var(--rw-blue)]">
+        <Card className={`${overviewPanelClass} border-l-4 border-l-[var(--rw-blue)]`}>
           <CardContent className="p-5">
             <div className="flex items-center justify-between">
               <div>
@@ -174,7 +182,7 @@ export function NationalOverview() {
         </Card>
 
         {/* YoY Change */}
-        <Card className={`border-l-4 ${improving ? 'border-l-emerald-500' : 'border-l-red-500'}`}>
+        <Card className={`${overviewPanelClass} border-l-4 ${improving ? 'border-l-emerald-500' : 'border-l-red-500'}`}>
           <CardContent className="p-5">
             <div className="flex items-center justify-between">
               <div>
@@ -193,7 +201,7 @@ export function NationalOverview() {
         </Card>
 
         {/* Critical Components */}
-        <Card className="border-l-4 border-l-[var(--risk-critical)]">
+        <Card className={`${overviewPanelClass} border-l-4 border-l-[var(--risk-critical)]`}>
           <CardContent className="p-5">
             <div className="flex items-center justify-between">
               <div>
@@ -206,7 +214,7 @@ export function NationalOverview() {
         </Card>
 
         {/* Total Budget */}
-        <Card className="border-l-4 border-l-[var(--rw-green)]">
+        <Card className={`${overviewPanelClass} border-l-4 border-l-[var(--rw-green)]`}>
           <CardContent className="p-5">
             <div className="flex items-center justify-between">
               <div>
@@ -223,21 +231,23 @@ export function NationalOverview() {
 
       {/* Historical Trend Analysis */}
       {historyData.length > 1 && (
-        <Card>
+        <Card className={`${overviewPanelClass} overflow-hidden`}>
           <CardHeader>
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-              <CardTitle className="flex items-center space-x-2">
-                <LineChart className="h-5 w-5 text-[var(--rw-blue)]" />
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <CardTitle className="flex items-center space-x-2 text-slate-900">
+                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--rw-blue)]/10 text-[var(--rw-blue)] ring-1 ring-[var(--rw-blue)]/15">
+                  <LineChart className="h-5 w-5" />
+                </span>
                 <span>Historical Trend Analysis</span>
               </CardTitle>
-              <div className="flex rounded-lg border border-gray-200 overflow-hidden">
+              <div className="inline-flex rounded-xl border border-slate-200/90 bg-slate-50/80 p-0.5 shadow-inner">
                 <button
                   type="button"
                   onClick={() => setTrendView('fsfsi')}
-                  className={`px-3 py-1.5 text-xs font-medium transition-colors ${
+                  className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
                     trendView === 'fsfsi'
-                      ? 'bg-[var(--rw-blue)] text-white'
-                      : 'bg-white text-gray-600 hover:bg-gray-50'
+                      ? 'bg-[var(--rw-blue)] text-white shadow-sm'
+                      : 'text-slate-600 hover:bg-white/80'
                   }`}
                 >
                   FSFSI Trend
@@ -245,10 +255,10 @@ export function NationalOverview() {
                 <button
                   type="button"
                   onClick={() => setTrendView('components')}
-                  className={`px-3 py-1.5 text-xs font-medium transition-colors border-l border-gray-200 ${
+                  className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
                     trendView === 'components'
-                      ? 'bg-[var(--rw-blue)] text-white'
-                      : 'bg-white text-gray-600 hover:bg-gray-50'
+                      ? 'bg-[var(--rw-blue)] text-white shadow-sm'
+                      : 'text-slate-600 hover:bg-white/80'
                   }`}
                 >
                   Components
@@ -256,17 +266,17 @@ export function NationalOverview() {
                 <button
                   type="button"
                   onClick={() => setTrendView('heatmap')}
-                  className={`px-3 py-1.5 text-xs font-medium transition-colors border-l border-gray-200 ${
+                  className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
                     trendView === 'heatmap'
-                      ? 'bg-[var(--rw-blue)] text-white'
-                      : 'bg-white text-gray-600 hover:bg-gray-50'
+                      ? 'bg-[var(--rw-blue)] text-white shadow-sm'
+                      : 'text-slate-600 hover:bg-white/80'
                   }`}
                 >
                   Heatmap
                 </button>
               </div>
             </div>
-            <p className="text-sm text-gray-500 mt-1">
+            <p className="mt-1 text-sm text-slate-500">
               {trendView === 'fsfsi' && 'Overall food system stress index across fiscal years'}
               {trendView === 'components' && 'Component-level stress trends over time'}
               {trendView === 'heatmap' && 'Visual overview of stress levels by component and year'}
@@ -285,7 +295,7 @@ export function NationalOverview() {
 
       {/* Strategic Plan Excerpt */}
       {activePlan && (
-        <Card className="border-[var(--rw-green)]/30 bg-gradient-to-r from-green-50 to-emerald-50/50">
+        <Card className="rounded-2xl border border-emerald-200/50 bg-gradient-to-r from-emerald-50/90 via-white/80 to-teal-50/40 shadow-sm ring-1 ring-emerald-900/[0.06] transition-shadow duration-200 hover:shadow-md supports-[backdrop-filter]:backdrop-blur-[2px]">
           <CardContent className="p-5">
             <div className="flex items-start justify-between">
               <div className="flex items-start space-x-3">

@@ -44,7 +44,7 @@ export function RwandaTopBar() {
   ];
 
   return (
-    <nav className="bg-[var(--rw-dark)] sticky top-0 z-50 shadow-lg">
+    <nav className="sticky top-0 z-50 border-b border-white/10 bg-[var(--rw-dark)]/95 shadow-[0_8px_30px_-12px_rgba(0,0,0,0.5)] backdrop-blur-md supports-[backdrop-filter]:bg-[var(--rw-dark)]/90">
       <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Left: Logo + Title */}

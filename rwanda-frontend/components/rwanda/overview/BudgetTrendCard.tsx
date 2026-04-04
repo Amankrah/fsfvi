@@ -25,6 +25,7 @@ import {
   PieChart,
   Lightbulb,
 } from 'lucide-react';
+import { overviewPanelClass } from '@/components/rwanda/overview/panelStyles';
 
 type BudgetView = 'total' | 'components' | 'insights';
 
@@ -111,7 +112,7 @@ export function BudgetTrendCard() {
 
   if (loading) {
     return (
-      <Card>
+      <Card className={overviewPanelClass}>
         <CardContent className="flex items-center justify-center min-h-[200px]">
           <Loader2 className="h-6 w-6 animate-spin text-[var(--rw-blue)] mr-2" />
           <span className="text-sm text-gray-500">Loading budget data...</span>
@@ -122,7 +123,7 @@ export function BudgetTrendCard() {
 
   if (error || !data) {
     return (
-      <Card>
+      <Card className={overviewPanelClass}>
         <CardContent className="flex flex-col items-center justify-center min-h-[200px] text-center">
           <AlertTriangle className="h-8 w-8 text-amber-500 mb-2" />
           <p className="text-sm text-gray-600">
@@ -137,12 +138,14 @@ export function BudgetTrendCard() {
   const latestYoy = data.national_trend[data.national_trend.length - 1]?.yoy_weighted_pct;
 
   return (
-    <Card>
+    <Card className={overviewPanelClass}>
       <CardHeader className="pb-2">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center space-x-2 text-base">
-              <BarChart3 className="h-5 w-5 text-[var(--rw-blue)]" />
+              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--rw-blue)]/10 text-[var(--rw-blue)] ring-1 ring-[var(--rw-blue)]/15">
+                <BarChart3 className="h-5 w-5" />
+              </span>
               <span>Budget Analysis</span>
             </CardTitle>
             {view === 'total' && trendDirection && (

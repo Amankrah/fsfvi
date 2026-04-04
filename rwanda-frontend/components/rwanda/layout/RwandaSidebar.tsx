@@ -59,10 +59,10 @@ export function RwandaSidebar() {
         key={item.id}
         type="button"
         onClick={() => router.push(item.href)}
-        className={`w-full group flex items-center justify-between px-3 py-2.5 rounded-lg transition-all mb-0.5 ${
+        className={`w-full group mb-0.5 flex items-center justify-between rounded-xl px-3 py-2.5 transition-all duration-200 ${
           active
-            ? 'bg-[var(--rw-blue)] text-white shadow-md'
-            : 'text-gray-700 hover:bg-gray-100'
+            ? 'bg-[var(--rw-blue)] text-white shadow-md shadow-[var(--rw-blue)]/25'
+            : 'text-gray-700 hover:bg-slate-100/90'
         }`}
       >
         <div className="flex items-center space-x-3">
@@ -86,17 +86,16 @@ export function RwandaSidebar() {
   };
 
   return (
-    <aside className="hidden lg:block lg:w-64 flex-shrink-0">
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden sticky top-20">
-        <div className="p-4 bg-gradient-to-r from-[var(--rw-blue)]/5 to-[var(--rw-green)]/5 border-b border-gray-200">
-          <h2 className="font-semibold text-gray-900 text-sm">Dashboard</h2>
+    <aside className="hidden shrink-0 lg:block lg:w-64">
+      <div className="sticky top-20 overflow-hidden rounded-2xl border border-white/70 bg-white/80 shadow-[0_20px_50px_-24px_rgba(15,23,42,0.28)] ring-1 ring-slate-900/[0.04] backdrop-blur-xl">
+        <div className="border-b border-slate-200/80 bg-gradient-to-r from-[var(--rw-blue)]/[0.08] via-white/50 to-[var(--rw-green)]/[0.06] p-4">
+          <h2 className="text-sm font-semibold tracking-tight text-slate-900">{t('nav.dashboard')}</h2>
+          <p className="mt-0.5 text-xs text-slate-500">{t('app.platform_name')}</p>
         </div>
 
-        <nav className="p-2 space-y-0.5">
-          {navItems.map(renderNavItem)}
-        </nav>
+        <nav className="space-y-0.5 p-2">{navItems.map(renderNavItem)}</nav>
 
-        <div className="border-t border-gray-200 p-2">
+        <div className="border-t border-slate-200/80 bg-slate-50/40 p-2">
           {accountItems.map(renderNavItem)}
         </div>
       </div>

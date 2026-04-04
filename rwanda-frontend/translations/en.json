@@ -74,6 +74,7 @@
   "nav": {
     "home": "Home",
     "about": "About",
+    "dashboard": "Dashboard",
     "overview": "National Overview",
     "assessment": "FSFI Assessment",
     "performance": "Performance Gap",

@@ -35,10 +35,15 @@
   --color-risk-moderate: var(--risk-moderate);
   --color-risk-high: var(--risk-high);
   --color-risk-critical: var(--risk-critical);
+  /* Slightly larger than browser default 16px for accessibility (scales rem-based utilities). */
+  --font-sans: var(--font-app), ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+html {
+  font-size: 106.25%;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
 }
