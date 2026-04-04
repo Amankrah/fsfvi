@@ -3,8 +3,10 @@
 import { useState } from 'react';
 import { RwandaLoginForm } from '@/components/rwanda/auth/RwandaLoginForm';
 import { TwoFactorForm } from '@/components/rwanda/auth/TwoFactorForm';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 export default function LoginPage() {
+  const { t } = useLanguage();
   const [showTwoFactor, setShowTwoFactor] = useState(false);
   const [tempToken, setTempToken] = useState('');
   const [username, setUsername] = useState('');
@@ -32,7 +34,7 @@ export default function LoginPage() {
       </div>
       <div className="text-center py-4">
         <p className="text-xs text-gray-500">
-          &copy; {new Date().getFullYear()} Republic of Rwanda — Food Systems Financial Intelligence
+          &copy; {new Date().getFullYear()} {t('app.platform_name')}. {t('app.ministry')}.
         </p>
       </div>
     </div>

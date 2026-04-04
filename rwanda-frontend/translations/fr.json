@@ -1,11 +1,16 @@
 {
   "app": {
-    "title": "République du Rwanda : Tableau de bord FSFI",
-    "subtitle": "Intelligence Financière des Systèmes Alimentaires",
+    "title": "Intelligence du financement des systèmes alimentaires — FSFI",
+    "platform_name": "Intelligence du financement des systèmes alimentaires",
+    "subtitle": "FSFI · Tableau de bord du gouvernement rwandais",
     "ministry": "Ministère de l'Agriculture et des Ressources Animales",
     "republic": "République du Rwanda"
   },
   "landing": {
+    "hero_kicker": "Gouvernement du Rwanda",
+    "hero_metric_indicators": "Indicateurs nationaux",
+    "hero_metric_components": "Composantes du système alimentaire",
+    "hero_panel_caption": "Cadre national du Rwanda",
     "hero_title_1": "Savoir où investir.",
     "hero_title_2": "Renforcer la résilience du système alimentaire.",
     "hero_p1": "L'Intelligence financière des systèmes alimentaires aide le gouvernement du Rwanda et ses partenaires au développement à voir comment allouer les fonds dans le système alimentaire. Elle appuie la définition d'objectifs nationaux et l'amélioration des résultats globaux.",
@@ -14,6 +19,7 @@
     "hero_cta_about": "Comment ça marche",
     "components_title": "8 composantes d'indicateurs",
     "components_sub": "Définies pour le contexte rwandais et alignées sur les priorités nationales.",
+    "components_chip": "Rwanda",
     "learn_more": "En savoir plus",
     "cta_access_title": "Accéder au tableau de bord",
     "cta_access_body": "Connectez-vous avec vos identifiants institutionnels.",
@@ -39,7 +45,7 @@
     "challenge_q2": "Comment les allocations s'alignent-elles sur les objectifs nationaux et le PSTA 5 ?",
     "challenge_q3": "Quel mix d'investissement réduit la vulnérabilité face aux chocs ?",
     "provides_title": "Ce que fournit FSFI",
-    "provides_fsfsi": "FSFI calcule l'indice de stress du financement des systèmes alimentaires (FSFSI). Il rassemble 37 indicateurs en 8 composantes pour décrire le stress dans le système alimentaire, afin d'ancrer budgets et investissements dans les données.",
+    "provides_fsfsi": "FSFI calcule l'indice de stress du financement du système alimentaire (FSFSI). Il rassemble 37 indicateurs en 8 composantes pour décrire le stress dans le système alimentaire, afin d'ancrer budgets et investissements dans les données.",
     "card_assess_title": "Évalue la performance",
     "card_assess_body": "Montre la situation du système alimentaire rwandais sur les dimensions qui comptent pour les résultats et la résilience.",
     "card_gaps_title": "Identifie les écarts",
@@ -63,7 +69,7 @@
     "cta_body": "Connectez-vous avec vos identifiants institutionnels pour accéder au tableau de bord.",
     "cta_signin": "Connexion au tableau de bord",
     "cta_home": "Retour à l'accueil",
-    "footer_line": "Intelligence financière des systèmes alimentaires"
+    "footer_line": "Intelligence du financement des systèmes alimentaires"
   },
   "nav": {
     "home": "Accueil",
@@ -99,7 +105,7 @@
     "confirm_password": "Confirmer le mot de passe"
   },
   "overview": {
-    "national_fsfi": "Indice d'Intelligence Financière du Système Alimentaire du Rwanda",
+    "national_fsfi": "Indice de stress du financement du système alimentaire du Rwanda (FSFSI)",
     "risk_level": "Niveau de Risque",
     "yoy_change": "Variation Annuelle",
     "critical_components": "Composantes Critiques",

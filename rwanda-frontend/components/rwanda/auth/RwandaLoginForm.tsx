@@ -69,9 +69,9 @@ export function RwandaLoginForm({ onTwoFactorRequired }: RwandaLoginFormProps) {
           <RwandaLogo size="lg" />
         </div>
         <h1 className="text-2xl font-bold text-gray-900 mb-1">
-          {t('app.republic')}
+          {t('app.platform_name')}
         </h1>
-        <p className="text-sm text-gray-600">{t('app.subtitle')}</p>
+        <p className="text-sm text-gray-600">{t('app.ministry')}</p>
         <div className="mt-3 flex justify-center">
           <LanguageToggle />
         </div>

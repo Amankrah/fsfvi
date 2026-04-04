@@ -2,6 +2,8 @@
 
 Full step-by-step guide to set up and run the Rwanda FSFSI backend from scratch.
 
+**FSFSI** denotes the **Food System Financing Stress Index** — the weighted system stress score produced by the Rust assessment engine.
+
 ---
 
 ## Prerequisites

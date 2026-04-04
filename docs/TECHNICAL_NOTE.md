@@ -1,7 +1,8 @@
 # Rwanda FSFI — Technical Computation Note
 
 **Food Systems Financial Intelligence (FSFI) | Technical Reference**  
-*Computation Architecture, Mathematical Formulations, and Implementation Details*
+*Computation Architecture, Mathematical Formulations, and Implementation Details*  
+*FSFSI = Food System Financing Stress Index*
 
 ---
 
@@ -10,7 +11,7 @@
 1. [System Architecture Overview](#1-system-architecture-overview)
 2. [Data Model and Input Variables](#2-data-model-and-input-variables)
 3. [Performance Gap Computation](#3-performance-gap-computation)
-4. [Indicator-Level Financial Stress](#4-indicator-level-financial-stress)
+4. [Indicator-Level Financing Stress](#4-indicator-level-financing-stress)
 5. [Weighting Methods](#5-weighting-methods)
 6. [System-Level FSFSI Score](#6-system-level-fsfsi-score)
 7. [Optimal Budget Allocation (Lagrangian Optimization)](#7-optimal-budget-allocation-lagrangian-optimization)
@@ -106,7 +107,9 @@ When observed or benchmark values are absent, the Rust engine applies fallbacks:
 
 ---
 
-## 4. Indicator-Level Financial Stress
+## 4. Indicator-Level Financing Stress
+
+FSFSI is the **Food System Financing Stress Index**: a weighted aggregate of indicator-level stresses defined below.
 
 The stress function for indicator \(i\) is:
 
@@ -195,8 +198,8 @@ where \(n_c\) is the number of indicators in component \(c\) and \(\omega_c\) is
 For **equal weighting**, every indicator gets \(\omega_i = 1/N\) directly (no component-level step), so components with more indicators contribute more total weight.
 
 **Interpretation:**
-- \(\text{FSFSI} = 0\): No financial stress — all indicators at benchmark, regardless of investment
-- Higher FSFSI → more financial stress → worse food system health
+- \(\text{FSFSI} = 0\): No financing stress — all indicators at benchmark, regardless of investment
+- Higher FSFSI → more financing stress → worse food system health
 - The score has no hard upper bound but is effectively bounded by \(\max(\delta_i) \le 1\)
 
 ---

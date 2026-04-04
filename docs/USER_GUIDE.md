@@ -1,7 +1,8 @@
 # Rwanda FSFI Dashboard — User Guide
 
 **Food Systems Financial Intelligence (FSFI) | Republic of Rwanda**  
-*Ministry of Agriculture & Animal Resources (MINAGRI)*
+*Ministry of Agriculture & Animal Resources (MINAGRI)*  
+*FSFSI = Food System Financing Stress Index*
 
 ---
 
@@ -52,12 +53,12 @@ After first login, go to **Profile → Change Password**. You will be required t
 
 ## 2. Understanding the FSFSI Score
 
-The **Food Systems Financial Stress Index (FSFSI)** is the central metric of this dashboard. It measures how much financial stress Rwanda's food system is experiencing across all 8 components and 37 indicators.
+The **Food System Financing Stress Index (FSFSI)** is the central metric of this dashboard. It measures how much financing-related stress Rwanda's food system is experiencing across all 8 components and 37 indicators.
 
 ### What the Score Means
 
-> **Higher FSFSI = More Financial Stress = Worse outcome**  
-> **Lower FSFSI = Less Financial Stress = Better outcome**
+> **Higher FSFSI = More financing stress = Worse outcome**  
+> **Lower FSFSI = Less financing stress = Better outcome**
 
 The score is calculated using the following logic for each indicator:
 
@@ -83,7 +84,7 @@ FSFSI = Σ (weight × stress) for all 37 indicators
 | 🟢 **Low** | 0.00 – 0.05 | Food system is well-funded; indicators near benchmark |
 | 🟡 **Medium** | 0.05 – 0.15 | Moderate gaps; targeted investment can close deficits |
 | 🟠 **High** | 0.15 – 0.30 | Significant underinvestment; intervention needed |
-| 🔴 **Critical** | > 0.30 | Severe financial stress; urgent reallocation required |
+| 🔴 **Critical** | > 0.30 | Severe financing stress; urgent reallocation required |
 
 ### Point-in-Time vs. Cumulative FSFSI
 
@@ -231,7 +232,7 @@ Rwanda's food system is divided into **8 components**, each grouping related ind
 
 **URL:** `/dashboard`
 
-The National Overview is your starting point. It provides a **national-level snapshot** of food system financial health for the selected fiscal year.
+The National Overview is your starting point. It provides a **national-level snapshot** of food system financing health for the selected fiscal year.
 
 ### Key Metrics Row
 
@@ -629,11 +630,11 @@ The Budget Allocation sub-tab allows direct entry of component-level budget figu
 
 | Term | Definition |
 |------|-----------|
-| **FSFSI** | Food Systems Financial Stress Index — the headline composite metric. Higher = more stressed. |
+| **FSFSI** | Food System Financing Stress Index — the headline composite metric. Higher = more stressed. |
 | **Cumulative FSFSI** | Memory-adjusted FSFSI that carries forward historical stress. The dashboard's primary headline. |
 | **Overall FSFSI** | Point-in-time FSFSI for a single fiscal year, without memory effects. |
 | **Performance Gap (δ)** | Normalized distance between an indicator's observed value and its benchmark. 0 = at benchmark; 1 = maximum gap. |
-| **Stress (υ)** | Indicator-level financial stress = δ × e^(−α × f). Combines gap and investment level. |
+| **Stress (υ)** | Indicator-level financing stress = δ × e^(−α × f). Combines gap and investment level. |
 | **Sensitivity (α)** | How responsive an indicator is to financial investment. Expressed as stress reduction per billion RWF. |
 | **Budget Allocation (f)** | Weighted financial investment assigned to an indicator, in billions RWF. |
 | **Efficiency Index** | Optimal FSFSI ÷ Actual FSFSI. Ranges 0–1; 1 = perfectly efficient budget allocation. |

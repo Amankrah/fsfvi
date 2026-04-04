@@ -5,8 +5,8 @@ import { FiscalYearProvider } from '@/contexts/FiscalYearContext';
 import { AlertProvider } from '@/contexts/AlertContext';
 
 export const metadata: Metadata = {
-  title: 'Rwanda FSFI: Food Systems Financial Intelligence',
-  description: 'Decision-support for food system budget allocation. Ministry of Agriculture and Animal Resources.',
+  title: 'FSFI — Food Systems Financing Intelligence (Rwanda)',
+  description: 'Decision-support for food system budget allocation. Ministry of Agriculture and Animal Resources, Government of Rwanda.',
   icons: { icon: '/icon.svg' },
 };
 

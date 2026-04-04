@@ -7,9 +7,11 @@ import { RwandaSidebar } from '@/components/rwanda/layout/RwandaSidebar';
 import { RwandaFooter } from '@/components/rwanda/layout/RwandaFooter';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { User } from 'lucide-react';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 function ProfileContent() {
   const { user } = useAuth(true);
+  const { t } = useLanguage();
 
   return (
     <Card>
@@ -27,7 +29,7 @@ function ProfileContent() {
           </div>
           <div>
             <label className="text-sm font-medium text-gray-500">Government</label>
-            <p className="text-gray-900 font-medium">{user?.government_name || 'Republic of Rwanda'}</p>
+            <p className="text-gray-900 font-medium">{user?.government_name || t('app.ministry')}</p>
           </div>
           <div>
             <label className="text-sm font-medium text-gray-500">Role</label>

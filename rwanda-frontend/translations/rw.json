@@ -1,11 +1,16 @@
 {
   "app": {
-    "title": "Repubulika y'u Rwanda: FSFI Ikibaho",
-    "subtitle": "Ubumenyi bw'Imari y'Ibiribwa",
+    "title": "Ubumenyi ku nguzanyo z'imari mu sisitemu z'ibiribwa — FSFI",
+    "platform_name": "Ubumenyi ku nguzanyo z'imari mu sisitemu z'ibiribwa",
+    "subtitle": "FSFI · Ikibaho cya Guverinoma y'u Rwanda",
     "ministry": "Minisiteri y'Ubuhinzi n'Ubworozi",
     "republic": "Repubulika y'u Rwanda"
   },
   "landing": {
+    "hero_kicker": "Guverinoma y'u Rwanda",
+    "hero_metric_indicators": "Ibipimo by'igihugu",
+    "hero_metric_components": "Ibice bya sisitemu y'ibiribwa",
+    "hero_panel_caption": "Imitegurere ya Guverinoma y'u Rwanda",
     "hero_title_1": "Menya aho winjiza imari.",
     "hero_title_2": "Wubake sisitemu y'ibiribwa ikomeye.",
     "hero_p1": "Ubumenyi bw'Imari y'Ibiribwa (FSFI) bufasha Guverinoma y'u Rwanda n'abafatanyabikorwa mu iterambere kubona uko amafaranga agomba kugabanywa mu sisitemu y'ibiribwa. Bufasha kugena intego z'igihugu no kunoza ibisubizo byose.",
@@ -14,6 +19,7 @@
     "hero_cta_about": "Uko bikora",
     "components_title": "Ibice 8 by'ibipimo",
     "components_sub": "Byashyizweho ku murima wa Rwanda kandi bihuza n'intego z'igihugu.",
+    "components_chip": "Rwanda",
     "learn_more": "Menya byinshi",
     "cta_access_title": "Kugera ku kibaho",
     "cta_access_body": "Injira ukoresheje amakuru yawe y'ubuyobozi.",
@@ -63,7 +69,7 @@
     "cta_body": "Injira ukoresheje amakuru yawe y'ubuyobozi kugira ngo ubone ikibaho.",
     "cta_signin": "Injira ku kibaho",
     "cta_home": "Subira ahabanza",
-    "footer_line": "Ubumenyi bw'Imari y'Ibiribwa"
+    "footer_line": "Ubumenyi ku nguzanyo z'imari mu sisitemu z'ibiribwa"
   },
   "nav": {
     "home": "Ahabanza",

@@ -1,19 +1,25 @@
 {
   "app": {
-    "title": "Republic of Rwanda: FSFI Dashboard",
-    "subtitle": "Food Systems Financial Intelligence",
+    "title": "Food Systems Financing Intelligence — FSFI",
+    "platform_name": "Food Systems Financing Intelligence",
+    "subtitle": "FSFI · Rwanda government dashboard",
     "ministry": "Ministry of Agriculture and Animal Resources",
     "republic": "Republic of Rwanda"
   },
   "landing": {
+    "hero_kicker": "Government of Rwanda",
+    "hero_metric_indicators": "National indicators",
+    "hero_metric_components": "Food system components",
+    "hero_panel_caption": "Rwanda national framework",
     "hero_title_1": "Know where to invest.",
     "hero_title_2": "Build a more resilient food system.",
-    "hero_p1": "Food Systems Financial Intelligence helps the Government of Rwanda and its development partners see how to allocate funds across the food system. It supports setting national goals and improving overall food system outcomes.",
+    "hero_p1": "Food Systems Financing Intelligence helps the Government of Rwanda and its development partners see how to allocate funds across the food system. It supports setting national goals and improving overall food system outcomes.",
     "hero_p2": "For Rwanda, FSFI works with 37 indicators grouped in 8 components. Stronger, better-targeted allocation across these areas supports food systems resilience and leaves the country less exposed when shocks arrive.",
     "hero_cta_dashboard": "Sign in to Dashboard",
     "hero_cta_about": "How it works",
     "components_title": "8 indicator components",
     "components_sub": "Defined for Rwanda's context and aligned with national priorities.",
+    "components_chip": "Rwanda",
     "learn_more": "Learn more",
     "cta_access_title": "Access the dashboard",
     "cta_access_body": "Sign in with your government credentials.",
@@ -32,14 +38,14 @@
     "back": "Back to Home",
     "h1_about": "About",
     "h1_fsfi": "FSFI",
-    "hero_lead": "Food Systems Financial Intelligence is a decision-support platform that helps Rwanda's government understand where to invest and what impact to expect. Donors and partners can use the same evidence to align support with national food system goals and track results.",
+    "hero_lead": "Food Systems Financing Intelligence is a decision-support platform that helps Rwanda's government understand where to invest and what impact to expect. Donors and partners can use the same evidence to align support with national food system goals and track results.",
     "challenge_title": "The challenge",
     "challenge_intro": "Food system budgets must cover many priorities. Leaders need clear answers on where money does the most good, how spending links to resilience, and how to explain trade-offs to partners and the public.",
     "challenge_q1": "Where should the next franc go to improve the system as a whole?",
     "challenge_q2": "How do allocations line up with national goals and PSTA 5?",
     "challenge_q3": "What mix of investment reduces vulnerability when shocks hit?",
     "provides_title": "What FSFI provides",
-    "provides_fsfsi": "FSFI computes the Food Systems Financing Stress Index (FSFSI). It brings together 37 indicators in 8 components to describe stress and pressure in the food system, so budgets and investments can be grounded in data.",
+    "provides_fsfsi": "FSFI computes the Food System Financing Stress Index (FSFSI). It brings together 37 indicators in 8 components to describe stress and pressure in the food system, so budgets and investments can be grounded in data.",
     "card_assess_title": "Assesses performance",
     "card_assess_body": "Shows how Rwanda’s food system is doing across dimensions that matter for outcomes and resilience.",
     "card_gaps_title": "Identifies gaps",
@@ -63,7 +69,7 @@
     "cta_body": "Sign in with your government credentials to access the dashboard.",
     "cta_signin": "Sign In to Dashboard",
     "cta_home": "Back to Home",
-    "footer_line": "Food Systems Financial Intelligence"
+    "footer_line": "Food Systems Financing Intelligence"
   },
   "nav": {
     "home": "Home",
@@ -99,7 +105,7 @@
     "confirm_password": "Confirm Password"
   },
   "overview": {
-    "national_fsfi": "Rwanda Food System Financial Intelligence Index",
+    "national_fsfi": "Rwanda Food System Financing Stress Index (FSFSI)",
     "risk_level": "Risk Level",
     "yoy_change": "Year-over-Year Change",
     "critical_components": "Critical Components",
