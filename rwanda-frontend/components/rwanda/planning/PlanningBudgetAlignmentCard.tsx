@@ -121,9 +121,7 @@ export function PlanningBudgetAlignmentCard({
     const shares = shareMap(yp);
     const next: Record<string, string> = {};
     for (const [c, pct] of Object.entries(shares)) {
-      // Use 6 decimal places to minimize rounding accumulation when re-deriving
-      // percentages. The backend tolerance (0.5 pp) handles remaining precision loss.
-      next[c] = ((planBn * pct) / 100).toFixed(6);
+      next[c] = ((planBn * pct) / 100).toFixed(1);
     }
     setBnDraft((prev) => ({ ...prev, [yp.year]: next }));
   }, []);
@@ -302,9 +300,9 @@ export function PlanningBudgetAlignmentCard({
                       <td className="py-2 pr-2 font-medium text-gray-900">
                         {formatPlanPeriodLabel(yp)}
                       </td>
-                      <td className="py-2 pr-2 font-mono text-xs">{planBn.toFixed(3)}</td>
+                      <td className="py-2 pr-2 font-mono text-xs">{planBn.toFixed(1)}</td>
                       <td className="py-2 pr-2 font-mono text-xs">
-                        {userSum != null ? userSum.toFixed(3) : '—'}
+                        {userSum != null ? userSum.toFixed(1) : '—'}
                       </td>
                       <td className="py-2 pr-2 font-mono text-xs">
                         {deltaPct != null ? `${deltaPct > 0 ? '+' : ''}${deltaPct.toFixed(1)}%` : '—'}
@@ -405,7 +403,7 @@ export function PlanningBudgetAlignmentCard({
                                       <input
                                         type="number"
                                         min={0}
-                                        step={0.0001}
+                                        step={0.1}
                                         className="w-24 rounded border border-gray-300 px-1.5 py-0.5 font-mono"
                                         value={bnDraft[yp.year]?.[comp] ?? ''}
                                         onChange={(e) =>
@@ -437,7 +435,7 @@ export function PlanningBudgetAlignmentCard({
                             <span className="font-semibold text-gray-800">
                               {t('planning.alignment_auto_total')}:{' '}
                               <span className="font-mono text-[var(--rw-blue)]">
-                                {parsed.ok ? `${parsed.sum.toFixed(4)} bn RWF` : '—'}
+                                {parsed.ok ? `${parsed.sum.toFixed(1)} bn RWF` : '—'}
                               </span>
                             </span>
                             {loadingYear === yp.year && (

@@ -237,7 +237,7 @@ mod tests {
         ];
         for s in &scenarios {
             let result = calculate_ahp_weights(s).unwrap();
-            assert_eq!(result.weights.len(), 6, "Scenario {} failed", s);
+            assert_eq!(result.weights.len(), 8, "Scenario {} failed", s);
             let sum: f64 = result.weights.values().sum();
             assert!((sum - 1.0).abs() < 1e-6, "Scenario {} weights don't sum to 1", s);
         }

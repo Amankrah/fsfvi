@@ -19,9 +19,11 @@ import {
 
 interface RwandaLoginFormProps {
   onTwoFactorRequired?: (tempToken: string, username: string) => void;
+  /** Shown above the card when redirecting after session expiry (opaque, i18n-safe). */
+  sessionNotice?: string;
 }
 
-export function RwandaLoginForm({ onTwoFactorRequired }: RwandaLoginFormProps) {
+export function RwandaLoginForm({ onTwoFactorRequired, sessionNotice }: RwandaLoginFormProps) {
   const router = useRouter();
   const { t } = useLanguage();
   const [username, setUsername] = useState('');
@@ -63,6 +65,14 @@ export function RwandaLoginForm({ onTwoFactorRequired }: RwandaLoginFormProps) {
 
   return (
     <div className="w-full max-w-md">
+      {sessionNotice ? (
+        <div
+          className="mb-6 rounded-xl border border-[var(--rw-blue)]/25 bg-[var(--rw-blue)]/8 px-4 py-3 text-sm text-slate-800 shadow-sm"
+          role="status"
+        >
+          {sessionNotice}
+        </div>
+      ) : null}
       {/* Header */}
       <div className="text-center mb-8">
         <div className="flex justify-center mb-4">

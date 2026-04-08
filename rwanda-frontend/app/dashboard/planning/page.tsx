@@ -92,6 +92,8 @@ function normalizeSavedPlanJson(raw: MultiYearStrategicPlan): MultiYearStrategic
   };
 }
 
+type PlanningOutputTab = 'overview' | 'components' | 'alignment' | 'mtef' | 'outcomes';
+
 export default function PlanningPage() {
   const { t } = useLanguage();
   const { fiscalYear } = useFiscalYear();
@@ -128,6 +130,9 @@ export default function PlanningPage() {
   const [loadedFromAssessmentId, setLoadedFromAssessmentId] = useState<string | null>(null);
   /** FY label for multi-year plan row 1 (Year 1); defaults to assessment FY + 1 when unset. */
   const [planningStartFiscalYear, setPlanningStartFiscalYear] = useState(2025);
+
+  const [planOutputTab, setPlanOutputTab] = useState<PlanningOutputTab>('overview');
+  const [planOutputVersion, setPlanOutputVersion] = useState(0);
 
   const formatWeightingMethodLabel = useCallback(
     (code?: string | null) => {
@@ -205,6 +210,7 @@ export default function PlanningPage() {
         }
         const normalized = normalizeSavedPlanJson(pj as MultiYearStrategicPlan);
         setMultiYearPlan(normalized);
+        setPlanOutputVersion((v) => v + 1);
         setPlanningStartFiscalYear(
           normalized.planning_start_fiscal_year ?? full.fiscal_year + 1,
         );
@@ -346,6 +352,7 @@ export default function PlanningPage() {
 
       setMultiYearPlan(multiYear);
       setMtefPlan(mtef);
+      setPlanOutputVersion((v) => v + 1);
       setLoadedPlanId(null);
       setLoadedFromAssessmentId(null);
     } catch (err: unknown) {
@@ -384,6 +391,10 @@ export default function PlanningPage() {
       setSavedPlans([]);
     }
   }, [assessment, fetchSavedPlans]);
+
+  useEffect(() => {
+    setPlanOutputTab('overview');
+  }, [planOutputVersion]);
 
   const baselineBudget = assessment
     ? toPlanningInput(assessment).reduce((s, c) => s + c.financial_allocation_lcu, 0)
@@ -846,24 +857,43 @@ export default function PlanningPage() {
               </div>
             </CardContent>
             <CardContent className="pt-0">
-              <button
-                type="button"
-                onClick={runPlanning}
-                disabled={generating}
-                className="inline-flex items-center gap-2 rounded-lg bg-[var(--rw-blue)] px-6 py-3 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {generating ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    {t('planning.generating')}
-                  </>
-                ) : (
-                  <>
-                    <Target className="h-4 w-4" />
-                    {t('planning.generate_plans')}
-                  </>
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  onClick={runPlanning}
+                  disabled={generating}
+                  className="inline-flex items-center gap-2 rounded-lg bg-[var(--rw-blue)] px-6 py-3 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {generating ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      {t('planning.generating')}
+                    </>
+                  ) : (
+                    <>
+                      <Target className="h-4 w-4" />
+                      {t('planning.generate_plans')}
+                    </>
+                  )}
+                </button>
+                {multiYearPlan && (
+                  <button
+                    type="button"
+                    onClick={runPlanning}
+                    disabled={generating}
+                    title={t('planning.regenerate_plans_hint')}
+                    className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {generating ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <RefreshCw className="h-4 w-4" />
+                    )}
+                    {t('planning.regenerate_plans')}
+                  </button>
                 )}
-              </button>
+              </div>
+              <p className="text-xs text-gray-500 mt-2 max-w-xl">{t('planning.workflow_hint')}</p>
             </CardContent>
           </Card>
 
@@ -909,105 +939,196 @@ export default function PlanningPage() {
                   </div>
 
                   {!multiYearPlan.target_already_achieved && multiYearPlan.yearly_plans.length > 0 && (
-                <>
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <TrendingDown className="h-5 w-5 text-[var(--rw-blue)]" />
-                        {t('planning.trajectory_title')}
-                      </CardTitle>
-                      <p className="text-sm text-gray-500 font-normal">{t('planning.trajectory_help')}</p>
-                    </CardHeader>
-                    <CardContent>
-                      <PlanningTrajectoryChart
-                        yearlyPlans={multiYearPlan.yearly_plans}
-                        baselineFsfvi={multiYearPlan.baseline_fsfvi}
-                        targetFsfvi={multiYearPlan.target_fsfvi}
-                      />
-                    </CardContent>
-                  </Card>
+                    <>
+                      <div
+                        className="sticky top-0 z-20 -mx-1 px-1 py-2 mb-2 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80 border-b border-gray-200"
+                        role="tablist"
+                        aria-label={t('planning.output_tabs_label')}
+                      >
+                        <div className="flex flex-wrap gap-1 sm:gap-2">
+                          {(
+                            [
+                              ['overview', 'planning.tab_overview'],
+                              ['components', 'planning.tab_components'],
+                              ['alignment', 'planning.tab_alignment'],
+                              ['mtef', 'planning.tab_mtef'],
+                              ['outcomes', 'planning.tab_outcomes'],
+                            ] as const
+                          ).map(([id, labelKey]) => (
+                            <button
+                              key={id}
+                              type="button"
+                              role="tab"
+                              id={`plan-tab-${id}`}
+                              aria-selected={planOutputTab === id}
+                              onClick={() => setPlanOutputTab(id)}
+                              className={`rounded-lg px-3 py-2 text-xs sm:text-sm font-medium transition-colors ${
+                                planOutputTab === id
+                                  ? 'bg-[var(--rw-blue)] text-white shadow-sm'
+                                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                              }`}
+                            >
+                              {t(labelKey)}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
 
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                          <DollarSign className="h-5 w-5 text-[var(--rw-blue)]" />
-                          {t('planning.budget_evolution')}
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <PlanningBudgetChart
-                          yearlyPlans={multiYearPlan.yearly_plans}
-                          baselineBudget={baselineBudget}
-                        />
-                      </CardContent>
-                    </Card>
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                          <BarChart3 className="h-5 w-5 text-[var(--rw-blue)]" />
-                          {t('planning.allocation_share')}
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <ComponentAllocationChart yearlyPlans={multiYearPlan.yearly_plans} />
-                      </CardContent>
-                    </Card>
-                  </div>
+                      <div
+                        role="tabpanel"
+                        aria-labelledby={`plan-tab-${planOutputTab}`}
+                        className="space-y-6 min-h-[200px]"
+                      >
+                        {planOutputTab === 'overview' && (
+                          <>
+                            <Card>
+                              <CardHeader>
+                                <CardTitle className="flex items-center gap-2">
+                                  <TrendingDown className="h-5 w-5 text-[var(--rw-blue)]" />
+                                  {t('planning.trajectory_title')}
+                                </CardTitle>
+                                <p className="text-sm text-gray-500 font-normal">{t('planning.trajectory_help')}</p>
+                              </CardHeader>
+                              <CardContent>
+                                <PlanningTrajectoryChart
+                                  yearlyPlans={multiYearPlan.yearly_plans}
+                                  baselineFsfvi={multiYearPlan.baseline_fsfvi}
+                                  targetFsfvi={multiYearPlan.target_fsfvi}
+                                />
+                              </CardContent>
+                            </Card>
 
-                  {/* Component Recovery Trajectory */}
-                  <ComponentTrajectoryTable
-                    yearlyPlans={multiYearPlan.yearly_plans}
-                    baselineComponents={
-                      Object.fromEntries(
-                        (assessment?.component_results ?? []).map((c) => [
-                          c.component,
-                          c.cumulative_stress ?? c.component_stress,
-                        ])
-                      )
-                    }
-                  />
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                              <Card>
+                                <CardHeader>
+                                  <CardTitle className="flex items-center gap-2">
+                                    <DollarSign className="h-5 w-5 text-[var(--rw-blue)]" />
+                                    {t('planning.budget_evolution')}
+                                  </CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                  <PlanningBudgetChart
+                                    yearlyPlans={multiYearPlan.yearly_plans}
+                                    baselineBudget={baselineBudget}
+                                  />
+                                </CardContent>
+                              </Card>
+                              <Card>
+                                <CardHeader>
+                                  <CardTitle className="flex items-center gap-2">
+                                    <BarChart3 className="h-5 w-5 text-[var(--rw-blue)]" />
+                                    {t('planning.allocation_share')}
+                                  </CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                  <ComponentAllocationChart yearlyPlans={multiYearPlan.yearly_plans} />
+                                </CardContent>
+                              </Card>
+                            </div>
+                          </>
+                        )}
 
-                  <PlanningBudgetAlignmentCard
-                    assessmentId={assessment.id}
-                    weightingMethod={weightingMethod}
-                    scenario={scenario}
-                    yearlyPlans={multiYearPlan.yearly_plans}
-                    planWeightingMethod={multiYearPlan.planning_weighting_method}
-                    planScenario={multiYearPlan.planning_scenario}
-                    planId={loadedPlanId ?? undefined}
-                  />
+                        {planOutputTab === 'components' && (
+                          <ComponentTrajectoryTable
+                            yearlyPlans={multiYearPlan.yearly_plans}
+                            baselineComponents={
+                              Object.fromEntries(
+                                (assessment?.component_results ?? []).map((c) => [
+                                  c.component,
+                                  c.cumulative_stress ?? c.component_stress,
+                                ]),
+                              )
+                            }
+                          />
+                        )}
 
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>{t('planning.insights_title')}</CardTitle>
-                      <p className="text-sm text-gray-500 font-normal">{t('planning.insights_help')}</p>
-                    </CardHeader>
-                    <CardContent>
-                      <PlanningInsightsCards
-                        expectedOutcomes={multiYearPlan.expected_outcomes}
-                        implementationRisks={multiYearPlan.implementation_risks}
-                        successFactors={multiYearPlan.success_factors}
-                      />
-                    </CardContent>
-                  </Card>
-                </>
+                        {planOutputTab === 'alignment' && (
+                          <PlanningBudgetAlignmentCard
+                            assessmentId={assessment.id}
+                            weightingMethod={weightingMethod}
+                            scenario={scenario}
+                            yearlyPlans={multiYearPlan.yearly_plans}
+                            planWeightingMethod={multiYearPlan.planning_weighting_method}
+                            planScenario={multiYearPlan.planning_scenario}
+                            planId={loadedPlanId ?? undefined}
+                          />
+                        )}
+
+                        {planOutputTab === 'mtef' && (
+                          mtefPlan ? (
+                            <div className="space-y-4">
+                              <div>
+                                <h3 className="text-base font-semibold text-gray-900 flex items-center gap-2">
+                                  <CalendarRange className="h-5 w-5 text-[var(--rw-blue)]" />
+                                  {t('planning.section_mtef_title')}
+                                </h3>
+                                <p className="text-sm text-gray-600 mt-0.5">{t('planning.section_mtef_desc')}</p>
+                              </div>
+                              <Card className="border-[var(--rw-blue)]/20">
+                                <CardContent className="pt-6">
+                                  <MtefSummaryCards plan={mtefPlan} />
+                                </CardContent>
+                              </Card>
+                            </div>
+                          ) : (
+                            <p className="text-sm text-gray-600 py-6">{t('planning.tab_mtef_unavailable')}</p>
+                          )
+                        )}
+
+                        {planOutputTab === 'outcomes' && (
+                          <Card>
+                            <CardHeader>
+                              <CardTitle>{t('planning.insights_title')}</CardTitle>
+                              <p className="text-sm text-gray-500 font-normal">{t('planning.insights_help')}</p>
+                            </CardHeader>
+                            <CardContent>
+                              <PlanningInsightsCards
+                                expectedOutcomes={multiYearPlan.expected_outcomes}
+                                implementationRisks={multiYearPlan.implementation_risks}
+                                successFactors={multiYearPlan.success_factors}
+                              />
+                            </CardContent>
+                          </Card>
+                        )}
+                      </div>
+                    </>
                   )}
 
                   {multiYearPlan.target_already_achieved && (
-                <Card className="border-[var(--rw-green)]/30 bg-green-50/30">
-                  <CardContent className="py-8 text-center">
-                    <Target className="h-12 w-12 text-[var(--rw-green)] mx-auto mb-3" />
-                    <h3 className="text-lg font-semibold text-gray-900">{t('planning.target_achieved_title')}</h3>
-                    <p className="text-gray-600 mt-1">{multiYearPlan.expected_outcomes[0] ?? t('planning.target_achieved_message')}</p>
-                  </CardContent>
-                </Card>
+                    <Card className="border-[var(--rw-green)]/30 bg-green-50/30">
+                      <CardContent className="py-8 text-center">
+                        <Target className="h-12 w-12 text-[var(--rw-green)] mx-auto mb-3" />
+                        <h3 className="text-lg font-semibold text-gray-900">{t('planning.target_achieved_title')}</h3>
+                        <p className="text-gray-600 mt-1">
+                          {multiYearPlan.expected_outcomes[0] ?? t('planning.target_achieved_message')}
+                        </p>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {multiYearPlan.target_already_achieved && mtefPlan && (
+                    <section className="pt-6 border-t-2 border-gray-200" aria-labelledby="planning-mtef-achieved-heading">
+                      <div className="mb-4">
+                        <h2
+                          id="planning-mtef-achieved-heading"
+                          className="text-lg font-semibold text-gray-900 flex items-center gap-2"
+                        >
+                          <CalendarRange className="h-5 w-5 text-[var(--rw-blue)]" />
+                          {t('planning.section_mtef_title')}
+                        </h2>
+                        <p className="text-sm text-gray-600 mt-0.5">{t('planning.section_mtef_desc')}</p>
+                      </div>
+                      <Card className="border-[var(--rw-blue)]/20">
+                        <CardContent className="pt-6">
+                          <MtefSummaryCards plan={mtefPlan} />
+                        </CardContent>
+                      </Card>
+                    </section>
                   )}
                 </section>
               )}
 
-              {/* ---------- MTEF (clearly separate from multi-year plan) ---------- */}
-              {mtefPlan && (
+              {!multiYearPlan && mtefPlan && (
                 <section className="pt-8 border-t-2 border-gray-200" aria-labelledby="planning-mtef-heading">
                   <div className="mb-4">
                     <h2 id="planning-mtef-heading" className="text-lg font-semibold text-gray-900 flex items-center gap-2">
@@ -1023,24 +1144,12 @@ export default function PlanningPage() {
                   </Card>
                 </section>
               )}
-
-              <div className="flex justify-end">
-                <button
-                  type="button"
-                  onClick={runPlanning}
-                  disabled={generating}
-                  className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-                >
-                  {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-                  {t('common.retry')}
-                </button>
-              </div>
             </>
           )}
 
           {/* Save Plan */}
           {hasPlans && assessment && multiYearPlan && (
-            <Card className="border-2 border-[var(--rw-green)]/30 bg-green-50/30">
+            <Card className="border-2 border-[var(--rw-green)]/30 bg-green-50">
               <CardContent className="py-5">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
                   <div className="flex-1">
@@ -1051,6 +1160,9 @@ export default function PlanningPage() {
                       {loadedPlanId
                         ? t('planning.save_update_help')
                         : t('planning.save_new_help')}
+                    </p>
+                    <p className="text-xs text-gray-600 mt-2 border-t border-green-200/60 pt-2">
+                      {t('planning.save_state_note')}
                     </p>
                   </div>
                   <div className="flex items-center gap-3 w-full sm:w-auto">

@@ -8,6 +8,8 @@
  */
 
 import axios, { AxiosInstance } from 'axios';
+import { RW_AUTH_TOKEN_KEY, RW_USER_KEY } from '@/lib/auth/storageKeys';
+import { attachAuthInterceptors } from '@/lib/api/attachAuthInterceptors';
 import type {
   LoginRequest,
   LoginResponse,
@@ -28,10 +30,6 @@ import type {
 const RWANDA_API_BASE_URL =
   process.env.NEXT_PUBLIC_RWANDA_API_URL || 'http://localhost:8000';
 
-// Storage keys
-const TOKEN_KEY = 'rw_auth_token';
-const USER_KEY = 'rw_user';
-
 // ============================================================================
 // Axios Instance
 // ============================================================================
@@ -44,35 +42,7 @@ const authClient: AxiosInstance = axios.create({
   timeout: 30000,
 });
 
-// Request interceptor for auth header
-authClient.interceptors.request.use(
-  (config) => {
-    const tokenData = localStorage.getItem(TOKEN_KEY);
-    if (tokenData) {
-      try {
-        const parsed = JSON.parse(tokenData);
-        config.headers['Authorization'] = `Bearer ${parsed.token}`;
-      } catch {
-        // Invalid token data
-      }
-    }
-    return config;
-  },
-  (error) => Promise.reject(error)
-);
-
-// Response interceptor for error handling
-authClient.interceptors.response.use(
-  (response) => response,
-  async (error) => {
-    if (error.response?.status === 401) {
-      // Clear auth data on 401
-      localStorage.removeItem(TOKEN_KEY);
-      localStorage.removeItem(USER_KEY);
-    }
-    return Promise.reject(error);
-  }
-);
+attachAuthInterceptors(authClient);
 
 // ============================================================================
 // Auth API Methods
@@ -90,13 +60,13 @@ export const authAPI = {
 
     if (!data.requires_two_fa && data.token) {
       localStorage.setItem(
-        TOKEN_KEY,
+        RW_AUTH_TOKEN_KEY,
         JSON.stringify({
           token: data.token,
           refresh_token: data.refresh_token ?? '',
         })
       );
-      localStorage.setItem(USER_KEY, JSON.stringify(data.user));
+      localStorage.setItem(RW_USER_KEY, JSON.stringify(data.user));
     }
 
     return data;
@@ -112,13 +82,13 @@ export const authAPI = {
     const data = response.data;
 
     localStorage.setItem(
-      TOKEN_KEY,
+      RW_AUTH_TOKEN_KEY,
       JSON.stringify({
         token: data.token,
         refresh_token: data.refresh_token ?? '',
       })
     );
-    localStorage.setItem(USER_KEY, JSON.stringify(data.user));
+    localStorage.setItem(RW_USER_KEY, JSON.stringify(data.user));
 
     return data;
   },
@@ -165,7 +135,7 @@ export const authAPI = {
     const data = response.data;
 
     // Update cached user data
-    localStorage.setItem(USER_KEY, JSON.stringify(data));
+    localStorage.setItem(RW_USER_KEY, JSON.stringify(data));
 
     return data;
   },
@@ -180,8 +150,8 @@ export const authAPI = {
       await authClient.post('/logout/');
     } finally {
       // Always clear local storage
-      localStorage.removeItem(TOKEN_KEY);
-      localStorage.removeItem(USER_KEY);
+      localStorage.removeItem(RW_AUTH_TOKEN_KEY);
+      localStorage.removeItem(RW_USER_KEY);
     }
   },
 
@@ -204,7 +174,7 @@ export const authAPI = {
    * Check if user is authenticated (local check)
    */
   isAuthenticated: (): boolean => {
-    const tokenData = localStorage.getItem(TOKEN_KEY);
+    const tokenData = localStorage.getItem(RW_AUTH_TOKEN_KEY);
     return tokenData !== null;
   },
 
@@ -212,7 +182,7 @@ export const authAPI = {
    * Get current user from cache
    */
   getCurrentUser: (): UserResponse | null => {
-    const userData = localStorage.getItem(USER_KEY);
+    const userData = localStorage.getItem(RW_USER_KEY);
     if (userData) {
       try {
         return JSON.parse(userData) as UserResponse;
@@ -227,7 +197,7 @@ export const authAPI = {
    * Get auth token
    */
   getToken: (): string | null => {
-    const tokenData = localStorage.getItem(TOKEN_KEY);
+    const tokenData = localStorage.getItem(RW_AUTH_TOKEN_KEY);
     if (tokenData) {
       try {
         const parsed = JSON.parse(tokenData);

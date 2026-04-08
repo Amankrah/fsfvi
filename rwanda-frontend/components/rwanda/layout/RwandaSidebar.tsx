@@ -86,17 +86,22 @@ export function RwandaSidebar() {
   };
 
   return (
-    <aside className="hidden shrink-0 lg:block lg:w-64">
-      <div className="sticky top-20 overflow-hidden rounded-2xl border border-white/70 bg-white/80 shadow-[0_20px_50px_-24px_rgba(15,23,42,0.28)] ring-1 ring-slate-900/[0.04] backdrop-blur-xl">
-        <div className="border-b border-slate-200/80 bg-gradient-to-r from-[var(--rw-blue)]/[0.08] via-white/50 to-[var(--rw-green)]/[0.06] p-4">
+    <aside className="hidden shrink-0 lg:block lg:w-64 lg:self-start">
+      <div className="sticky top-20 flex max-h-[calc(100vh-5.25rem)] flex-col overflow-hidden rounded-2xl border border-white/70 bg-white/80 shadow-[0_20px_50px_-24px_rgba(15,23,42,0.28)] ring-1 ring-slate-900/[0.04] backdrop-blur-xl">
+        <div className="shrink-0 border-b border-slate-200/80 bg-gradient-to-r from-[var(--rw-blue)]/[0.08] via-white/50 to-[var(--rw-green)]/[0.06] p-4">
           <h2 className="text-sm font-semibold tracking-tight text-slate-900">{t('nav.dashboard')}</h2>
           <p className="mt-0.5 text-xs text-slate-500">{t('app.platform_name')}</p>
         </div>
 
-        <nav className="space-y-0.5 p-2">{navItems.map(renderNavItem)}</nav>
+        <nav className="min-h-0 flex-1 space-y-0.5 overflow-y-auto overscroll-y-contain p-2">
+          {navItems.map(renderNavItem)}
+        </nav>
 
-        <div className="border-t border-slate-200/80 bg-slate-50/40 p-2">
-          {accountItems.map(renderNavItem)}
+        <div className="shrink-0 border-t border-slate-200/80 bg-slate-50/50">
+          <p className="px-3 pt-2.5 pb-1 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+            {t('nav.account_section')}
+          </p>
+          <div className="space-y-0.5 p-2 pt-0">{accountItems.map(renderNavItem)}</div>
         </div>
       </div>
     </aside>

@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { LanguageToggle } from '@/components/rwanda/shared/LanguageToggle';
@@ -18,6 +19,40 @@ import {
   Landmark,
   Layers,
 } from 'lucide-react';
+
+/** Portrait files: place under public/team/ (e.g. john-ulimwengu.jpg). Falls back to initials if missing or broken. */
+function TeamMemberAvatar({
+  imageSrc,
+  alt,
+  fallbackInitials,
+  fallbackClassName,
+}: {
+  imageSrc: string;
+  alt: string;
+  fallbackInitials: string;
+  fallbackClassName: string;
+}) {
+  const [showImage, setShowImage] = useState(true);
+  return (
+    <div className="w-20 h-20 rounded-2xl overflow-hidden mb-3 ring-1 ring-gray-200/90 bg-gray-100 shrink-0 shadow-sm">
+      {showImage ? (
+        <img
+          src={imageSrc}
+          alt={alt}
+          className="h-full w-full object-cover object-center"
+          loading="lazy"
+          onError={() => setShowImage(false)}
+        />
+      ) : (
+        <div
+          className={`h-full w-full flex items-center justify-center text-xs font-bold leading-tight text-center px-1 ${fallbackClassName}`}
+        >
+          {fallbackInitials}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function LandingPage() {
   const { t } = useLanguage();
@@ -218,7 +253,7 @@ export default function LandingPage() {
             <div className="mx-auto mt-5 h-1 w-12 rounded-full bg-gradient-to-r from-[var(--rw-blue)] to-[var(--rw-green)]" aria-hidden />
           </div>
 
-          <div className="grid sm:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-5">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
             {featureBlocks.map((item, i) => {
               const ItemIcon = item.Icon;
               return (
@@ -294,13 +329,13 @@ export default function LandingPage() {
 
           <div className="rounded-3xl border border-gray-200/90 bg-gradient-to-b from-gray-50/90 to-white px-6 py-12 sm:px-12 sm:py-14 shadow-[0_4px_40px_-20px_rgba(0,0,0,0.06)]">
             <div className="flex flex-wrap justify-center items-center gap-x-12 gap-y-10 md:gap-x-20 md:gap-y-12">
+              <PartnerLogo image={ifpriLogo} label="IFPRI" href="https://www.ifpri.org/" />
+              <PartnerLogo image={mcgillLogo} label="McGill University" href="https://www.mcgill.ca/" />
               <PartnerLogo
                 image={akademiaLogo}
                 label="Akademiya2063"
                 href="https://www.akademiya2063.org/"
               />
-              <PartnerLogo image={ifpriLogo} label="IFPRI" href="https://www.ifpri.org/" />
-              <PartnerLogo image={mcgillLogo} label="McGill University" href="https://www.mcgill.ca/" />
             </div>
           </div>
 
@@ -322,22 +357,31 @@ export default function LandingPage() {
                     name: 'John Ulimwengu',
                     affiliation: 'IFPRI',
                     href: 'https://www.ifpri.org/profile/john-ulimwengu/',
-                    initials: 'JU',
-                    color: 'bg-[var(--rw-blue)]/10 text-[var(--rw-blue)] ring-1 ring-[var(--rw-blue)]/15',
+                    imageSrc: '/team/john-ulimwengu.jpg',
+                    imageAlt: 'John Ulimwengu, IFPRI',
+                    fallbackInitials: 'JU',
+                    fallbackClass:
+                      'bg-[var(--rw-blue)]/10 text-[var(--rw-blue)] ring-1 ring-[var(--rw-blue)]/15',
                   },
                   {
                     name: 'Emmanuel A. Kwofie',
                     affiliation: 'McGill University',
                     href: 'https://www.eakwofie.com/',
-                    initials: 'EK',
-                    color: 'bg-[var(--rw-green)]/10 text-[var(--rw-green)] ring-1 ring-[var(--rw-green)]/15',
+                    imageSrc: '/team/emmanuel-kwofie.jpg',
+                    imageAlt: 'Emmanuel A. Kwofie, McGill University',
+                    fallbackInitials: 'E.A.K.',
+                    fallbackClass:
+                      'bg-[var(--rw-green)]/10 text-[var(--rw-green)] ring-1 ring-[var(--rw-green)]/15',
                   },
                   {
                     name: 'Ebenezer M. Kwofie',
                     affiliation: 'McGill University',
                     href: 'https://www.mcgill.ca/bioeng/kwofie-ebenezer-miezah',
-                    initials: 'EK',
-                    color: 'bg-[var(--rw-yellow)]/20 text-amber-800 ring-1 ring-[var(--rw-yellow)]/25',
+                    imageSrc: '/team/ebenezer-kwofie.jpg',
+                    imageAlt: 'Ebenezer M. Kwofie, McGill University',
+                    fallbackInitials: 'E.M.K.',
+                    fallbackClass:
+                      'bg-[var(--rw-yellow)]/20 text-amber-800 ring-1 ring-[var(--rw-yellow)]/25',
                   },
                 ].map((person) => (
                   <a
@@ -347,9 +391,12 @@ export default function LandingPage() {
                     rel="noopener noreferrer"
                     className="group flex flex-col items-center text-center rounded-2xl border border-gray-100 bg-gray-50/80 p-5 transition-all hover:border-[var(--rw-blue)]/25 hover:bg-white hover:shadow-[0_12px_36px_-20px_rgba(0,161,222,0.12)]"
                   >
-                    <div className={`w-11 h-11 rounded-xl flex items-center justify-center text-xs font-bold mb-3 ${person.color}`}>
-                      {person.initials}
-                    </div>
+                    <TeamMemberAvatar
+                      imageSrc={person.imageSrc}
+                      alt={person.imageAlt}
+                      fallbackInitials={person.fallbackInitials}
+                      fallbackClassName={person.fallbackClass}
+                    />
                     <p className="text-sm font-semibold text-gray-800 group-hover:text-[var(--rw-blue)] transition-colors leading-tight">
                       {person.name}
                     </p>

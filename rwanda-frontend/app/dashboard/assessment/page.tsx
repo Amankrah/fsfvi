@@ -1,10 +1,17 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useFiscalYear } from '@/contexts/FiscalYearContext';
 import { FiscalYearSelector } from '@/components/rwanda/shared/FiscalYearSelector';
-import { getRiskBgColor, formatRWFCompact, formatScore, getPerformanceGapDisplay } from '@/lib/utils/formatters';
+import {
+  getRiskBgColor,
+  formatRWFCompact,
+  formatScore,
+  getPerformanceGapDisplay,
+  formatPolicyDate,
+  riskBadgeTranslationKey,
+} from '@/lib/utils/formatters';
 import { assessmentAPI } from '@/lib/api/assessmentApi';
 import type {
   DashboardSummary,
@@ -21,18 +28,161 @@ import {
   Play,
   AlertTriangle,
   BarChart3,
-  Activity,
   ChevronRight,
   Calendar,
   List,
   TrendingDown,
   Target,
   Check,
+  Filter,
+  ArrowDownWideNarrow,
 } from 'lucide-react';
 import type { StressLevel } from '@/lib/utils/formatters';
+import type { Locale, TranslationParams } from '@/contexts/LanguageContext';
+
+function assessmentWeightingLabel(
+  method: string,
+  t: (key: string, params?: TranslationParams) => string,
+): string {
+  const key = `assessment_page.weighting_${method}`;
+  const out = t(key);
+  return out === key ? method.replace(/_/g, ' ') : out;
+}
+
+function assessmentScenarioLabel(
+  scenario: string,
+  t: (key: string, params?: TranslationParams) => string,
+): string {
+  const key = `assessment_page.scenario_${scenario}`;
+  const out = t(key);
+  return out === key ? scenario.replace(/_/g, ' ') : out;
+}
+
+function SavedRunsCompareTable({
+  rows,
+  locale,
+  t,
+}: {
+  rows: SavedAssessment[];
+  locale: Locale;
+  t: (key: string, params?: TranslationParams) => string;
+}) {
+  if (rows.length < 2) return null;
+  return (
+    <div className="mt-6 pt-6 border-t border-gray-200">
+      <h3 className="text-sm font-semibold text-gray-900 mb-3">{t('assessment_page.compare_heading')}</h3>
+      <div className="overflow-x-auto rounded-lg border border-slate-200">
+        <table className="w-full text-sm text-left">
+          <thead className="bg-slate-50 text-xs uppercase tracking-wide text-gray-500">
+            <tr>
+              <th className="px-3 py-2.5 font-medium">{t('assessment_page.compare_col_run')}</th>
+              <th className="px-3 py-2.5 font-medium text-right tabular-nums">{t('assessment_page.compare_col_point')}</th>
+              <th className="px-3 py-2.5 font-medium text-right tabular-nums">{t('assessment_page.compare_col_cumulative')}</th>
+              <th className="px-3 py-2.5 font-medium">{t('assessment_page.compare_col_stress')}</th>
+              <th className="px-3 py-2.5 font-medium text-right tabular-nums">{t('assessment_page.compare_col_efficiency')}</th>
+              <th className="px-3 py-2.5 font-medium min-w-[7rem]">{t('assessment_page.compare_col_weighting')}</th>
+              <th className="px-3 py-2.5 font-medium min-w-[7rem]">{t('assessment_page.compare_col_scenario')}</th>
+              <th className="px-3 py-2.5 font-medium text-right whitespace-nowrap">{t('assessment_page.compare_col_updated')}</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {rows.map((a) => {
+              const level = (a.stress_level ?? 'medium') as StressLevel;
+              return (
+                <tr key={a.id} className="hover:bg-slate-50/60">
+                  <td className="px-3 py-2.5 font-medium text-gray-900 max-w-[14rem]">
+                    <span className="line-clamp-2" title={a.assessment_name || a.id}>
+                      {a.assessment_name || `…${a.id.slice(0, 8)}`}
+                    </span>
+                  </td>
+                  <td className="px-3 py-2.5 text-right tabular-nums">{formatScore(a.fsfsi_score)}</td>
+                  <td className="px-3 py-2.5 text-right tabular-nums text-slate-700">
+                    {a.cumulative_fsfsi != null ? formatScore(a.cumulative_fsfsi) : '—'}
+                  </td>
+                  <td className="px-3 py-2.5">
+                    <span className={`inline-flex text-xs font-bold px-2 py-0.5 rounded-full ${getRiskBgColor(level)}`}>
+                      {t(riskBadgeTranslationKey(a.stress_level))}
+                    </span>
+                  </td>
+                  <td className="px-3 py-2.5 text-right tabular-nums">
+                    {a.efficiency_index != null ? formatScore(a.efficiency_index) : '—'}
+                  </td>
+                  <td className="px-3 py-2.5 text-xs text-gray-800">{assessmentWeightingLabel(a.weighting_method, t)}</td>
+                  <td className="px-3 py-2.5 text-xs text-gray-800">{assessmentScenarioLabel(a.scenario, t)}</td>
+                  <td className="px-3 py-2.5 text-right text-xs text-gray-600 whitespace-nowrap">
+                    {a.computed_at ? formatPolicyDate(a.computed_at, locale) : '—'}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+/** Drop duplicate indicators (legacy runs or API quirks); keep first rank order. */
+function dedupeActionPriorities(items: ActionPriority[]): ActionPriority[] {
+  const seen = new Set<string>();
+  const out: ActionPriority[] = [];
+  for (const p of items) {
+    const key = (p.indicator_code && p.indicator_code.trim()) || `${p.rank}:${p.action.slice(0, 80)}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(p);
+  }
+  return out.sort((a, b) => a.rank - b.rank);
+}
+
+const MAX_COMPARE_RUNS = 4;
+
+function TopPrioritiesBlock({ priorities, compact }: { priorities: ActionPriority[]; compact?: boolean }) {
+  const list = dedupeActionPriorities(priorities).slice(0, 5);
+  if (!list.length) return null;
+  return (
+    <div className="mt-4 pt-4 border-t border-gray-200">
+      <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Top priorities</p>
+      <p className="text-xs text-slate-600 mb-3 leading-relaxed">
+        Ranked by financing stress (unique indicators). Budget lines reference the modelled optimal mix.
+      </p>
+      <ul className="space-y-3">
+        {list.map((p) => (
+          <li
+            key={p.indicator_code || `${p.rank}-${p.component}`}
+            className={`rounded-lg border border-slate-200/90 bg-slate-50/60 shadow-sm ${compact ? 'px-3 py-2.5 text-sm' : 'px-3 py-3 text-sm'}`}
+          >
+            <div className="flex flex-wrap items-center gap-2 gap-y-1">
+              <span
+                className={`inline-flex items-center justify-center rounded-md bg-[var(--rw-blue)] font-bold text-white ${compact ? 'h-6 min-w-[1.5rem] px-1.5 text-[10px]' : 'h-7 min-w-[1.75rem] px-2 text-xs'}`}
+              >
+                {p.rank}
+              </span>
+              {p.indicator_code ? (
+                <span className={`font-mono font-semibold text-slate-800 ${compact ? 'text-[11px]' : 'text-xs'}`}>
+                  {p.indicator_code}
+                </span>
+              ) : null}
+              <span className={`font-medium text-slate-600 ${compact ? 'text-[11px]' : 'text-xs'}`}>{p.component}</span>
+            </div>
+            <p className={`mt-2 leading-relaxed text-slate-800 ${compact ? 'text-xs' : ''}`}>{p.action}</p>
+            <p className={`mt-2 font-medium text-emerald-800 ${compact ? 'text-[11px]' : 'text-xs'}`}>{p.budget_implication}</p>
+            {!compact ? (
+              <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-slate-500">
+                <span>{p.expected_impact}</span>
+                <span className="text-slate-400">·</span>
+                <span>{p.timeline}</span>
+              </div>
+            ) : null}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
 
 export default function AssessmentPage() {
-  const { t } = useLanguage();
+  const { t, locale } = useLanguage();
   const { fiscalYear } = useFiscalYear();
 
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
@@ -43,6 +193,7 @@ export default function AssessmentPage() {
   const [weightingMethod, setWeightingMethod] = useState('hybrid');
   const [scenario, setScenario] = useState('normal_operations');
   const [error, setError] = useState<string | null>(null);
+  const [compareIds, setCompareIds] = useState<string[]>([]);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -55,6 +206,7 @@ export default function AssessmentPage() {
       setSummary(summaryRes);
       setAssessments(listRes);
       setSelectedAssessment(null);
+      setCompareIds([]);
     } catch (err) {
       console.error('Assessment fetch failed:', err);
       setError('Unable to load assessment data.');
@@ -68,6 +220,20 @@ export default function AssessmentPage() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  const toggleCompareId = useCallback((id: string) => {
+    setCompareIds((prev) => {
+      if (prev.includes(id)) return prev.filter((x) => x !== id);
+      if (prev.length >= MAX_COMPARE_RUNS) return prev;
+      return [...prev, id];
+    });
+  }, []);
+
+  const comparedAssessments = useMemo(() => {
+    if (compareIds.length === 0) return [];
+    const byId = new Map(assessments.map((a) => [a.id, a]));
+    return compareIds.map((id) => byId.get(id)).filter(Boolean) as SavedAssessment[];
+  }, [assessments, compareIds]);
 
   const handleRunAssessment = async () => {
     setRunning(true);
@@ -118,13 +284,11 @@ export default function AssessmentPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2 tracking-tight">
             <FileCheck className="h-7 w-7 text-[var(--rw-blue)]" />
-            {t('assessment')}
+            {t('assessment_page.page_title')}
           </h1>
-          <p className="text-sm text-gray-600 mt-1">
-            Run and view FSFSI assessments by fiscal year. All computation is performed by the backend engine.
-          </p>
+          <p className="text-sm text-gray-600 mt-1 max-w-3xl leading-relaxed">{t('assessment_page.page_subtitle')}</p>
         </div>
         <FiscalYearSelector />
       </div>
@@ -138,30 +302,47 @@ export default function AssessmentPage() {
 
       {/* Summary cards (when we have an assessment for this year) */}
       {!isEmpty && summary && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <Card className="border-l-4 border-l-[var(--rw-blue)]">
             <CardContent className="p-5">
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">FSFSI Score</p>
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                {summary.cumulative_fsfsi != null
+                  ? t('assessment_page.fsfsi_kpi_title_cumulative')
+                  : t('assessment_page.fsfsi_kpi_title_simple')}
+              </p>
               <p className="text-3xl font-bold text-gray-900 mt-1">
                 {formatScore(summary.cumulative_fsfsi ?? summary.overall_fsfsi)}
               </p>
-              <p className="text-xs text-gray-400 mt-0.5">
-                This year: {formatScore(summary.overall_fsfsi)}
-              </p>
+              {summary.cumulative_fsfsi != null ? (
+                <p className="text-xs text-gray-500 mt-0.5">
+                  {t('assessment_page.fsfsi_kpi_sub_point_in_time', {
+                    score: formatScore(summary.overall_fsfsi),
+                  })}
+                </p>
+              ) : (
+                <p className="text-xs text-gray-500 mt-0.5">
+                  {t('overview.fsfsi_point_in_time')}: {formatScore(summary.overall_fsfsi)}
+                </p>
+              )}
               <div className={`mt-1.5 inline-block px-3 py-1 rounded-full text-xs font-bold ${getRiskBgColor(
                 (summary.cumulative_stress_level || stressLevel) as StressLevel
               )}`}>
-                {(summary.cumulative_stress_level || stressLevel).charAt(0).toUpperCase() +
-                 (summary.cumulative_stress_level || stressLevel).slice(1)} Risk
+                {t(riskBadgeTranslationKey(summary.cumulative_stress_level || stressLevel))}
               </div>
+              <p className="text-xs text-slate-600 mt-2 leading-relaxed">
+                {t('assessment_page.fsfsi_kpi_explainer', { fy: fiscalYear.label })}
+              </p>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="p-5">
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Efficiency Index</p>
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                {t('assessment_page.efficiency_title')}
+              </p>
               <p className="text-3xl font-bold text-gray-900 mt-1">
                 {formatScore(summary.efficiency_index)}
               </p>
+              <p className="text-xs text-slate-600 mt-2 leading-relaxed">{t('assessment_page.efficiency_hint')}</p>
             </CardContent>
           </Card>
           <Card>
@@ -174,11 +355,14 @@ export default function AssessmentPage() {
           </Card>
           <Card>
             <CardContent className="p-5 flex flex-col justify-center">
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Computed</p>
-              <p className="text-sm text-gray-700 mt-1">
-                {summary.computed_at
-                  ? new Date(summary.computed_at).toLocaleString()
-                  : '—'}
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                {t('assessment_page.last_updated')}
+              </p>
+              <p className="text-sm text-gray-800 mt-1 font-medium">
+                {summary.computed_at ? formatPolicyDate(summary.computed_at, locale) : '—'}
+              </p>
+              <p className="text-xs text-gray-500 mt-2 leading-relaxed">
+                {t('assessment_page.data_vintage', { fy: fiscalYear.label })}
               </p>
             </CardContent>
           </Card>
@@ -201,25 +385,24 @@ export default function AssessmentPage() {
             {selectedAssessment?.component_results && selectedAssessment.component_results.length > 0 ? (
               <ComponentsBreakdownTable components={selectedAssessment.component_results} />
             ) : summary?.components && summary.components.length > 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {summary.components.map((c) => (
                   <ComponentSummaryCard key={c.component} component={c} />
                 ))}
               </div>
             ) : null}
-            {selectedAssessment?.component_results && selectedAssessment.component_results.length > 0 && (() => {
-              const priorities = (selectedAssessment.result_json?.action_priorities as ActionPriority[] | undefined) ?? summary?.top_priorities ?? [];
-              return priorities.length > 0 ? (
-                <div className="mt-6 pt-4 border-t border-gray-200">
-                  <p className="text-xs font-medium text-gray-500 uppercase mb-2">Top priorities</p>
-                  <ul className="space-y-1 text-sm text-gray-700">
-                    {priorities.slice(0, 5).map((p: ActionPriority, i: number) => (
-                      <li key={i}>{p.action}</li>
-                    ))}
-                  </ul>
-                </div>
-              ) : null;
-            })()}
+            {selectedAssessment?.component_results && selectedAssessment.component_results.length > 0 ? (
+              <TopPrioritiesBlock
+                priorities={
+                  (selectedAssessment.result_json?.action_priorities as ActionPriority[] | undefined) ??
+                  summary?.top_priorities ??
+                  []
+                }
+                compact={false}
+              />
+            ) : !selectedAssessment && summary?.top_priorities && summary.top_priorities.length > 0 ? (
+              <TopPrioritiesBlock priorities={summary.top_priorities} compact={false} />
+            ) : null}
           </CardContent>
         </Card>
       ) : null}
@@ -303,103 +486,92 @@ export default function AssessmentPage() {
         </CardContent>
       </Card>
 
-      {/* Saved Assessments + Component Breakdown */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-4">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <List className="h-5 w-5 text-[var(--rw-blue)]" />
-                Saved assessments — {fiscalYear.label}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {assessments.length === 0 ? (
-                <p className="text-gray-500 py-6 text-center">
-                  No assessments for this fiscal year. Use &quot;Run assessment&quot; to compute one (requires indicator data in the database).
-                </p>
-              ) : (
-                <ul className="divide-y divide-gray-200">
+      {/* Saved assessments (full width) + optional compare + detail */}
+      <div className="space-y-4">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <List className="h-5 w-5 text-[var(--rw-blue)]" />
+              Saved assessments — {fiscalYear.label}
+            </CardTitle>
+            <p className="text-sm text-gray-500 font-normal leading-relaxed mt-1">{t('assessment_page.saved_list_intro')}</p>
+            {compareIds.length > 0 ? (
+              <div className="flex flex-wrap items-center gap-2 mt-2">
+                <span className="text-xs text-slate-600">
+                  {t('assessment_page.compare_selection_status', { n: compareIds.length, max: MAX_COMPARE_RUNS })}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setCompareIds([])}
+                  className="text-xs font-medium text-[var(--rw-blue)] hover:underline"
+                >
+                  {t('assessment_page.compare_clear')}
+                </button>
+              </div>
+            ) : null}
+          </CardHeader>
+          <CardContent>
+            {assessments.length === 0 ? (
+              <p className="text-gray-500 py-6 text-center">
+                No assessments for this fiscal year. Use &quot;Run assessment&quot; to compute one (requires indicator data in the database).
+              </p>
+            ) : (
+              <>
+                <ul className="divide-y divide-gray-200 rounded-lg border border-gray-100 overflow-hidden">
                   {assessments.map((a) => (
-                    <li key={a.id}>
+                    <li key={a.id} className="flex items-stretch bg-white hover:bg-slate-50/80">
+                      <label className="flex items-center px-3 sm:px-4 cursor-pointer shrink-0 border-r border-gray-100 bg-slate-50/50">
+                        <input
+                          type="checkbox"
+                          checked={compareIds.includes(a.id)}
+                          onChange={() => toggleCompareId(a.id)}
+                          disabled={!compareIds.includes(a.id) && compareIds.length >= MAX_COMPARE_RUNS}
+                          className="rounded border-gray-300 text-[var(--rw-blue)] focus:ring-[var(--rw-blue)]"
+                          title={t('assessment_page.compare_heading')}
+                        />
+                      </label>
                       <button
                         type="button"
                         onClick={() => loadAssessmentDetail(a.id)}
-                        className="w-full flex items-center justify-between py-3 px-2 rounded-lg hover:bg-gray-50 text-left"
+                        className="flex flex-1 items-center justify-between gap-2 py-3 pr-3 sm:pr-4 pl-3 text-left min-w-0"
                       >
-                        <div className="flex items-center gap-3">
-                          <Calendar className="h-4 w-4 text-gray-400" />
-                          <div>
-                            <p className="font-medium text-gray-900">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <Calendar className="h-4 w-4 text-gray-400 shrink-0" />
+                          <div className="min-w-0">
+                            <p className="font-medium text-gray-900 truncate">
                               {a.assessment_name || `Assessment ${a.id.slice(0, 8)}`}
                             </p>
                             <p className="text-xs text-gray-500">
-                              FSFSI {formatScore(a.fsfsi_score)} · {a.stress_level} · {a.indicators_count} indicators
+                              {t('assessment_page.saved_list_score_prefix')} {formatScore(a.fsfsi_score)}
+                              {a.cumulative_fsfsi != null
+                                ? ` · ${t('assessment_page.saved_list_cumulative_abbr', {
+                                    score: formatScore(a.cumulative_fsfsi),
+                                  })}`
+                                : ''}{' '}
+                              · {a.stress_level} · {a.indicators_count} indicators
                             </p>
                           </div>
                         </div>
-                        <ChevronRight className="h-5 w-5 text-gray-400" />
+                        <ChevronRight className="h-5 w-5 text-gray-400 shrink-0" />
                       </button>
                     </li>
                   ))}
                 </ul>
-              )}
-            </CardContent>
-          </Card>
-        </div>
 
-        {/* Detail panel */}
-        <div className="space-y-4">
-          {selectedAssessment ? (
-            <AssessmentDetailPanel assessment={selectedAssessment} onClose={() => setSelectedAssessment(null)} />
-          ) : !isEmpty && summary ? (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <BarChart3 className="h-5 w-5 text-[var(--rw-blue)]" />
-                  Component breakdown
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {summary.components.map((c) => (
-                    <ComponentSummaryRow key={c.component} component={c} />
-                  ))}
-                </div>
-                {summary.top_priorities && summary.top_priorities.length > 0 && (
-                  <div className="mt-4 pt-4 border-t border-gray-200">
-                    <p className="text-xs font-medium text-gray-500 uppercase mb-2">Top priorities</p>
-                    <ul className="space-y-1 text-sm text-gray-700">
-                      {summary.top_priorities.slice(0, 5).map((p: ActionPriority, i: number) => (
-                        <li key={i}>{p.action}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          ) : (
-            <Card>
-              <CardContent className="py-8 text-center text-gray-500">
-                <Activity className="h-10 w-10 mx-auto mb-2 text-gray-300" />
-                <p>Run an assessment for {fiscalYear.label} to see component breakdown and priorities.</p>
-              </CardContent>
-            </Card>
-          )}
-        </div>
+                {compareIds.length >= 2 ? (
+                  <SavedRunsCompareTable rows={comparedAssessments} locale={locale} t={t} />
+                ) : compareIds.length === 1 ? (
+                  <p className="mt-4 text-sm text-slate-500">{t('assessment_page.compare_need_two')}</p>
+                ) : null}
+              </>
+            )}
+          </CardContent>
+        </Card>
+
+        {selectedAssessment ? (
+          <AssessmentDetailPanel assessment={selectedAssessment} onClose={() => setSelectedAssessment(null)} />
+        ) : null}
       </div>
-    </div>
-  );
-}
-
-function ComponentSummaryRow({ component }: { component: ComponentSummary }) {
-  const level = (component.priority_level || 'medium') as StressLevel;
-  return (
-    <div className="flex items-center justify-between gap-2 py-1">
-      <span className="text-sm font-medium text-gray-900 truncate">{component.component_display}</span>
-      <span className={`text-xs font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${getRiskBgColor(level)}`}>
-        {formatScore(component.stress)}
-      </span>
     </div>
   );
 }
@@ -460,48 +632,171 @@ function ComponentsBreakdownTable({ components }: { components: ComponentResult[
   );
 }
 
+type IndicatorSort = 'stress_desc' | 'stress_asc' | 'gap_desc' | 'gap_asc' | 'code_asc';
+
 function IndicatorsBreakdownTable({ indicators }: { indicators: SavedIndicatorResult[] }) {
+  const { t } = useLanguage();
+  const [componentFilter, setComponentFilter] = useState<string>('all');
+  const [search, setSearch] = useState('');
+  const [sort, setSort] = useState<IndicatorSort>('stress_desc');
+
+  const componentOptions = useMemo(() => {
+    const labels = new Map<string, string>();
+    for (const ind of indicators) {
+      labels.set(ind.component, ind.component_display);
+    }
+    return [...labels.entries()].sort((a, b) => a[1].localeCompare(b[1]));
+  }, [indicators]);
+
+  const filteredSorted = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    let rows = indicators.filter((ind) => {
+      if (componentFilter !== 'all' && ind.component !== componentFilter) return false;
+      if (!q) return true;
+      return (
+        ind.indicator_code.toLowerCase().includes(q) ||
+        (ind.indicator_name || '').toLowerCase().includes(q) ||
+        ind.component_display.toLowerCase().includes(q)
+      );
+    });
+    const cmp = (a: SavedIndicatorResult, b: SavedIndicatorResult) => {
+      switch (sort) {
+        case 'stress_desc':
+          return b.stress_value - a.stress_value;
+        case 'stress_asc':
+          return a.stress_value - b.stress_value;
+        case 'gap_desc':
+          return b.performance_gap - a.performance_gap;
+        case 'gap_asc':
+          return a.performance_gap - b.performance_gap;
+        case 'code_asc':
+          return a.indicator_code.localeCompare(b.indicator_code);
+        default:
+          return 0;
+      }
+    };
+    rows = [...rows].sort(cmp);
+    return rows;
+  }, [indicators, componentFilter, search, sort]);
+
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b border-gray-200 text-left text-gray-500 uppercase tracking-wide">
-            <th className="pb-2 pr-4 font-medium">Indicator</th>
-            <th className="pb-2 pr-4 font-medium">Component</th>
-            <th className="pb-2 pr-4 font-medium text-right">Observed</th>
-            <th className="pb-2 pr-4 font-medium text-right">Benchmark</th>
-            <th className="pb-2 pr-4 font-medium text-right">Performance gap</th>
-            <th className="pb-2 pr-4 font-medium text-right">Stress</th>
-            <th className="pb-2 font-medium text-right">Budget %</th>
-          </tr>
-        </thead>
-        <tbody>
-          {indicators.map((ind) => (
-            <tr key={ind.id} className="border-b border-gray-100">
-              <td className="py-3 pr-4">
-                <span className="font-medium text-gray-900">{ind.indicator_code}</span>
-                <span className="block text-xs text-gray-500 truncate max-w-[180px]" title={ind.indicator_name}>{ind.indicator_name}</span>
-              </td>
-              <td className="py-3 pr-4 text-gray-700">{ind.component_display}</td>
-              <td className="py-3 pr-4 text-right">{ind.observed_value != null ? formatScore(ind.observed_value) : '—'}</td>
-              <td className="py-3 pr-4 text-right">{ind.benchmark_value != null ? formatScore(ind.benchmark_value) : '—'}</td>
-              <td className="py-3 pr-4 text-right">
-                {(() => {
-                  const { className, isGood } = getPerformanceGapDisplay(ind.performance_gap);
-                  return (
-                    <span className={`inline-flex items-center gap-0.5 ${className}`} title={isGood ? 'On or better than benchmark' : 'Gap vs benchmark'}>
-                      {isGood ? <Check className="h-3.5 w-3.5" /> : <TrendingDown className="h-3.5 w-3.5" />}
-                      {formatScore(ind.performance_gap)}
-                    </span>
-                  );
-                })()}
-              </td>
-              <td className="py-3 pr-4 text-right">{formatScore(ind.stress_value)}</td>
-              <td className="py-3 text-right">{formatScore(ind.share_weighted_percent)}%</td>
+    <div className="space-y-4">
+      <div className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-slate-50/50 p-3 sm:flex-row sm:flex-wrap sm:items-end">
+        <div className="flex items-center gap-2 text-slate-600">
+          <Filter className="h-4 w-4 shrink-0" />
+          <span className="text-xs font-semibold uppercase tracking-wide">Filters</span>
+        </div>
+        <div className="min-w-[10rem] flex-1 sm:max-w-[14rem]">
+          <label className="mb-1 block text-xs font-medium text-slate-600" htmlFor="ind-filter-component">
+            Component
+          </label>
+          <select
+            id="ind-filter-component"
+            className="w-full rounded-md border border-slate-300 bg-white px-2 py-2 text-sm"
+            value={componentFilter}
+            onChange={(e) => setComponentFilter(e.target.value)}
+          >
+            <option value="all">All components</option>
+            {componentOptions.map(([key, label]) => (
+              <option key={key} value={key}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="min-w-[8rem] flex-1 sm:max-w-[16rem]">
+          <label className="mb-1 block text-xs font-medium text-slate-600" htmlFor="ind-search">
+            Search
+          </label>
+          <input
+            id="ind-search"
+            type="search"
+            placeholder="Code, name, or component…"
+            className="w-full rounded-md border border-slate-300 bg-white px-2 py-2 text-sm"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+        <div className="min-w-[12rem] sm:max-w-[14rem]">
+          <label className="mb-1 block text-xs font-medium text-slate-600" htmlFor="ind-sort">
+            Sort
+          </label>
+          <select
+            id="ind-sort"
+            className="w-full rounded-md border border-slate-300 bg-white px-2 py-2 text-sm"
+            value={sort}
+            onChange={(e) => setSort(e.target.value as IndicatorSort)}
+          >
+            <option value="stress_desc">Stress (high → low)</option>
+            <option value="stress_asc">Stress (low → high)</option>
+            <option value="gap_desc">Performance gap (high → low)</option>
+            <option value="gap_asc">Performance gap (low → high)</option>
+            <option value="code_asc">Indicator code (A–Z)</option>
+          </select>
+        </div>
+        <p className="flex items-center gap-1.5 text-xs text-slate-500 sm:ml-auto">
+          <ArrowDownWideNarrow className="h-3.5 w-3.5" />
+          Showing {filteredSorted.length} of {indicators.length}
+        </p>
+      </div>
+
+      <p className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs leading-relaxed text-slate-700">
+        {t('assessment_page.gap_legend')}
+      </p>
+
+      <div className="overflow-x-auto rounded-lg border border-slate-100">
+        <table className="w-full text-sm">
+          <thead className="bg-slate-50/90">
+            <tr className="border-b border-gray-200 text-left text-gray-500 uppercase tracking-wide">
+              <th className="px-3 py-2.5 pr-4 font-medium">Indicator</th>
+              <th className="py-2.5 pr-4 font-medium">Component</th>
+              <th className="py-2.5 pr-4 font-medium text-right">Observed</th>
+              <th className="py-2.5 pr-4 font-medium text-right">Benchmark</th>
+              <th className="py-2.5 pr-4 font-medium text-right">Performance gap</th>
+              <th className="py-2.5 pr-4 font-medium text-right">Stress</th>
+              <th className="py-2.5 pr-2 font-medium text-right">Budget %</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {filteredSorted.map((ind) => (
+              <tr key={ind.id} className="border-b border-gray-100 hover:bg-slate-50/50">
+                <td className="px-3 py-3 pr-4">
+                  <span className="font-medium text-gray-900">{ind.indicator_code}</span>
+                  <span className="block text-xs text-gray-500 truncate max-w-[200px]" title={ind.indicator_name}>
+                    {ind.indicator_name}
+                  </span>
+                </td>
+                <td className="py-3 pr-4 text-gray-700">{ind.component_display}</td>
+                <td className="py-3 pr-4 text-right tabular-nums">{ind.observed_value != null ? formatScore(ind.observed_value) : '—'}</td>
+                <td className="py-3 pr-4 text-right tabular-nums">{ind.benchmark_value != null ? formatScore(ind.benchmark_value) : '—'}</td>
+                <td className="py-3 pr-4 text-right">
+                  {(() => {
+                    const { className, isGood } = getPerformanceGapDisplay(ind.performance_gap);
+                    return (
+                      <span
+                        className={`inline-flex items-center justify-end gap-0.5 tabular-nums ${className}`}
+                        title={
+                          isGood
+                            ? t('assessment_page.gap_tooltip_on_benchmark')
+                            : t('assessment_page.gap_tooltip_off_benchmark')
+                        }
+                      >
+                        {isGood ? <Check className="h-3.5 w-3.5" /> : <TrendingDown className="h-3.5 w-3.5" />}
+                        {formatScore(ind.performance_gap)}
+                      </span>
+                    );
+                  })()}
+                </td>
+                <td className="py-3 pr-4 text-right font-medium tabular-nums text-slate-900">{formatScore(ind.stress_value)}</td>
+                <td className="py-3 pr-3 text-right tabular-nums">{formatScore(ind.share_weighted_percent)}%</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {filteredSorted.length === 0 ? (
+          <p className="px-3 py-8 text-center text-sm text-slate-500">No indicators match the current filters.</p>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -513,13 +808,14 @@ function AssessmentDetailPanel({
   assessment: SavedAssessment;
   onClose: () => void;
 }) {
+  const { t, locale } = useLanguage();
   const stressLevel = (assessment.stress_level ?? 'medium') as StressLevel;
   const components = assessment.component_results ?? [];
 
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-lg">Assessment detail</CardTitle>
+        <CardTitle className="text-lg">{t('assessment_page.detail_title')}</CardTitle>
         <button
           type="button"
           onClick={onClose}
@@ -530,19 +826,47 @@ function AssessmentDetailPanel({
       </CardHeader>
       <CardContent className="space-y-4">
         <div>
-          <p className="text-xs text-gray-500">FSFSI Score</p>
+          <p className="text-xs text-gray-500">{t('assessment_page.detail_point_in_time_label')}</p>
           <p className="text-2xl font-bold text-gray-900">
             {formatScore(assessment.fsfsi_score)}
             <span className={`ml-2 text-sm font-bold px-2 py-0.5 rounded-full ${getRiskBgColor(stressLevel)}`}>
-              {assessment.stress_level}
+              {t(riskBadgeTranslationKey(assessment.stress_level))}
             </span>
           </p>
         </div>
+        {assessment.cumulative_fsfsi != null ? (
+          <div>
+            <p className="text-xs text-gray-500">{t('assessment_page.detail_cumulative_label')}</p>
+            <p className="text-lg font-semibold text-gray-900">{formatScore(assessment.cumulative_fsfsi)}</p>
+            {assessment.cumulative_stress_level ? (
+              <span
+                className={`mt-1 inline-block text-xs font-bold px-2 py-0.5 rounded-full ${getRiskBgColor(
+                  (assessment.cumulative_stress_level as StressLevel) || 'medium',
+                )}`}
+              >
+                {t(riskBadgeTranslationKey(assessment.cumulative_stress_level))}
+              </span>
+            ) : null}
+          </div>
+        ) : null}
+        <p className="text-xs text-slate-600 leading-relaxed">{t('assessment_page.detail_vs_dashboard_note')}</p>
         <p className="text-sm text-gray-600">
-          {assessment.assessment_name} · {assessment.indicators_count} indicators · {assessment.components_count} components
+          {assessment.assessment_name} · {assessment.indicators_count} indicators · {assessment.components_count}{' '}
+          components
         </p>
-        <p className="text-xs text-gray-500">
-          Computed {assessment.computed_at ? new Date(assessment.computed_at).toLocaleString() : '—'}
+        <div className="text-xs text-gray-600 space-y-1">
+          <p>
+            <span className="font-medium text-gray-700">{t('assessment_page.detail_weighting')}:</span>{' '}
+            {assessmentWeightingLabel(assessment.weighting_method, t)}
+          </p>
+          <p>
+            <span className="font-medium text-gray-700">{t('assessment_page.detail_scenario')}:</span>{' '}
+            {assessmentScenarioLabel(assessment.scenario, t)}
+          </p>
+        </div>
+        <p className="text-xs text-gray-600">
+          <span className="font-medium text-gray-700">{t('assessment_page.last_updated')}:</span>{' '}
+          {assessment.computed_at ? formatPolicyDate(assessment.computed_at, locale) : '—'}
         </p>
         {components.length > 0 && (
           <div className="pt-2 border-t border-gray-200">

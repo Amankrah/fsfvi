@@ -95,6 +95,8 @@ pub struct ComponentAggregation {
     pub total_weighted_lcu_bn: f64,
     pub total_share_weighted_percent: f64,
     pub average_performance_gap: f64,
+    /// Mean of υᵢ = δᵢ·e^(−αᵢfᵢ) across component indicators (financing-adjusted stress).
+    pub average_stress: f64,
     /// Stress category: low | medium | high | critical (from determine_priority_level)
     pub priority_level: String,
 }
@@ -180,6 +182,9 @@ pub struct SubIndicator {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ActionPriority {
     pub rank: usize,
+    /// Indicator code when priority is indicator-scoped; empty for legacy component-only assessments.
+    pub indicator_code: String,
+    /// Food-system component (humanized) for grouping; indicator path uses `indicator_component`.
     pub component: String,
     pub action: String,
     pub expected_impact: String,
@@ -335,10 +340,12 @@ pub fn assess_food_system(
         .enumerate()
         .map(|(rank, &(idx, stress_val))| {
             let comp = &components[idx];
+            let label = humanize_component(&comp.component_type);
             ActionPriority {
                 rank: rank + 1,
-                component: comp.component_type.clone(),
-                action: generate_action(&comp.component_type, stress_val),
+                indicator_code: String::new(),
+                component: label.clone(),
+                action: format_legacy_component_priority(rank + 1, &label, stress_val),
                 expected_impact: format!(
                     "{:.1}% stress reduction potential",
                     stress_val * 100.0 * 0.3
@@ -654,6 +661,7 @@ pub fn assess_indicators(
             total_weighted_lcu_bn: round_to_precision(total_weighted, Some(4)),
             total_share_weighted_percent: round_to_precision(total_share, Some(4)),
             average_performance_gap: round_to_precision(avg_gap, Some(4)),
+            average_stress: round_to_precision(avg_stress, Some(4)),
             priority_level,
         });
     }
@@ -678,47 +686,57 @@ pub fn assess_indicators(
 
     let risk_level = determine_stress_level(fsfsi_actual).to_string();
 
-    // Action priorities — sort by stress descending
+    // Ranked priorities: unique indicators by code (same code can appear only once), top 5 by stress.
     let mut indexed: Vec<(usize, f64)> = stresses.iter().copied().enumerate().collect();
     indexed.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
 
-    let action_priorities: Vec<ActionPriority> = indexed
-        .iter()
-        .take(10) // Top 10 priorities
-        .enumerate()
-        .map(|(rank, &(idx, stress_val))| {
-            let ind = &indicators[idx];
-            ActionPriority {
-                rank: rank + 1,
-                component: format!("{} ({})", ind.name, ind.indicator_code),
-                action: generate_indicator_action(&ind.indicator_component, stress_val),
-                expected_impact: format!(
-                    "{:.1}% stress reduction potential",
-                    stress_val * 100.0 * 0.3
-                ),
-                budget_implication: if optimal_alloc[idx] > allocations[idx] {
-                    format!(
-                        "Increase by {:.2} bn LCU",
-                        optimal_alloc[idx] - allocations[idx]
-                    )
-                } else {
-                    format!(
-                        "Reduce by {:.2} bn LCU",
-                        allocations[idx] - optimal_alloc[idx]
-                    )
-                },
-                timeline: if stress_val >= 0.6 {
-                    "Immediate (0-3 months)".to_string()
-                } else if stress_val >= 0.4 {
-                    "Short-term (3-6 months)".to_string()
-                } else if stress_val >= 0.25 {
-                    "Medium-term (6-12 months)".to_string()
-                } else {
-                    "Long-term (12+ months)".to_string()
-                },
-            }
-        })
-        .collect();
+    let mut seen_codes = std::collections::HashSet::<String>::new();
+    let mut action_priorities: Vec<ActionPriority> = Vec::new();
+    for &(idx, stress_val) in indexed.iter() {
+        let ind = &indicators[idx];
+        if !seen_codes.insert(ind.indicator_code.clone()) {
+            continue;
+        }
+        let rank = action_priorities.len() + 1;
+        if rank > 5 {
+            break;
+        }
+        let comp_display = humanize_component(&ind.indicator_component);
+        let name_short = truncate_indicator_name(&ind.name, 56);
+        let action =
+            format_indicator_priority_action(rank, &ind.indicator_code, &name_short, &comp_display, stress_val);
+
+        action_priorities.push(ActionPriority {
+            rank,
+            indicator_code: ind.indicator_code.clone(),
+            component: comp_display,
+            action,
+            expected_impact: format!(
+                "{:.1}% stress reduction potential",
+                stress_val * 100.0 * 0.3
+            ),
+            budget_implication: if optimal_alloc[idx] > allocations[idx] {
+                format!(
+                    "Increase mapped weighted total by {:.2} bn LCU vs current (toward optimal)",
+                    optimal_alloc[idx] - allocations[idx]
+                )
+            } else {
+                format!(
+                    "Reduce mapped weighted total by {:.2} bn LCU vs current (toward optimal)",
+                    allocations[idx] - optimal_alloc[idx]
+                )
+            },
+            timeline: if stress_val >= 0.6 {
+                "Immediate (0-3 months)".to_string()
+            } else if stress_val >= 0.4 {
+                "Short-term (3-6 months)".to_string()
+            } else if stress_val >= 0.25 {
+                "Medium-term (6-12 months)".to_string()
+            } else {
+                "Long-term (12+ months)".to_string()
+            },
+        });
+    }
 
     let elapsed = start.elapsed().as_millis() as u64;
 
@@ -748,30 +766,42 @@ pub fn assess_indicators(
     })
 }
 
-fn generate_indicator_action(component: &str, stress: f64) -> String {
-    let severity = if stress >= 0.6 {
-        "Urgent intervention required"
-    } else if stress >= 0.4 {
-        "Prioritize funding increase"
-    } else if stress >= 0.25 {
-        "Monitor and optimize allocation"
-    } else {
-        "Maintain current trajectory"
-    };
+fn truncate_indicator_name(name: &str, max_len: usize) -> String {
+    let t = name.trim();
+    if t.chars().count() <= max_len {
+        return t.to_string();
+    }
+    let take = max_len.saturating_sub(1);
+    t.chars().take(take).collect::<String>() + "…"
+}
 
-    let area = match component {
-        "markets" => "in market development and trade facilitation",
-        "crop_production" => "in crop production and agricultural productivity",
-        "nutrition" => "in nutrition programs and food security",
-        "research" => "in agricultural research and innovation",
-        "post_harvest" => "in post-harvest handling and storage",
-        "environment" => "in environmental protection and climate resilience",
-        "animal_systems" => "in livestock and animal production systems",
-        "finance" => "in agricultural finance and credit access",
-        _ => "across food system components",
-    };
+/// Single-line priority for indicator assessments (unique per indicator; budget detail in `budget_implication`).
+fn format_indicator_priority_action(
+    rank: usize,
+    code: &str,
+    name_short: &str,
+    component_display: &str,
+    stress: f64,
+) -> String {
+    format!(
+        "#{rank} · {code} ({name_short}) — financing stress {stress:.3} in {component_display}. \
+         Reallocate toward this line using the modelled optimal mix (see budget implication).",
+        rank = rank,
+        code = code,
+        name_short = name_short,
+        stress = stress,
+        component_display = component_display,
+    )
+}
 
-    format!("{} {}", severity, area)
+fn format_legacy_component_priority(rank: usize, component_label: &str, stress: f64) -> String {
+    format!(
+        "#{rank}: {component_label} — component financing stress {stress:.3}. \
+         Adjust sector envelopes and PSTA alignment; use budget implication vs optimal allocation.",
+        rank = rank,
+        component_label = component_label,
+        stress = stress,
+    )
 }
 
 // ---------------------------------------------------------------------------
@@ -791,32 +821,6 @@ fn humanize_component(component_type: &str) -> String {
         })
         .collect::<Vec<_>>()
         .join(" ")
-}
-
-fn generate_action(component_type: &str, stress: f64) -> String {
-    let severity = if stress >= 0.6 {
-        "Urgent intervention required"
-    } else if stress >= 0.4 {
-        "Prioritize funding increase"
-    } else if stress >= 0.25 {
-        "Monitor and optimize allocation"
-    } else {
-        "Maintain current trajectory"
-    };
-
-    let area = match component_type {
-        "agricultural_development" => "in agricultural productivity programs",
-        "infrastructure" => "in food system infrastructure",
-        "market_access" => "in market linkage and trade facilitation",
-        "nutrition_food_safety" | "nutrition_health" => "in nutrition and food safety programs",
-        "climate_resilience" | "climate_natural_resources" => "in climate adaptation measures",
-        "financial_services" | "social_protection_equity" => "in financial inclusion programs",
-        "governance_policy" | "governance_institutions" => "in institutional capacity building",
-        "research_innovation" => "in R&D and extension services",
-        _ => "across food system components",
-    };
-
-    format!("{} {}", severity, area)
 }
 
 // ---------------------------------------------------------------------------
@@ -1039,6 +1043,8 @@ mod tests {
                 share_weighted_percent: 8.5,
                 observed_value: Some(75.0),
                 benchmark_value: Some(90.0),
+                higher_is_better: None,
+                sensitivity_parameter: None,
             },
             IndicatorInput {
                 indicator_code: "IND-05".to_string(),
@@ -1050,6 +1056,8 @@ mod tests {
                 share_weighted_percent: 12.2,
                 observed_value: Some(70.0),
                 benchmark_value: Some(85.0),
+                higher_is_better: None,
+                sensitivity_parameter: None,
             },
             IndicatorInput {
                 indicator_code: "IND-12".to_string(),
@@ -1061,6 +1069,8 @@ mod tests {
                 share_weighted_percent: 10.1,
                 observed_value: Some(65.0),
                 benchmark_value: Some(80.0),
+                higher_is_better: None,
+                sensitivity_parameter: None,
             },
             IndicatorInput {
                 indicator_code: "IND-18".to_string(),
@@ -1072,6 +1082,8 @@ mod tests {
                 share_weighted_percent: 4.5,
                 observed_value: Some(60.0),
                 benchmark_value: Some(75.0),
+                higher_is_better: None,
+                sensitivity_parameter: None,
             },
             IndicatorInput {
                 indicator_code: "IND-22".to_string(),
@@ -1083,6 +1095,8 @@ mod tests {
                 share_weighted_percent: 6.5,
                 observed_value: Some(55.0),
                 benchmark_value: Some(70.0),
+                higher_is_better: None,
+                sensitivity_parameter: None,
             },
             IndicatorInput {
                 indicator_code: "IND-28".to_string(),
@@ -1094,6 +1108,8 @@ mod tests {
                 share_weighted_percent: 5.6,
                 observed_value: Some(50.0),
                 benchmark_value: Some(65.0),
+                higher_is_better: None,
+                sensitivity_parameter: None,
             },
             IndicatorInput {
                 indicator_code: "IND-32".to_string(),
@@ -1105,6 +1121,8 @@ mod tests {
                 share_weighted_percent: 7.8,
                 observed_value: Some(68.0),
                 benchmark_value: Some(82.0),
+                higher_is_better: None,
+                sensitivity_parameter: None,
             },
             IndicatorInput {
                 indicator_code: "IND-36".to_string(),
@@ -1116,6 +1134,8 @@ mod tests {
                 share_weighted_percent: 5.0,
                 observed_value: Some(72.0),
                 benchmark_value: Some(88.0),
+                higher_is_better: None,
+                sensitivity_parameter: None,
             },
         ]
     }
@@ -1132,6 +1152,19 @@ mod tests {
         assert_eq!(result.component_aggregations.len(), 8);
         assert!(result.efficiency.efficiency_index >= 0.0);
         assert!(result.efficiency.efficiency_index <= 1.0);
+        assert!(
+            result.action_priorities.len() <= 5,
+            "top priorities should cap at 5 unique indicators"
+        );
+        let mut codes = std::collections::HashSet::new();
+        for p in &result.action_priorities {
+            assert!(!p.indicator_code.is_empty());
+            assert!(codes.insert(p.indicator_code.clone()));
+            assert!(
+                p.action.contains(&p.indicator_code),
+                "action should name the indicator"
+            );
+        }
     }
 
     #[test]

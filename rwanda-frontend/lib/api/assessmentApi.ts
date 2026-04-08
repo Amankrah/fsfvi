@@ -12,6 +12,7 @@
  */
 
 import axios, { AxiosInstance } from 'axios';
+import { attachAuthInterceptors } from '@/lib/api/attachAuthInterceptors';
 import type {
   AssessmentRequest,
   AssessmentResult,
@@ -32,8 +33,6 @@ import type {
 const RWANDA_API_BASE_URL =
   process.env.NEXT_PUBLIC_RWANDA_API_URL || 'http://localhost:8000';
 
-const TOKEN_KEY = 'rw_auth_token';
-
 // ============================================================================
 // Axios Instance
 // ============================================================================
@@ -46,48 +45,7 @@ const assessmentClient: AxiosInstance = axios.create({
   timeout: 120000, // 2 minutes for complex calculations
 });
 
-// Request interceptor for auth header
-assessmentClient.interceptors.request.use(
-  (config) => {
-    const tokenData = localStorage.getItem(TOKEN_KEY);
-    if (tokenData) {
-      try {
-        const parsed = JSON.parse(tokenData);
-        config.headers['Authorization'] = `Bearer ${parsed.token}`;
-      } catch {
-        console.error('[AssessmentAPI] Failed to parse auth token');
-      }
-    }
-    console.log(`[AssessmentAPI] ${config.method?.toUpperCase()} ${config.url}`);
-    return config;
-  },
-  (error) => Promise.reject(error)
-);
-
-// Response interceptor for error handling
-assessmentClient.interceptors.response.use(
-  (response) => {
-    console.log(`[AssessmentAPI] Response:`, {
-      url: response.config.url,
-      status: response.status,
-    });
-    return response;
-  },
-  async (error) => {
-    if (error.response?.status === 401) {
-      console.error('[AssessmentAPI] Unauthorized - redirecting to login');
-      localStorage.removeItem(TOKEN_KEY);
-      localStorage.removeItem('rw_user');
-      window.location.href = '/login';
-    }
-    console.error('[AssessmentAPI] Error:', {
-      url: error.config?.url,
-      status: error.response?.status,
-      message: error.response?.data?.error || error.message,
-    });
-    return Promise.reject(error);
-  }
-);
+attachAuthInterceptors(assessmentClient);
 
 // ============================================================================
 // Assessment API Methods

@@ -1,11 +1,10 @@
 'use client';
 
 /**
- * Budget Optimization – fiscal years are driven by the same backend source as the Assessment dashboard:
- * GET /api/assessments/available-years/ (years that have at least one saved assessment).
- * The shared FiscalYearSelector fetches and displays only those years.
+ * Budget Optimization — uses latest saved assessment for the selected FY.
+ * Results load automatically (same three API calls as "run") so the page is never an empty shell.
  */
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useFiscalYear } from '@/contexts/FiscalYearContext';
 import { FiscalYearSelector } from '@/components/rwanda/shared/FiscalYearSelector';
@@ -27,9 +26,24 @@ import {
   Target,
   Sparkles,
   RefreshCw,
+  LayoutTemplate,
 } from 'lucide-react';
+import type { TranslationParams } from '@/contexts/LanguageContext';
+import { formatScore, formatRWFCompact, formatEngineDurationMs } from '@/lib/utils/formatters';
 
 type OptimizationTab = 'efficiency' | 'reallocation' | 'roi';
+
+function weightingLabel(method: string, t: (key: string, params?: TranslationParams) => string): string {
+  const key = `assessment_page.weighting_${method}`;
+  const out = t(key);
+  return out === key ? method.replace(/_/g, ' ') : out;
+}
+
+function scenarioLabel(scenario: string, t: (key: string, params?: TranslationParams) => string): string {
+  const key = `assessment_page.scenario_${scenario}`;
+  const out = t(key);
+  return out === key ? scenario.replace(/_/g, ' ') : out;
+}
 
 export default function OptimizationPage() {
   const { t } = useLanguage();
@@ -44,7 +58,9 @@ export default function OptimizationPage() {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<OptimizationTab>('efficiency');
 
-  // Fetch assessment data
+  const assessmentRef = useRef<SavedAssessment | null>(null);
+  assessmentRef.current = assessment;
+
   const fetchAssessment = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -53,9 +69,9 @@ export default function OptimizationPage() {
     setRoiData(null);
 
     try {
-      const assessments = await assessmentAPI.listAssessments(fiscalYear.start_year, 1);
-      if (assessments.length > 0) {
-        const detail = await assessmentAPI.getAssessment(assessments[0].id);
+      const list = await assessmentAPI.listAssessments(fiscalYear.start_year, 1);
+      if (list.length > 0) {
+        const detail = await assessmentAPI.getAssessment(list[0].id);
         setAssessment(detail);
       } else {
         setAssessment(null);
@@ -63,27 +79,28 @@ export default function OptimizationPage() {
     } catch (err) {
       console.error('Failed to fetch assessment:', err);
       setError('Unable to load assessment data.');
+      setAssessment(null);
     } finally {
       setLoading(false);
     }
   }, [fiscalYear.start_year]);
 
-  // Run optimization analysis — delegates to the backend which uses the
-  // assessment as the single source of truth for FSFSI scores.
+  useEffect(() => {
+    fetchAssessment();
+  }, [fetchAssessment]);
+
   const runOptimization = useCallback(async () => {
-    if (!assessment) return;
+    const a = assessmentRef.current;
+    if (!a) return;
 
     setAnalyzing(true);
     setError(null);
 
     try {
-      // All three analyses use the assessment_id — the backend loads the
-      // assessment's FSFSI and component data, runs the Rust optimizer,
-      // then stamps the assessment's FSFSI as the authoritative current score.
       const [efficiency, reallocation, roi] = await Promise.all([
-        optimizationAPI.efficiencyForAssessment(assessment.id),
-        optimizationAPI.reallocationForAssessment(assessment.id),
-        optimizationAPI.roiForAssessment(assessment.id),
+        optimizationAPI.efficiencyForAssessment(a.id),
+        optimizationAPI.reallocationForAssessment(a.id),
+        optimizationAPI.roiForAssessment(a.id),
       ]);
 
       setEfficiencyData(efficiency);
@@ -98,102 +115,162 @@ export default function OptimizationPage() {
     } finally {
       setAnalyzing(false);
     }
-  }, [assessment]);
+  }, []);
 
   useEffect(() => {
-    fetchAssessment();
-  }, [fetchAssessment]);
-
-  // Determine if we have optimization data
-  const hasOptimizationData = efficiencyData || reallocationData || roiData;
+    if (loading || !assessment) return;
+    void runOptimization();
+  }, [loading, assessment?.id, fiscalYear.start_year, runOptimization]);
 
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <Loader2 className="h-8 w-8 animate-spin text-[var(--rw-blue)]" />
-        <span className="ml-3 text-gray-600">Loading optimization data...</span>
+        <span className="ml-3 text-gray-600">{t('optimization_page.loading')}</span>
       </div>
     );
   }
 
+  const hasOptimizationData = Boolean(efficiencyData && reallocationData && roiData);
+  const optContext =
+    assessment && efficiencyData
+      ? {
+          fiscalYearLabel: fiscalYear.label,
+          assessmentName: assessment.assessment_name || undefined,
+          weightingLabel: weightingLabel(assessment.weighting_method, t),
+          scenarioLabel: scenarioLabel(assessment.scenario, t),
+          indicatorCount: assessment.indicators_count,
+          cumulativeFsfsi: assessment.cumulative_fsfsi,
+        }
+      : undefined;
+
+  const resultsLead =
+    efficiencyData && reallocationData
+      ? t('optimization_page.results_lead', {
+          current: formatScore(efficiencyData.current_fsfsi),
+          optimal: formatScore(efficiencyData.optimal_fsfsi),
+          waste: (efficiencyData.waste_ratio * 100).toFixed(1),
+        })
+      : '';
+
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2 tracking-tight">
             <Sparkles className="h-7 w-7 text-[var(--rw-blue)]" />
-            Budget Optimization
+            {t('optimization_page.title')}
           </h1>
-          <p className="text-sm text-gray-600 mt-1">
-            Analyze allocation efficiency and generate optimization recommendations.
-          </p>
+          <p className="text-sm text-gray-600 mt-1 max-w-3xl leading-relaxed">{t('optimization_page.subtitle')}</p>
+          <p className="text-xs text-slate-500 mt-2 max-w-3xl leading-relaxed">{t('optimization_page.method_note')}</p>
         </div>
-        <FiscalYearSelector />
+        <div className="flex flex-col items-end gap-1">
+          <FiscalYearSelector />
+          <span className="text-[10px] text-gray-500 text-right max-w-[12rem] leading-snug">
+            {t('optimization_page.fy_selector_hint')}
+          </span>
+        </div>
       </div>
 
       {error && (
-        <div className="flex items-center gap-2 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-red-800 text-sm">
-          <AlertTriangle className="h-5 w-5 flex-shrink-0" />
-          {error}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-red-800 text-sm">
+          <div className="flex items-center gap-2 flex-1">
+            <AlertTriangle className="h-5 w-5 flex-shrink-0" />
+            {error}
+          </div>
+          {assessment ? (
+            <button
+              type="button"
+              onClick={() => void runOptimization()}
+              disabled={analyzing}
+              className="inline-flex items-center justify-center gap-2 rounded-lg bg-red-800/90 px-4 py-2 text-xs font-medium text-white hover:opacity-90 disabled:opacity-50"
+            >
+              {analyzing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+              {t('optimization_page.retry')}
+            </button>
+          ) : null}
         </div>
       )}
 
-      {/* No Assessment State – fiscal year is from backend (available-years); only years with assessments appear */}
       {!assessment && (
         <Card>
           <CardContent className="py-12 text-center">
             <AlertTriangle className="h-12 w-12 text-yellow-500 mx-auto mb-4" />
-            <h2 className="text-lg font-semibold text-gray-900 mb-2">No Assessment Data</h2>
-            <p className="text-gray-600 max-w-md mx-auto">
-              The fiscal year dropdown shows only years that have assessment data. Run an assessment for{' '}
-              {fiscalYear.label} on the FSFI Assessment page to enable budget optimization here.
-            </p>
+            <h2 className="text-lg font-semibold text-gray-900 mb-2">{t('optimization_page.no_assessment_title')}</h2>
+            <p className="text-gray-600 max-w-md mx-auto">{t('optimization_page.no_assessment_body')}</p>
           </CardContent>
         </Card>
       )}
 
-      {/* Assessment Found - Show Run Analysis Button */}
       {assessment && !hasOptimizationData && (
-        <Card>
-          <CardContent className="py-8">
-            <div className="text-center">
-              <Target className="h-12 w-12 text-[var(--rw-blue)] mx-auto mb-4" />
-              <h2 className="text-lg font-semibold text-gray-900 mb-2">
-                Ready to Analyze
-              </h2>
-              <p className="text-gray-600 max-w-md mx-auto mb-6">
-                Assessment data available for {fiscalYear.label}. Run optimization analysis to get
-                efficiency insights, reallocation recommendations, and ROI rankings.
-              </p>
-              <button
-                type="button"
-                onClick={runOptimization}
-                disabled={analyzing}
-                className="inline-flex items-center gap-2 rounded-lg bg-[var(--rw-blue)] px-6 py-3 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {analyzing ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Analyzing...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="h-4 w-4" />
-                    Run Optimization Analysis
-                  </>
-                )}
-              </button>
+        <Card className="border border-dashed border-slate-200 bg-gradient-to-br from-slate-50/80 to-white">
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <LayoutTemplate className="h-5 w-5 text-[var(--rw-blue)]" />
+              {analyzing ? t('optimization_page.preview_running_title') : t('optimization_page.preview_title')}
+            </CardTitle>
+            <p className="text-sm text-gray-600 font-normal leading-relaxed">
+              {analyzing ? t('optimization_page.preview_running_body') : t('optimization_page.preview_idle_body')}
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="rounded-lg border bg-white p-4 shadow-sm">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">
+                  {t('optimization_page.preview_kpi_assessment')}
+                </p>
+                <p className="text-lg font-bold text-gray-900 mt-1">{formatScore(assessment.fsfsi_score)}</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  {assessment.indicators_count} {t('optimization_page.preview_indicators')}
+                </p>
+              </div>
+              <div className="rounded-lg border bg-white p-4 shadow-sm">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">
+                  {t('optimization_page.preview_kpi_budget')}
+                </p>
+                <p className="text-lg font-bold text-gray-900 mt-1">
+                  {formatRWFCompact(Number(assessment.total_budget_lcu_bn || 0) * 1_000_000_000)}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">{fiscalYear.label}</p>
+              </div>
+              <div className="rounded-lg border bg-white p-4 shadow-sm">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">
+                  {t('optimization_page.preview_kpi_engine')}
+                </p>
+                <p className="text-sm font-medium text-gray-800 mt-2">{weightingLabel(assessment.weighting_method, t)}</p>
+                <p className="text-xs text-gray-500 mt-1">{scenarioLabel(assessment.scenario, t)}</p>
+              </div>
             </div>
+            <div className="rounded-lg bg-slate-100/80 p-4 space-y-2">
+              <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide">
+                {t('optimization_page.preview_outputs_title')}
+              </p>
+              <ul className="text-sm text-slate-600 space-y-1 list-disc list-inside">
+                <li>{t('optimization_page.preview_output_efficiency')}</li>
+                <li>{t('optimization_page.preview_output_reallocation')}</li>
+                <li>{t('optimization_page.preview_output_roi')}</li>
+              </ul>
+              <p className="text-xs text-slate-500 pt-1">{t('optimization_page.time_hint')}</p>
+            </div>
+            {analyzing && (
+              <div className="flex items-center gap-3 text-sm text-[var(--rw-blue)]">
+                <Loader2 className="h-5 w-5 animate-spin shrink-0" />
+                <span>{t('optimization_page.analyzing_detail')}</span>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
 
-      {/* Optimization Results */}
-      {hasOptimizationData && (
+      {hasOptimizationData && efficiencyData && reallocationData && roiData && (
         <>
-          {/* Tab Navigation */}
-          <div className="flex items-center justify-between gap-4">
+          {resultsLead ? (
+            <p className="text-sm text-slate-800 leading-relaxed border-l-4 border-[var(--rw-blue)] bg-slate-50/90 pl-4 py-3 rounded-r-lg">
+              {resultsLead}
+            </p>
+          ) : null}
+
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div className="flex rounded-lg border border-gray-200 overflow-hidden bg-white">
               <button
                 type="button"
@@ -205,7 +282,7 @@ export default function OptimizationPage() {
                 }`}
               >
                 <TrendingUp className="h-4 w-4" />
-                Efficiency
+                {t('optimization_page.tab_efficiency')}
               </button>
               <button
                 type="button"
@@ -217,7 +294,7 @@ export default function OptimizationPage() {
                 }`}
               >
                 <DollarSign className="h-4 w-4" />
-                Reallocation
+                {t('optimization_page.tab_reallocation')}
               </button>
               <button
                 type="button"
@@ -229,13 +306,14 @@ export default function OptimizationPage() {
                 }`}
               >
                 <Target className="h-4 w-4" />
-                ROI Analysis
+                {t('optimization_page.tab_roi')}
               </button>
             </div>
             <button
               type="button"
-              onClick={runOptimization}
+              onClick={() => void runOptimization()}
               disabled={analyzing}
+              title={t('optimization_page.rerun_title')}
               className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {analyzing ? (
@@ -243,70 +321,53 @@ export default function OptimizationPage() {
               ) : (
                 <RefreshCw className="h-4 w-4" />
               )}
-              Refresh
+              {t('optimization_page.rerun')}
             </button>
           </div>
 
-          {/* Tab Content */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg">
                 {activeTab === 'efficiency' && (
                   <>
                     <TrendingUp className="h-5 w-5 text-[var(--rw-blue)]" />
-                    Allocation Efficiency Analysis
+                    {t('optimization_page.card_efficiency_title')}
                   </>
                 )}
                 {activeTab === 'reallocation' && (
                   <>
                     <DollarSign className="h-5 w-5 text-[var(--rw-blue)]" />
-                    Budget Reallocation Plan
+                    {t('optimization_page.card_reallocation_title')}
                   </>
                 )}
                 {activeTab === 'roi' && (
                   <>
                     <Target className="h-5 w-5 text-[var(--rw-blue)]" />
-                    Return on Investment Analysis
+                    {t('optimization_page.card_roi_title')}
                   </>
                 )}
               </CardTitle>
-              <p className="text-sm text-gray-500 font-normal">
-                {activeTab === 'efficiency' &&
-                  'Compares current allocations with optimal allocations to identify inefficiencies.'}
-                {activeTab === 'reallocation' &&
-                  'Provides prioritized recommendations for reallocating budget across components.'}
-                {activeTab === 'roi' &&
-                  'Ranks components by return on investment to identify best funding opportunities.'}
+              <p className="text-sm text-gray-500 font-normal leading-relaxed">
+                {activeTab === 'efficiency' && t('optimization_page.card_efficiency_sub')}
+                {activeTab === 'reallocation' && t('optimization_page.card_reallocation_sub')}
+                {activeTab === 'roi' && t('optimization_page.card_roi_sub')}
+              </p>
+              <p className="text-xs text-slate-500 font-normal">
+                {t('optimization_page.engine_timing_aggregate', {
+                  ms: formatEngineDurationMs(
+                    (efficiencyData.computing_time_ms || 0) +
+                      (reallocationData.computing_time_ms || 0) +
+                      (roiData.computing_time_ms || 0),
+                  ),
+                })}
               </p>
             </CardHeader>
             <CardContent>
-              {activeTab === 'efficiency' && efficiencyData && (
-                <EfficiencyAnalysis data={efficiencyData} />
+              {activeTab === 'efficiency' && (
+                <EfficiencyAnalysis data={efficiencyData} context={optContext} />
               )}
-              {activeTab === 'reallocation' && reallocationData && (
-                <ReallocationPlan data={reallocationData} />
-              )}
-              {activeTab === 'roi' && roiData && <RoiAnalysis data={roiData} />}
-
-              {/* Loading state for individual tabs */}
-              {activeTab === 'efficiency' && !efficiencyData && (
-                <div className="flex items-center justify-center h-[200px] text-gray-500">
-                  <Loader2 className="h-6 w-6 animate-spin mr-2" />
-                  Loading efficiency analysis...
-                </div>
-              )}
-              {activeTab === 'reallocation' && !reallocationData && (
-                <div className="flex items-center justify-center h-[200px] text-gray-500">
-                  <Loader2 className="h-6 w-6 animate-spin mr-2" />
-                  Loading reallocation plan...
-                </div>
-              )}
-              {activeTab === 'roi' && !roiData && (
-                <div className="flex items-center justify-center h-[200px] text-gray-500">
-                  <Loader2 className="h-6 w-6 animate-spin mr-2" />
-                  Loading ROI analysis...
-                </div>
-              )}
+              {activeTab === 'reallocation' && <ReallocationPlan data={reallocationData} />}
+              {activeTab === 'roi' && <RoiAnalysis data={roiData} />}
             </CardContent>
           </Card>
         </>

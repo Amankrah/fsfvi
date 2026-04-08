@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { authAPI } from '@/lib/api/authApi';
+import { clearAuthStorage, redirectToLoginSessionExpired } from '@/lib/api/authSession';
 import type { UserResponse } from '@/lib/types/auth';
 
 export function useAuth(requireAuth: boolean = true) {
@@ -29,7 +30,7 @@ export function useAuth(requireAuth: boolean = true) {
           setUser(freshUser);
         } catch {
           setIsAuthenticated(false);
-          if (requireAuth) router.push('/login');
+          if (requireAuth) redirectToLoginSessionExpired();
         }
       }
 
@@ -43,8 +44,7 @@ export function useAuth(requireAuth: boolean = true) {
     try {
       await authAPI.logout();
     } catch {
-      localStorage.removeItem('rw_auth_token');
-      localStorage.removeItem('rw_user');
+      clearAuthStorage();
     }
     router.push('/login');
   };
@@ -58,7 +58,7 @@ export function useAuth(requireAuth: boolean = true) {
     } catch {
       setIsAuthenticated(false);
       setUser(null);
-      if (requireAuth) router.push('/login');
+      if (requireAuth) redirectToLoginSessionExpired();
       return null;
     }
   };

@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 import type { ReallocationPlan as ReallocationPlanType, ReallocationItem } from '@/lib/types/optimization';
 import type { IndicatorComponent } from '@/lib/types/assessment';
 import { COMPONENT_DISPLAY_NAMES } from '@/lib/types/assessment';
-import { formatScore, formatRWFCompact } from '@/lib/utils/formatters';
+import { formatScore, formatRWFCompact, formatEngineDurationMs } from '@/lib/utils/formatters';
 import {
   ArrowRight,
   TrendingDown,
@@ -58,7 +58,8 @@ export function ReallocationPlan({ data }: ReallocationPlanProps) {
           </div>
         </div>
         <p className="text-sm text-gray-600 mt-3">
-          Total Budget: {formatRWFCompact(data.total_budget_lcu)} · Computed in {data.computing_time_ms}ms
+          Total budget: {formatRWFCompact(data.total_budget_lcu)} · Engine step:{' '}
+          {formatEngineDurationMs(data.computing_time_ms)}
         </p>
       </div>
 

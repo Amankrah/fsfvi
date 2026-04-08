@@ -20,6 +20,7 @@ import {
   AlertTriangle,
   Sparkles,
 } from 'lucide-react';
+import { formatEngineDurationMs } from '@/lib/utils/formatters';
 
 interface RoiAnalysisProps {
   data: RoiAnalysisType;
@@ -189,7 +190,8 @@ export function RoiAnalysis({ data }: RoiAnalysisProps) {
             Component ROI Rankings
           </h3>
           <p className="text-xs text-gray-500 mt-1">
-            Total budget: RWF {(data.total_budget_lcu / 1_000_000_000).toFixed(1)}B · Computed in {data.computing_time_ms}ms
+            Total budget: RWF {(data.total_budget_lcu / 1_000_000_000).toFixed(1)}B · Engine step:{' '}
+            {formatEngineDurationMs(data.computing_time_ms)}
           </p>
         </div>
         <div className="overflow-x-auto">

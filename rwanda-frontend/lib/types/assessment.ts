@@ -180,7 +180,10 @@ export interface ComponentAggregation {
 
 export interface ActionPriority {
   rank: number;
-  component: IndicatorComponent;
+  /** Present for indicator-scoped priorities from Rust; empty for legacy component-only runs */
+  indicator_code?: string;
+  /** Humanized component (food-system pillar) */
+  component: string;
   action: string;
   expected_impact: string;
   budget_implication: string;

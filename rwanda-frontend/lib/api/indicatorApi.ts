@@ -6,10 +6,10 @@
  */
 
 import axios, { AxiosInstance } from 'axios';
+import { attachAuthInterceptors } from '@/lib/api/attachAuthInterceptors';
 
 const RWANDA_API_BASE_URL =
   process.env.NEXT_PUBLIC_RWANDA_API_URL || 'http://localhost:8000';
-const TOKEN_KEY = 'rw_auth_token';
 
 const indicatorClient: AxiosInstance = axios.create({
   baseURL: `${RWANDA_API_BASE_URL}/api/indicators`,
@@ -17,33 +17,7 @@ const indicatorClient: AxiosInstance = axios.create({
   timeout: 60000,
 });
 
-indicatorClient.interceptors.request.use(
-  (config) => {
-    const tokenData = localStorage.getItem(TOKEN_KEY);
-    if (tokenData) {
-      try {
-        const parsed = JSON.parse(tokenData);
-        config.headers['Authorization'] = `Bearer ${parsed.token}`;
-      } catch {
-        console.error('[IndicatorAPI] Failed to parse auth token');
-      }
-    }
-    return config;
-  },
-  (error) => Promise.reject(error)
-);
-
-indicatorClient.interceptors.response.use(
-  (response) => response,
-  async (error) => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem(TOKEN_KEY);
-      localStorage.removeItem('rw_user');
-      window.location.href = '/login';
-    }
-    return Promise.reject(error);
-  }
-);
+attachAuthInterceptors(indicatorClient);
 
 // =============================================================================
 // Types

@@ -178,6 +178,7 @@ class ActionPriorityOutputSerializer(serializers.Serializer):
     """Output for action priority recommendation."""
 
     rank = serializers.IntegerField()
+    indicator_code = serializers.CharField(required=False, allow_blank=True, default="")
     component = serializers.CharField()
     action = serializers.CharField()
     expected_impact = serializers.CharField()
@@ -344,6 +345,9 @@ class AssessmentResultListSerializer(serializers.ModelSerializer):
             "scenario",
             "fsfsi_score",
             "stress_level",
+            "cumulative_fsfsi",
+            "cumulative_stress_level",
+            "efficiency_index",
             "components_count",
             "indicators_count",
             "computed_at",

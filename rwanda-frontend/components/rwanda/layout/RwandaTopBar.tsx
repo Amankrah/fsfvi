@@ -44,7 +44,22 @@ export function RwandaTopBar() {
   ];
 
   return (
-    <nav className="sticky top-0 z-50 border-b border-white/10 bg-[var(--rw-dark)]/95 shadow-[0_8px_30px_-12px_rgba(0,0,0,0.5)] backdrop-blur-md supports-[backdrop-filter]:bg-[var(--rw-dark)]/90">
+    <header className="sticky top-0 z-50 shadow-[0_8px_30px_-14px_rgba(0,0,0,0.45)]">
+      <div className="border-b border-white/10 bg-gradient-to-r from-[var(--rw-blue)] via-[#0d4a7a] to-[var(--rw-green)]">
+        <div className="max-w-[1400px] mx-auto px-4 py-1.5 sm:px-6 sm:py-2 lg:px-8">
+          <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-0.5 text-center sm:justify-start sm:text-left">
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-white/95 sm:text-xs">
+              {t('app.republic')}
+            </span>
+            <span className="hidden text-white/50 sm:inline" aria-hidden>
+              ·
+            </span>
+            <span className="text-[11px] font-medium text-white/90 sm:text-sm">{t('app.ministry')}</span>
+          </div>
+        </div>
+      </div>
+
+      <nav className="border-b border-white/10 bg-[var(--rw-dark)]/95 backdrop-blur-md supports-[backdrop-filter]:bg-[var(--rw-dark)]/90">
       <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Left: Logo + Title */}
@@ -62,8 +77,8 @@ export function RwandaTopBar() {
               <h1 className="text-sm font-bold text-white leading-tight">
                 {t('app.platform_name')}
               </h1>
-              <p className="text-xs text-gray-400 leading-tight">
-                {t('app.ministry')}
+              <p className="text-xs font-medium text-sky-100/80 leading-tight">
+                {t('app.subtitle')}
               </p>
             </div>
           </div>
@@ -111,6 +126,7 @@ export function RwandaTopBar() {
           </div>
         </div>
       )}
-    </nav>
+      </nav>
+    </header>
   );
 }

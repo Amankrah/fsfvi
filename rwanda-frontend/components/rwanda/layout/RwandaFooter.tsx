@@ -7,11 +7,15 @@ export function RwandaFooter() {
   const year = new Date().getFullYear();
 
   return (
-    <footer className="bg-white border-t border-gray-200 mt-auto">
-      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-4">
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-gray-500">
-          <p>&copy; {year} {t('app.platform_name')} — {t('app.ministry')}</p>
-          <p>{t('app.subtitle')}</p>
+    <footer className="mt-auto border-t border-slate-200 bg-slate-50">
+      <div className="mx-auto max-w-[1400px] px-4 py-5 sm:px-6 lg:px-8">
+        <div className="flex flex-col gap-1 text-center sm:text-left">
+          <p className="text-sm font-medium text-slate-700">
+            © {year} · {t('app.republic')} — {t('app.ministry')}
+          </p>
+          <p className="text-xs leading-relaxed text-slate-500">
+            {t('app.platform_name')} · {t('app.subtitle')}
+          </p>
         </div>
       </div>
     </footer>

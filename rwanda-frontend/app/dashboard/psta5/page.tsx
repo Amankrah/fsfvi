@@ -65,6 +65,30 @@ export default function PSTA5Page() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedPillar, setSelectedPillar] = useState<string | null>(null);
+  const [atRiskExpanded, setAtRiskExpanded] = useState(false);
+
+  const yearlyChartData = useMemo(() => {
+    const rows = data?.alignment_summary?.yearly_alignments;
+    if (!rows?.length) return [];
+    return rows.map((ya) => {
+      const paImprov = ya.pa_indicator_improvements ?? {};
+      const pa1 = paImprov['PA1'] ?? 0;
+      const pa2 = paImprov['PA2'] ?? 0;
+      const pa3 = paImprov['PA3'] ?? 0;
+      const overallImprovement = pa1 * 0.58 + pa2 * 0.17 + pa3 * 0.24;
+      return {
+        year: `FY${ya.fiscal_year}`,
+        fiscalYear: ya.fiscal_year,
+        improvement: overallImprovement,
+        pa1Improv: pa1,
+        pa2Improv: pa2,
+        pa3Improv: pa3,
+        budget: ya.total_budget_bn,
+        projectedFsfvi: ya.projected_fsfvi,
+        yearTarget: ya.year_target,
+      };
+    });
+  }, [data?.alignment_summary?.yearly_alignments]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -146,9 +170,15 @@ export default function PSTA5Page() {
             Strategic Plan for Agriculture Transformation (2024-2029) — KPI Progress & Budget Alignment
           </p>
         </div>
-        <div className="flex items-center gap-2 text-sm text-gray-500">
-          <Activity className="h-4 w-4" />
-          <span>Data Year: FY{summary.data_year}</span>
+        <div className="flex flex-col items-stretch sm:items-end gap-2 text-right max-w-md">
+          <span className="inline-flex items-center justify-center sm:justify-end gap-1.5 rounded-full bg-slate-800 px-3 py-1.5 text-xs font-semibold text-white">
+            <Activity className="h-3.5 w-3.5 opacity-90" />
+            Projected outcomes · FY{summary.data_year} (final plan year)
+          </span>
+          <p className="text-xs text-gray-600 leading-snug">
+            Figures below use the <strong>active strategic plan</strong> (modelled allocations and stress), not audited
+            realized budgets or reported KPI outturns.
+          </p>
         </div>
       </div>
 
@@ -158,11 +188,16 @@ export default function PSTA5Page() {
           <CardHeader className="pb-2">
             <CardTitle className="text-base flex items-center gap-2">
               <BarChart3 className="h-5 w-5 text-[var(--rw-blue)]" />
-              PSTA-5 Alignment
+              PSTA-5 alignment (summary)
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex flex-col items-center">
+              <p className="text-[11px] text-gray-600 text-center leading-snug mb-2 px-1">
+                <strong>Weighted</strong> budget fit: each Priority Area gets a fit score, then averages using PSTA-5
+                weights (58% · 17% · 24%). This can differ from the plan card gauge, which uses a single{' '}
+                <strong>unweighted</strong> mix check — both are valid; they are not duplicates of the same number.
+              </p>
               {/* Budget Alignment - Primary (what the plan controls) */}
               <div className="relative w-36 h-36">
                 <ResponsiveContainer width="100%" height="100%">
@@ -183,12 +218,10 @@ export default function PSTA5Page() {
                   <span className="text-2xl font-bold text-gray-900">
                     {summary.overall_score.toFixed(0)}%
                   </span>
-                  <span className="text-[10px] text-gray-500">Budget Aligned</span>
+                  <span className="text-[10px] text-gray-500 text-center leading-tight px-1">Weighted<br />budget fit</span>
                 </div>
               </div>
-              <p className="text-xs text-center text-gray-500 mt-2 mb-3">
-                How well the strategic plan&apos;s budget matches PSTA-5 targets
-              </p>
+              <p className="text-xs text-center text-gray-500 mt-2 mb-3">Pillar scores combined with official PSTA-5 priority weights</p>
 
               {/* Projected Indicator Improvement - from plan allocations */}
               <div className="w-full pt-3 border-t border-gray-200">
@@ -223,10 +256,58 @@ export default function PSTA5Page() {
                   <p className="text-base font-semibold text-gray-900">{data.kpis.length}</p>
                 </div>
                 <div>
-                  <p className="text-[10px] text-gray-500">At Risk</p>
-                  <p className="text-base font-semibold text-red-600">{summary.kpis_at_risk.length}</p>
+                  <p className="text-[10px] text-gray-500">At risk</p>
+                  <button
+                    type="button"
+                    className={`text-base font-semibold w-full rounded underline-offset-2 hover:underline focus:outline-none focus:ring-2 focus:ring-red-300 px-1 ${
+                      summary.kpis_at_risk.length ? 'text-red-600' : 'text-gray-400 cursor-default no-underline'
+                    }`}
+                    disabled={!summary.kpis_at_risk.length}
+                    aria-expanded={atRiskExpanded}
+                    onClick={() => {
+                      if (!summary.kpis_at_risk.length) return;
+                      setAtRiskExpanded((e) => {
+                        const next = !e;
+                        if (next) {
+                          setTimeout(() => {
+                            document.getElementById('psta-priority-attention')?.scrollIntoView({
+                              behavior: 'smooth',
+                              block: 'start',
+                            });
+                          }, 50);
+                        }
+                        return next;
+                      });
+                    }}
+                  >
+                    {summary.kpis_at_risk.length}
+                  </button>
+                  <p className="text-[9px] text-gray-400 mt-0.5">
+                    {summary.kpis_at_risk.length ? 'Tap to list' : 'None'}
+                  </p>
                 </div>
               </div>
+              {atRiskExpanded && summary.kpis_at_risk.length > 0 && (
+                <div
+                  className="mt-3 w-full rounded-lg border border-red-100 bg-red-50/80 p-2 text-left max-h-48 overflow-y-auto"
+                  id="psta-summary-at-risk-list"
+                >
+                  <p className="text-[10px] font-semibold text-red-900 mb-1">
+                    KPIs projected below 40% driver improvement ({summary.kpis_at_risk.length})
+                  </p>
+                  <ul className="space-y-1.5 text-[11px] text-red-950">
+                    {summary.kpis_at_risk.map((k) => (
+                      <li key={k.code} className="border-b border-red-100/80 pb-1 last:border-0">
+                        <span className="font-mono font-semibold">{k.code}</span>
+                        <span className="text-red-800/90"> · {k.name}</span>
+                        <div className="text-[10px] text-red-800/80 mt-0.5">
+                          {k.pillar_code} · projected {k.projected_improvement}%
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -242,13 +323,30 @@ export default function PSTA5Page() {
               Stress reduction in FSFSI indicators from plan allocations → PSTA-5 KPI progress
             </p>
           </CardHeader>
-          <CardContent>
-            <div className="h-[200px]">
+          <CardContent className="pb-4">
+            <div className="h-[248px] w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={pillarChartData} layout="vertical" margin={{ left: 20, right: 20 }}>
-                  <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                  <XAxis type="number" domain={[0, 100]} tickFormatter={(v) => `${v}%`} />
-                  <YAxis type="category" dataKey="name" tick={{ fontSize: 12 }} width={40} />
+                <BarChart
+                  data={pillarChartData}
+                  layout="vertical"
+                  margin={{ top: 16, right: 20, left: 8, bottom: 12 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e5e7eb" />
+                  <XAxis
+                    type="number"
+                    domain={[0, 100]}
+                    tickFormatter={(v) => `${v}%`}
+                    tick={{ fontSize: 12, fill: '#4b5563' }}
+                    tickMargin={8}
+                    axisLine={{ stroke: '#d1d5db' }}
+                  />
+                  <YAxis
+                    type="category"
+                    dataKey="name"
+                    tick={{ fontSize: 13, fill: '#111827', fontWeight: 600 }}
+                    tickLine={false}
+                    width={44}
+                  />
                   <Tooltip
                     content={({ active, payload }) => {
                       if (!active || !payload?.length) return null;
@@ -265,13 +363,29 @@ export default function PSTA5Page() {
                       );
                     }}
                   />
-                  <Bar dataKey="indicatorImprovement" name="Indicator Improvement" radius={[0, 4, 4, 0]}>
+                  <Bar dataKey="indicatorImprovement" name="Indicator Improvement" radius={[0, 4, 4, 0]} barSize={22}>
                     {pillarChartData.map((entry) => (
                       <Cell key={entry.name} fill={getProgressColor(entry.indicatorImprovement)} />
                     ))}
                   </Bar>
+                  {/* After <Bar> so the line layers above bar fills in this Recharts version */}
+                  <ReferenceLine x={40} stroke="#0f172a" strokeWidth={2} strokeDasharray="6 4" />
                 </BarChart>
               </ResponsiveContainer>
+            </div>
+            <div className="mt-4 space-y-2 rounded-lg bg-slate-50 border border-slate-100 px-3 py-2.5 text-xs text-slate-700 leading-relaxed">
+              <p>
+                <span className="font-semibold text-slate-900">What the horizontal axis shows: </span>
+                projected improvement in FSFSI-linked indicators (% reduction in financing stress vs baseline),
+                driven by the active plan&apos;s allocations.
+              </p>
+              <p className="flex flex-wrap items-start gap-2">
+                <span className="mt-0.5 inline-flex h-0 w-10 shrink-0 border-t-2 border-dashed border-slate-600" aria-hidden />
+                <span>
+                  <span className="font-semibold text-slate-900">Dashed vertical line at 40%</span>
+                  — same cutoff as &quot;at risk&quot; KPIs; bars ending left of the line are in the attention band.
+                </span>
+              </p>
             </div>
           </CardContent>
         </Card>
@@ -283,7 +397,7 @@ export default function PSTA5Page() {
           <CardHeader className="pb-2">
             <CardTitle className="text-base flex items-center gap-2">
               <Wallet className="h-5 w-5 text-[var(--rw-blue)]" />
-              Strategic Plan Budget Alignment
+              Strategic plan budget mix check
             </CardTitle>
             <p className="text-xs text-gray-600">
               <FileText className="h-3 w-3 inline mr-1" />
@@ -295,8 +409,14 @@ export default function PSTA5Page() {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Budget Alignment Score */}
+              {/* Budget Alignment Score — unweighted mix metric from API */}
               <div className="flex flex-col items-center justify-center p-4 bg-white rounded-lg border border-gray-200">
+                <p className="text-[11px] text-gray-600 text-center leading-snug mb-2 max-w-xs">
+                  <strong>Unweighted</strong> mix score: 100 minus twice the <em>simple average</em> of absolute
+                  gaps between actual and target PSTA-5 shares (58% / 17% / 24%). The summary card uses the{' '}
+                  <em>same gaps</em> but weights them by PSTA-5 priority — so the two percentages usually differ
+                  slightly.
+                </p>
                 <div className="relative w-32 h-32 mb-3">
                   <ResponsiveContainer width="100%" height="100%">
                     <RadialBarChart
@@ -319,12 +439,13 @@ export default function PSTA5Page() {
                     <span className="text-2xl font-bold text-gray-900">
                       {summary.budget_alignment.alignment_score.toFixed(0)}%
                     </span>
-                    <span className="text-xs text-gray-500">budget aligned</span>
+                    <span className="text-[10px] text-gray-500 text-center leading-tight px-1">
+                      Mean-gap<br />mix score
+                    </span>
                   </div>
                 </div>
                 <p className="text-xs text-center text-gray-600 max-w-xs">
-                  Measures how well the strategic plan&apos;s budget allocations match
-                  PSTA-5 Priority Area targets (PA1: 58%, PA2: 17%, PA3: 24%)
+                  How close the plan&apos;s mapped envelope is to the official PA budget shares (detail right →)
                 </p>
               </div>
 
@@ -397,9 +518,31 @@ export default function PSTA5Page() {
                     </div>
                   );
                 })}
-                <p className="text-xs text-gray-500 mt-2">
-                  Total mapped: {summary.budget_alignment.total_mapped_bn?.toFixed(1) ?? '—'} Bn RWF
-                </p>
+                <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-gray-700 space-y-1">
+                  <p>
+                    <strong>Mapped</strong> through FSFSI→PSTA-5 links:{' '}
+                    <span className="font-mono font-semibold">
+                      {summary.budget_alignment.total_mapped_bn?.toFixed(2) ?? '—'} Bn
+                    </span>{' '}
+                    RWF (only spend routed via mapped components).
+                  </p>
+                  <p>
+                    Full plan envelope (final plan year):{' '}
+                    <span className="font-mono font-semibold">
+                      {summary.budget_alignment.total_budget_bn?.toFixed(2) ?? '—'} Bn
+                    </span>{' '}
+                    RWF · Not mapped to a PA with current bridges:{' '}
+                    <span className="font-mono font-semibold">
+                      {summary.budget_alignment.unmapped_bn?.toFixed(2) ?? '—'} Bn
+                    </span>{' '}
+                    RWF.
+                  </p>
+                  <p className="text-amber-900 bg-amber-50 border border-amber-100 rounded px-2 py-1.5 text-[11px] leading-snug">
+                    A small &quot;mapped&quot; total means much of the plan sits in lines not attributed to Priority Areas
+                    in this mapping — it is <strong>not</strong> the full national agriculture budget (e.g. national
+                    ~2.2T RWF). Treat this panel as a <strong>traceability slice</strong>, not complete coverage.
+                  </p>
+                </div>
               </div>
             </div>
           </CardContent>
@@ -420,133 +563,137 @@ export default function PSTA5Page() {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Trajectory Chart */}
-              <div className="lg:col-span-2 h-[280px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart
-                    data={summary.yearly_alignments.map((ya) => {
-                      // Compute overall indicator improvement as weighted avg of PA improvements
-                      const paImprov = ya.pa_indicator_improvements ?? {};
-                      const pa1 = paImprov['PA1'] ?? 0;
-                      const pa2 = paImprov['PA2'] ?? 0;
-                      const pa3 = paImprov['PA3'] ?? 0;
-                      // Weight by PSTA-5 budget targets (58%, 17%, 24%)
-                      const overallImprovement = pa1 * 0.58 + pa2 * 0.17 + pa3 * 0.24;
-                      return {
-                        year: `FY${ya.fiscal_year}`,
-                        fiscalYear: ya.fiscal_year,
-                        improvement: overallImprovement,
-                        pa1Improv: pa1,
-                        pa2Improv: pa2,
-                        pa3Improv: pa3,
-                        budget: ya.total_budget_bn,
-                        projectedFsfvi: ya.projected_fsfvi,
-                        yearTarget: ya.year_target,
-                      };
-                    })}
-                    margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                    <XAxis dataKey="year" tick={{ fontSize: 11 }} />
-                    <YAxis
-                      yAxisId="left"
-                      domain={[0, 100]}
-                      tickFormatter={(v) => `${v}%`}
-                      tick={{ fontSize: 11 }}
-                    />
-                    <YAxis
-                      yAxisId="right"
-                      orientation="right"
-                      domain={[0, 'auto']}
-                      tickFormatter={(v) => `${v.toFixed(0)}B`}
-                      tick={{ fontSize: 11 }}
-                    />
-                    <Tooltip
-                      content={({ active, payload, label }) => {
-                        if (!active || !payload?.length) return null;
-                        const d = payload[0]?.payload;
-                        return (
-                          <div className="bg-white border border-gray-200 rounded-lg shadow-lg p-3 text-sm">
-                            <p className="font-medium text-gray-900 mb-2">{label}</p>
-                            <p className="text-emerald-600 font-medium">
-                              Overall Improvement: {d.improvement.toFixed(1)}%
-                            </p>
-                            <p className="text-gray-600">
-                              Budget: {d.budget.toFixed(1)} Bn RWF
-                            </p>
-                            {d.projectedFsfvi && (
-                              <p className="text-blue-600 text-xs mt-1">
-                                Projected FSFVI: {d.projectedFsfvi.toFixed(4)}
+              {/* Trajectory: improvement (%) separate from budget scale */}
+              <div className="lg:col-span-2 space-y-3">
+                <div className="h-[220px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={yearlyChartData} margin={{ top: 8, right: 16, left: 0, bottom: 4 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                      <XAxis dataKey="year" tick={{ fontSize: 11 }} />
+                      <YAxis
+                        domain={[0, 100]}
+                        tickFormatter={(v) => `${v}%`}
+                        tick={{ fontSize: 11 }}
+                        label={{
+                          value: 'Indicator improvement (% relative reduction in financing stress)',
+                          angle: -90,
+                          position: 'insideLeft',
+                          style: { fontSize: 9, fill: '#64748b' },
+                          offset: 4,
+                        }}
+                      />
+                      <Tooltip
+                        content={({ active, payload, label }) => {
+                          if (!active || !payload?.length) return null;
+                          const d = payload[0]?.payload;
+                          return (
+                            <div className="bg-white border border-gray-200 rounded-lg shadow-lg p-3 text-sm">
+                              <p className="font-medium text-gray-900 mb-2">{label}</p>
+                              <p className="text-emerald-600 font-medium">
+                                Weighted improvement: {d.improvement.toFixed(1)}%
                               </p>
-                            )}
-                            <div className="mt-2 pt-2 border-t border-gray-100 text-xs">
-                              <p className="text-gray-500 mb-1">By Priority Area:</p>
-                              <p style={{ color: PRIORITY_COLORS[0] }}>PA1: {d.pa1Improv.toFixed(1)}% improvement</p>
-                              <p style={{ color: PRIORITY_COLORS[1] }}>PA2: {d.pa2Improv.toFixed(1)}% improvement</p>
-                              <p style={{ color: PRIORITY_COLORS[2] }}>PA3: {d.pa3Improv.toFixed(1)}% improvement</p>
+                              <p className="text-gray-600 text-xs">Plan budget: {d.budget.toFixed(1)} Bn RWF</p>
+                              {d.projectedFsfvi != null && (
+                                <p className="text-blue-600 text-xs mt-1">
+                                  Projected FSFSI: {Number(d.projectedFsfvi).toFixed(4)}
+                                </p>
+                              )}
+                              <div className="mt-2 pt-2 border-t border-gray-100 text-xs">
+                                <p className="text-gray-500 mb-1">By Priority Area:</p>
+                                <p style={{ color: PRIORITY_COLORS[0] }}>PA1: {d.pa1Improv.toFixed(1)}%</p>
+                                <p style={{ color: PRIORITY_COLORS[1] }}>PA2: {d.pa2Improv.toFixed(1)}%</p>
+                                <p style={{ color: PRIORITY_COLORS[2] }}>PA3: {d.pa3Improv.toFixed(1)}%</p>
+                              </div>
                             </div>
-                          </div>
-                        );
-                      }}
-                    />
-                    <Legend />
-                    <Line
-                      yAxisId="left"
-                      type="monotone"
-                      dataKey="improvement"
-                      name="Indicator Improvement %"
-                      stroke="#059669"
-                      strokeWidth={2}
-                      dot={{ fill: '#059669', r: 4 }}
-                      activeDot={{ r: 6 }}
-                    />
-                    <Line
-                      yAxisId="left"
-                      type="monotone"
-                      dataKey="pa1Improv"
-                      name="PA1 (Modernization)"
-                      stroke={PRIORITY_COLORS[0]}
-                      strokeWidth={1}
-                      strokeDasharray="4 4"
-                      dot={{ fill: PRIORITY_COLORS[0], r: 2 }}
-                    />
-                    <Line
-                      yAxisId="left"
-                      type="monotone"
-                      dataKey="pa2Improv"
-                      name="PA2 (Markets)"
-                      stroke={PRIORITY_COLORS[1]}
-                      strokeWidth={1}
-                      strokeDasharray="4 4"
-                      dot={{ fill: PRIORITY_COLORS[1], r: 2 }}
-                    />
-                    <Line
-                      yAxisId="left"
-                      type="monotone"
-                      dataKey="pa3Improv"
-                      name="PA3 (Enablers)"
-                      stroke={PRIORITY_COLORS[2]}
-                      strokeWidth={1}
-                      strokeDasharray="4 4"
-                      dot={{ fill: PRIORITY_COLORS[2], r: 2 }}
-                    />
-                    <Line
-                      yAxisId="right"
-                      type="monotone"
-                      dataKey="budget"
-                      name="Budget (Bn)"
-                      stroke="#6b7280"
-                      strokeWidth={1}
-                      strokeDasharray="2 2"
-                      dot={{ fill: '#6b7280', r: 2 }}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
+                          );
+                        }}
+                      />
+                      <Legend wrapperStyle={{ fontSize: 11 }} />
+                      <Line
+                        type="monotone"
+                        dataKey="improvement"
+                        name="Weighted improvement %"
+                        stroke="#059669"
+                        strokeWidth={2.5}
+                        dot={{ fill: '#059669', r: 4 }}
+                        activeDot={{ r: 6 }}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="pa1Improv"
+                        name="PA1"
+                        stroke={PRIORITY_COLORS[0]}
+                        strokeWidth={2}
+                        strokeDasharray="6 4"
+                        dot={{ fill: PRIORITY_COLORS[0], r: 3 }}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="pa2Improv"
+                        name="PA2"
+                        stroke={PRIORITY_COLORS[1]}
+                        strokeWidth={2}
+                        strokeDasharray="6 4"
+                        dot={{ fill: PRIORITY_COLORS[1], r: 3 }}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="pa3Improv"
+                        name="PA3"
+                        stroke={PRIORITY_COLORS[2]}
+                        strokeWidth={2}
+                        strokeDasharray="6 4"
+                        dot={{ fill: PRIORITY_COLORS[2], r: 3 }}
+                      />
+                      <ReferenceLine
+                        y={40}
+                        stroke="#94a3b8"
+                        strokeDasharray="4 4"
+                        label={{ value: '40% threshold', position: 'right', fill: '#64748b', fontSize: 10 }}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="h-[120px] w-full">
+                  <p className="text-[11px] text-gray-600 mb-1 font-medium">Plan envelope by year (Bn RWF)</p>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={yearlyChartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                      <XAxis dataKey="year" tick={{ fontSize: 11 }} />
+                      <YAxis
+                        tickFormatter={(v) => `${v}`}
+                        tick={{ fontSize: 11 }}
+                        width={44}
+                        label={{
+                          value: 'Bn RWF',
+                          angle: -90,
+                          position: 'insideLeft',
+                          style: { fontSize: 9, fill: '#64748b' },
+                          offset: -2,
+                        }}
+                      />
+                      <Tooltip
+                        formatter={(value) => {
+                          const n = Number(value);
+                          if (!Number.isFinite(n)) return ['—', 'Budget'];
+                          return [`${n.toFixed(1)} Bn RWF`, 'Budget'];
+                        }}
+                        labelFormatter={(l) => String(l)}
+                      />
+                      <Bar dataKey="budget" name="Plan budget" fill="#64748b" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
               </div>
 
               {/* Year-by-Year Summary Table */}
               <div className="space-y-2">
-                <h4 className="text-sm font-medium text-gray-700 mb-3">Yearly Improvement Details</h4>
+                <h4 className="text-sm font-medium text-gray-700 mb-1">Yearly improvement details</h4>
+                <p className="text-[11px] text-gray-600 mb-2 leading-snug">
+                  Row shading uses the <strong>weighted</strong> PSTA-5 improvement (same green line in the chart):
+                  green ≥50%, amber ≥25%, grey below 25%. It marks pace of projected stress reduction, not budget
+                  adequacy.
+                </p>
                 <div className="space-y-2 max-h-[240px] overflow-y-auto pr-2">
                   {summary.yearly_alignments.map((ya) => {
                     const paImprov = ya.pa_indicator_improvements ?? {};
@@ -709,6 +856,88 @@ export default function PSTA5Page() {
         </CardContent>
       </Card>
 
+      {/* Priority Areas Requiring Attention — surfaced before the full KPI table for executive scan */}
+      {(() => {
+        const atRiskPAs = summary.pillar_scores.filter((ps) => (ps.indicator_improvement ?? 0) < 40);
+        if (atRiskPAs.length === 0) return null;
+        return (
+          <Card className="border-amber-200 bg-amber-50/50 scroll-mt-4" id="psta-priority-attention">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center gap-2 text-amber-700">
+                <AlertTriangle className="h-5 w-5" />
+                Priority Areas Requiring Attention
+              </CardTitle>
+              <p className="text-xs text-amber-600">
+                These Priority Areas have projected indicator improvement below 40%
+              </p>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {atRiskPAs.map((pa, idx) => {
+                  const pillarIdx = data.pillars.findIndex((p) => p.code === pa.pillar_code);
+                  const paKpis = data.kpis.filter((k) => k.pillar_code === pa.pillar_code);
+                  const improvement = pa.indicator_improvement ?? 0;
+                  const barColor = getProgressColor(improvement);
+                  return (
+                    <div
+                      key={pa.pillar_code}
+                      className="p-4 rounded-lg bg-white border border-amber-200"
+                    >
+                      <div className="flex items-center justify-between mb-3">
+                        <span
+                          className="text-xs font-bold px-2 py-0.5 rounded"
+                          style={{
+                            backgroundColor: `${PRIORITY_COLORS[pillarIdx >= 0 ? pillarIdx : idx]}20`,
+                            color: PRIORITY_COLORS[pillarIdx >= 0 ? pillarIdx : idx],
+                          }}
+                        >
+                          {pa.pillar_code}
+                        </span>
+                        <span className="text-sm font-bold" style={{ color: barColor }}>
+                          {improvement.toFixed(0)}% improvement
+                        </span>
+                      </div>
+                      <p className="text-sm font-medium text-gray-900 mb-2">{pa.pillar_name}</p>
+                      <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden mb-3">
+                        <div
+                          className="h-full rounded-full transition-all"
+                          style={{ width: `${improvement}%`, backgroundColor: barColor }}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-xs text-gray-500">
+                          <span className="font-medium">{paKpis.length} KPIs</span> in this area:
+                        </p>
+                        <div className="text-xs text-gray-600 max-h-20 overflow-y-auto space-y-0.5">
+                          {paKpis.slice(0, 5).map((kpi) => (
+                            <p key={kpi.code} className="truncate">
+                              • {kpi.code}: {kpi.name}
+                            </p>
+                          ))}
+                          {paKpis.length > 5 && (
+                            <p className="text-gray-400 italic">+{paKpis.length - 5} more in table below</p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="mt-3 pt-2 border-t border-gray-100">
+                        <p className="text-xs text-gray-500 mb-1">FSFSI components:</p>
+                        <p className="text-xs text-gray-700">
+                          {pa.components?.map((c) => componentLabel(c)).join(', ') || 'None mapped'}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <p className="text-xs text-amber-600 mt-4">
+                Consider increasing budget allocation to the components driving these Priority Areas
+                to improve projected indicator outcomes.
+              </p>
+            </CardContent>
+          </Card>
+        );
+      })()}
+
       {/* Projected KPI Impact Table */}
       <Card>
         <CardHeader className="pb-2">
@@ -763,10 +992,21 @@ export default function PSTA5Page() {
                       <td className="py-3 px-3">
                         <div>
                           <p className="font-medium text-gray-900">{kpi.code}</p>
-                          <p className="text-xs text-gray-500 line-clamp-1">{kpi.name}</p>
+                          <p className="text-xs text-gray-600 line-clamp-2">{kpi.name}</p>
                           {drivingComponents.length > 0 && (
-                            <p className="text-[10px] text-gray-400 mt-0.5">
-                              ← {drivingComponents.map((c: { component: string; weight: number }) => componentLabel(c.component)).join(', ')}
+                            <p className="text-xs font-medium text-slate-800 mt-1.5 leading-snug">
+                              <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">
+                                FSFSI drivers
+                              </span>
+                              <br />
+                              {drivingComponents
+                                .map((c: { component: string; weight: number }) => componentLabel(c.component))
+                                .join(' · ')}
+                            </p>
+                          )}
+                          {!kpi.higher_is_better && (
+                            <p className="text-[11px] text-blue-900 bg-blue-50 border border-blue-100 rounded px-1.5 py-0.5 mt-1.5 inline-block">
+                              Lower values are better for this KPI (direction encoded in PSTA-5 reference data).
                             </p>
                           )}
                         </div>
@@ -781,8 +1021,18 @@ export default function PSTA5Page() {
                         {kpi.target_value.toLocaleString()} {kpi.unit}
                       </td>
                       <td className="py-3 px-3">
-                        <div className="flex items-center justify-center gap-2">
-                          <div className="w-20 h-2 bg-gray-200 rounded-full overflow-hidden">
+                        <div className="flex flex-col items-center gap-1.5 min-w-[7rem]">
+                          <span
+                            className="inline-flex items-center justify-center rounded-md px-2.5 py-1 text-sm font-bold tabular-nums"
+                            style={{
+                              backgroundColor: `${getProgressColor(projectedImprovement)}22`,
+                              color: getProgressColor(projectedImprovement),
+                              border: `1px solid ${getProgressColor(projectedImprovement)}55`,
+                            }}
+                          >
+                            {projectedImprovement.toFixed(0)}%
+                          </span>
+                          <div className="w-full max-w-[120px] h-2.5 bg-gray-200 rounded-full overflow-hidden">
                             <div
                               className="h-full rounded-full transition-all"
                               style={{
@@ -791,9 +1041,6 @@ export default function PSTA5Page() {
                               }}
                             />
                           </div>
-                          <span className="text-xs font-medium w-10 text-right">
-                            {projectedImprovement.toFixed(0)}%
-                          </span>
                         </div>
                       </td>
                       <td className="py-3 px-3 text-center">
@@ -894,87 +1141,6 @@ export default function PSTA5Page() {
           </div>
         </CardContent>
       </Card>
-
-      {/* Priority Areas Requiring Attention */}
-      {(() => {
-        // Group at-risk KPIs by Priority Area
-        const atRiskPAs = summary.pillar_scores.filter((ps) => (ps.indicator_improvement ?? 0) < 40);
-        if (atRiskPAs.length === 0) return null;
-        return (
-          <Card className="border-amber-200 bg-amber-50/50">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base flex items-center gap-2 text-amber-700">
-                <AlertTriangle className="h-5 w-5" />
-                Priority Areas Requiring Attention
-              </CardTitle>
-              <p className="text-xs text-amber-600">
-                These Priority Areas have projected indicator improvement below 40%
-              </p>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {atRiskPAs.map((pa, idx) => {
-                  const pillarIdx = data.pillars.findIndex((p) => p.code === pa.pillar_code);
-                  const paKpis = data.kpis.filter((k) => k.pillar_code === pa.pillar_code);
-                  const improvement = pa.indicator_improvement ?? 0;
-                  return (
-                    <div
-                      key={pa.pillar_code}
-                      className="p-4 rounded-lg bg-white border border-amber-200"
-                    >
-                      <div className="flex items-center justify-between mb-3">
-                        <span
-                          className="text-xs font-bold px-2 py-0.5 rounded"
-                          style={{
-                            backgroundColor: `${PRIORITY_COLORS[pillarIdx >= 0 ? pillarIdx : idx]}20`,
-                            color: PRIORITY_COLORS[pillarIdx >= 0 ? pillarIdx : idx],
-                          }}
-                        >
-                          {pa.pillar_code}
-                        </span>
-                        <span className="text-sm font-bold text-amber-600">
-                          {improvement.toFixed(0)}% improvement
-                        </span>
-                      </div>
-                      <p className="text-sm font-medium text-gray-900 mb-2">{pa.pillar_name}</p>
-                      <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden mb-3">
-                        <div
-                          className="h-full rounded-full transition-all bg-amber-500"
-                          style={{ width: `${improvement}%` }}
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-xs text-gray-500">
-                          <span className="font-medium">{paKpis.length} KPIs</span> affected:
-                        </p>
-                        <div className="text-xs text-gray-600 max-h-16 overflow-y-auto">
-                          {paKpis.slice(0, 3).map((kpi) => (
-                            <p key={kpi.code} className="truncate">• {kpi.code}: {kpi.name}</p>
-                          ))}
-                          {paKpis.length > 3 && (
-                            <p className="text-gray-400 italic">+{paKpis.length - 3} more</p>
-                          )}
-                        </div>
-                      </div>
-                      {/* Components driving this PA */}
-                      <div className="mt-3 pt-2 border-t border-gray-100">
-                        <p className="text-xs text-gray-500 mb-1">Components:</p>
-                        <p className="text-xs text-gray-700">
-                          {pa.components?.map((c) => componentLabel(c)).join(', ') || 'None mapped'}
-                        </p>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-              <p className="text-xs text-amber-600 mt-4">
-                Consider increasing budget allocation to the components driving these Priority Areas
-                to improve projected indicator outcomes.
-              </p>
-            </CardContent>
-          </Card>
-        );
-      })()}
     </div>
   );
 }

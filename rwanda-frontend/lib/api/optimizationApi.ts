@@ -8,6 +8,7 @@
  */
 
 import axios, { AxiosInstance } from 'axios';
+import { attachAuthInterceptors } from '@/lib/api/attachAuthInterceptors';
 import type {
   EfficiencyAnalysis,
   ReallocationPlan,
@@ -22,8 +23,6 @@ import type { IndicatorComponent } from '@/lib/types/assessment';
 const RWANDA_API_BASE_URL =
   process.env.NEXT_PUBLIC_RWANDA_API_URL || 'http://localhost:8000';
 
-const TOKEN_KEY = 'rw_auth_token';
-
 // ============================================================================
 // Axios Instance
 // ============================================================================
@@ -36,41 +35,7 @@ const optimizationClient: AxiosInstance = axios.create({
   timeout: 120000,
 });
 
-// Request interceptor
-optimizationClient.interceptors.request.use(
-  (config) => {
-    const tokenData = localStorage.getItem(TOKEN_KEY);
-    if (tokenData) {
-      try {
-        const parsed = JSON.parse(tokenData);
-        config.headers['Authorization'] = `Bearer ${parsed.token}`;
-      } catch {
-        console.error('[OptimizationAPI] Failed to parse auth token');
-      }
-    }
-    console.log(`[OptimizationAPI] ${config.method?.toUpperCase()} ${config.url}`);
-    return config;
-  },
-  (error) => Promise.reject(error)
-);
-
-// Response interceptor
-optimizationClient.interceptors.response.use(
-  (response) => response,
-  async (error) => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem(TOKEN_KEY);
-      localStorage.removeItem('rw_user');
-      window.location.href = '/login';
-    }
-    const msg =
-      (error.response?.data as { error?: string })?.error ||
-      error.message ||
-      (error.response?.status ? `Request failed (${error.response.status})` : 'Request failed');
-    console.error('[OptimizationAPI] Error:', msg, error.response?.data);
-    return Promise.reject(error);
-  }
-);
+attachAuthInterceptors(optimizationClient);
 
 // ============================================================================
 // Component Input for Optimization

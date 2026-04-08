@@ -14,6 +14,18 @@
 
 export type StressLevel = 'low' | 'medium' | 'high' | 'critical';
 
+/** i18n key for full risk badge phrase (word order safe per locale). */
+export function riskBadgeTranslationKey(level: string | null | undefined): string {
+  const l = (level ?? 'medium').toLowerCase();
+  if (l === 'medium') return 'risk.badge_moderate';
+  const map: Record<string, string> = {
+    low: 'risk.badge_low',
+    high: 'risk.badge_high',
+    critical: 'risk.badge_critical',
+  };
+  return map[l] ?? 'risk.badge_moderate';
+}
+
 /** Map backend stress_level to Tailwind background classes */
 export function getRiskBgColor(stressLevel: StressLevel): string {
   const colors: Record<StressLevel, string> = {
@@ -109,9 +121,50 @@ export function formatScore(score: number | string | null | undefined, decimals:
   return Number.isFinite(n) ? n.toFixed(decimals) : '—';
 }
 
+/** Human-readable engine run duration (avoid raw "0 ms" when work was negligible). */
+export function formatEngineDurationMs(ms: number | null | undefined): string {
+  const n = ms == null ? NaN : Number(ms);
+  if (!Number.isFinite(n) || n < 0) return '—';
+  if (n >= 1000) return `${(n / 1000).toFixed(n >= 10_000 ? 0 : 1)} s`;
+  if (n < 1) return '< 1 ms';
+  return `${Math.round(n)} ms`;
+}
+
 /** Format as percentage */
 export function formatPercent(value: number, decimals: number = 1): string {
   return `${(value * 100).toFixed(decimals)}%`;
+}
+
+const POLICY_DATE_LOCALE: Record<string, string> = {
+  en: 'en-US',
+  fr: 'fr-FR',
+  rw: 'rw-RW',
+};
+
+/**
+ * Policy-friendly calendar date (no time of day) for executive-facing copy.
+ */
+export function formatPolicyDate(
+  iso: string | null | undefined,
+  locale: 'en' | 'fr' | 'rw' = 'en',
+): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  const tag = POLICY_DATE_LOCALE[locale] ?? 'en-US';
+  try {
+    return new Intl.DateTimeFormat(tag, {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    }).format(d);
+  } catch {
+    return new Intl.DateTimeFormat('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    }).format(d);
+  }
 }
 
 /** Format USD with compact notation (B/M) for large amounts */

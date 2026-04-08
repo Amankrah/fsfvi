@@ -12,8 +12,10 @@ import {
   Area,
   ComposedChart,
   Legend,
+  ReferenceArea,
 } from 'recharts';
 import type { AssessmentHistory } from '@/lib/types/assessment';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 interface FSFSITrendChartProps {
   data: AssessmentHistory[];
@@ -21,19 +23,25 @@ interface FSFSITrendChartProps {
 }
 
 const STRESS_THRESHOLDS = {
-  low: 0.0500,
-  medium: 0.1500,
-  high: 0.3000,
+  low: 0.05,
+  medium: 0.15,
+  high: 0.3,
 };
 
 const STRESS_COLORS = {
-  low: '#22c55e',      // green-500
-  medium: '#eab308',   // yellow-500
-  high: '#f97316',     // orange-500
-  critical: '#ef4444', // red-500
+  low: '#22c55e',
+  medium: '#ca8a04',
+  high: '#ea580c',
+  critical: '#dc2626',
 };
 
-export function FSFSITrendChart({ data, height = 450 }: FSFSITrendChartProps) {
+/** Line colors: strong contrast for policy audiences */
+const LINE_CURRENT = '#0284c7';
+const LINE_CUMULATIVE = '#b91c1c';
+
+export function FSFSITrendChart({ data, height = 500 }: FSFSITrendChartProps) {
+  const { t } = useLanguage();
+
   const chartData = useMemo(() => {
     return [...data]
       .sort((a, b) => a.fiscal_year - b.fiscal_year)
@@ -49,12 +57,26 @@ export function FSFSITrendChart({ data, height = 450 }: FSFSITrendChartProps) {
 
   const hasCumulative = chartData.some((d) => d.cumulative !== null);
 
-  const getStressColor = (score: number) => {
-    if (score >= STRESS_THRESHOLDS.high) return STRESS_COLORS.critical;
-    if (score >= STRESS_THRESHOLDS.medium) return STRESS_COLORS.high;
-    if (score >= STRESS_THRESHOLDS.low) return STRESS_COLORS.medium;
-    return STRESS_COLORS.low;
-  };
+  const yDomain = useMemo((): [number, number] => {
+    let min = Infinity;
+    let max = -Infinity;
+    for (const d of chartData) {
+      min = Math.min(min, d.fsfsi);
+      max = Math.max(max, d.fsfsi);
+      if (d.cumulative != null) {
+        min = Math.min(min, d.cumulative);
+        max = Math.max(max, d.cumulative);
+      }
+    }
+    if (!Number.isFinite(min) || !Number.isFinite(max)) {
+      return [0, 1];
+    }
+    const span = Math.max(0.06, max - min);
+    const pad = Math.min(0.12, Math.max(0.04, span * 0.2));
+    const low = Math.max(0, min - pad);
+    const high = Math.min(1, max + pad);
+    return [low, high];
+  }, [chartData]);
 
   interface TooltipEntry {
     value: number;
@@ -68,45 +90,46 @@ export function FSFSITrendChart({ data, height = 450 }: FSFSITrendChartProps) {
     };
   }
 
-  const CustomTooltip = ({ active, payload, label }: {
+  const CustomTooltip = ({
+    active,
+    payload,
+    label,
+  }: {
     active?: boolean;
     payload?: TooltipEntry[];
     label?: string;
   }) => {
-    if (!active || !payload || !payload.length) return null;
+    if (!active || !payload?.length) return null;
 
     const item = payload[0].payload;
     const gap = item.cumulative !== null ? item.cumulative - item.fsfsi : null;
 
     return (
-      <div className="bg-white border border-gray-200 rounded-lg shadow-lg p-3 min-w-[180px]">
-        <p className="font-semibold text-gray-900 mb-1">{label}</p>
-        <div className="space-y-1">
-          <p className="text-sm flex justify-between gap-4">
-            <span className="text-gray-500">Current:</span>
-            <span className="font-bold" style={{ color: 'var(--rw-blue)' }}>
-              {item.fsfsi.toFixed(4)}
-            </span>
+      <div className="min-w-[200px] rounded-lg border border-slate-200 bg-white p-3 shadow-lg">
+        <p className="mb-2 font-semibold text-slate-900">{label}</p>
+        <div className="space-y-1.5 text-sm">
+          <p className="flex justify-between gap-4">
+            <span className="text-slate-500">{t('overview.chart_legend_current')}:</span>
+            <span className="font-bold text-sky-700">{item.fsfsi.toFixed(4)}</span>
           </p>
           {item.cumulative !== null && (
-            <p className="text-sm flex justify-between gap-4">
-              <span className="text-gray-500">Cumulative:</span>
-              <span className="font-bold text-red-600">
-                {item.cumulative.toFixed(4)}
-              </span>
+            <p className="flex justify-between gap-4">
+              <span className="text-slate-500">{t('overview.chart_legend_cumulative')}:</span>
+              <span className="font-bold text-red-700">{item.cumulative.toFixed(4)}</span>
             </p>
           )}
           {gap !== null && gap > 0.001 && (
-            <p className="text-xs text-orange-600 border-t border-gray-100 pt-1 mt-1">
-              +{gap.toFixed(4)} accumulated damage lag
+            <p className="mt-1 border-t border-slate-100 pt-1.5 text-xs text-amber-800">
+              {t('overview.chart_tooltip_gap')}: +{gap.toFixed(4)}
             </p>
           )}
-          <p className="text-xs text-gray-500 capitalize">
-            Stress: {item.stressLevel}
+          <p className="text-xs capitalize text-slate-500">
+            {t('overview.risk_level')}: {item.stressLevel}
           </p>
           {item.yoyChange !== 0 && (
-            <p className={`text-xs ${item.yoyChange < 0 ? 'text-green-600' : 'text-red-600'}`}>
-              YoY: {item.yoyChange > 0 ? '+' : ''}{item.yoyChange.toFixed(1)}%
+            <p className={`text-xs ${item.yoyChange < 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+              {t('overview.yoy_change')}: {item.yoyChange > 0 ? '+' : ''}
+              {item.yoyChange.toFixed(1)}%
             </p>
           )}
         </div>
@@ -116,128 +139,132 @@ export function FSFSITrendChart({ data, height = 450 }: FSFSITrendChartProps) {
 
   if (!chartData.length) {
     return (
-      <div className="flex items-center justify-center h-[450px] text-gray-500">
+      <div className="flex h-[450px] items-center justify-center text-slate-500">
         No historical data available
       </div>
     );
   }
 
   return (
-    <div>
+    <div className="rounded-xl border border-slate-100 bg-slate-50/40 p-2 sm:p-3">
       <ResponsiveContainer width="100%" height={height}>
-        <ComposedChart data={chartData} margin={{ top: 20, right: 30, left: 0, bottom: 5 }}>
+        <ComposedChart data={chartData} margin={{ top: 24, right: 28, left: 8, bottom: 8 }}>
           <defs>
             <linearGradient id="fsfsiGradient" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="var(--rw-blue)" stopOpacity={0.15} />
-              <stop offset="95%" stopColor="var(--rw-blue)" stopOpacity={0} />
+              <stop offset="5%" stopColor={LINE_CURRENT} stopOpacity={0.22} />
+              <stop offset="95%" stopColor={LINE_CURRENT} stopOpacity={0} />
             </linearGradient>
             {hasCumulative && (
               <linearGradient id="cumulativeGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#ef4444" stopOpacity={0.08} />
-                <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
+                <stop offset="5%" stopColor={LINE_CUMULATIVE} stopOpacity={0.14} />
+                <stop offset="95%" stopColor={LINE_CUMULATIVE} stopOpacity={0} />
               </linearGradient>
             )}
           </defs>
-          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+
+          {/* Risk zones (y-bands; Y domain zooms to data so trends read clearly) */}
+          <ReferenceArea y1={0} y2={STRESS_THRESHOLDS.low} fill={STRESS_COLORS.low} fillOpacity={0.16} />
+          <ReferenceArea
+            y1={STRESS_THRESHOLDS.low}
+            y2={STRESS_THRESHOLDS.medium}
+            fill={STRESS_COLORS.medium}
+            fillOpacity={0.12}
+          />
+          <ReferenceArea
+            y1={STRESS_THRESHOLDS.medium}
+            y2={STRESS_THRESHOLDS.high}
+            fill={STRESS_COLORS.high}
+            fillOpacity={0.1}
+          />
+          <ReferenceArea y1={STRESS_THRESHOLDS.high} y2={1} fill={STRESS_COLORS.critical} fillOpacity={0.09} />
+
+          <CartesianGrid strokeDasharray="3 3" stroke="#cbd5e1" vertical={false} />
           <XAxis
             dataKey="year"
-            tick={{ fontSize: 12 }}
-            tickLine={{ stroke: '#e5e7eb' }}
+            tick={{ fontSize: 13, fill: '#475569', fontWeight: 500 }}
+            tickLine={{ stroke: '#94a3b8' }}
+            axisLine={{ stroke: '#94a3b8' }}
           />
           <YAxis
-            domain={[0, 1]}
-            tick={{ fontSize: 12 }}
-            tickLine={{ stroke: '#e5e7eb' }}
-            tickFormatter={(value: number) => value.toFixed(2)}
+            domain={yDomain}
+            tick={{ fontSize: 13, fill: '#475569', fontWeight: 500 }}
+            tickLine={{ stroke: '#94a3b8' }}
+            axisLine={{ stroke: '#94a3b8' }}
+            tickFormatter={(v: number) => v.toFixed(2)}
+            label={{
+              value: t('overview.chart_axis_stress_index'),
+              angle: -90,
+              position: 'insideLeft',
+              style: { textAnchor: 'middle', fill: '#64748b', fontSize: 12 },
+            }}
           />
           <Tooltip content={<CustomTooltip />} />
           <Legend
             verticalAlign="top"
-            height={36}
+            height={40}
             formatter={(value: string) => {
-              if (value === 'fsfsi') return 'Current Year Stress (point-in-time)';
-              if (value === 'cumulative') return 'Cumulative Stress (with damage persistence)';
+              if (value === 'fsfsi') return t('overview.chart_legend_current');
+              if (value === 'cumulative') return t('overview.chart_legend_cumulative');
               return value;
             }}
+            wrapperStyle={{ fontWeight: 600, fontSize: 13 }}
           />
 
-          {/* Stress threshold reference lines */}
           <ReferenceLine
             y={STRESS_THRESHOLDS.low}
             stroke={STRESS_COLORS.low}
-            strokeDasharray="5 5"
-            label={{ value: 'Low', position: 'right', fontSize: 10, fill: STRESS_COLORS.low }}
+            strokeDasharray="4 4"
+            strokeOpacity={0.7}
           />
           <ReferenceLine
             y={STRESS_THRESHOLDS.medium}
             stroke={STRESS_COLORS.medium}
-            strokeDasharray="5 5"
-            label={{ value: 'Medium', position: 'right', fontSize: 10, fill: STRESS_COLORS.medium }}
+            strokeDasharray="4 4"
+            strokeOpacity={0.7}
           />
           <ReferenceLine
             y={STRESS_THRESHOLDS.high}
             stroke={STRESS_COLORS.high}
-            strokeDasharray="5 5"
-            label={{ value: 'High', position: 'right', fontSize: 10, fill: STRESS_COLORS.high }}
+            strokeDasharray="4 4"
+            strokeOpacity={0.8}
           />
 
-          {/* Current year stress (blue line) */}
-          <Area
-            type="monotone"
-            dataKey="fsfsi"
-            stroke="none"
-            fill="url(#fsfsiGradient)"
-          />
+          <Area type="monotone" dataKey="fsfsi" stroke="none" fill="url(#fsfsiGradient)" />
           <Line
             type="monotone"
             dataKey="fsfsi"
             name="fsfsi"
-            stroke="var(--rw-blue)"
-            strokeWidth={3}
-            dot={{ r: 5, fill: 'var(--rw-blue)', strokeWidth: 2, stroke: '#fff' }}
-            activeDot={{ r: 7, fill: 'var(--rw-blue)', strokeWidth: 2, stroke: '#fff' }}
+            stroke={LINE_CURRENT}
+            strokeWidth={4}
+            dot={{ r: 5, fill: LINE_CURRENT, strokeWidth: 2, stroke: '#fff' }}
+            activeDot={{ r: 8, strokeWidth: 2, stroke: '#fff' }}
           />
 
-          {/* Cumulative stress (red dashed line) */}
           {hasCumulative && (
             <>
-              <Area
-                type="monotone"
-                dataKey="cumulative"
-                stroke="none"
-                fill="url(#cumulativeGradient)"
-              />
+              <Area type="monotone" dataKey="cumulative" stroke="none" fill="url(#cumulativeGradient)" />
               <Line
                 type="monotone"
                 dataKey="cumulative"
                 name="cumulative"
-                stroke="#ef4444"
-                strokeWidth={2}
-                strokeDasharray="6 3"
-                dot={{ r: 4, fill: '#ef4444', strokeWidth: 2, stroke: '#fff' }}
-                activeDot={{ r: 6, fill: '#ef4444', strokeWidth: 2, stroke: '#fff' }}
+                stroke={LINE_CUMULATIVE}
+                strokeWidth={3.5}
+                strokeDasharray="10 6"
+                dot={{ r: 5, fill: LINE_CUMULATIVE, strokeWidth: 2, stroke: '#fff' }}
+                activeDot={{ r: 8, strokeWidth: 2, stroke: '#fff' }}
               />
             </>
           )}
         </ComposedChart>
       </ResponsiveContainer>
 
-      {/* Explanation for policymakers */}
       {hasCumulative && (
-        <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-          <p className="text-xs font-medium text-amber-800">
-            Understanding the two lines:
-          </p>
-          <ul className="text-xs text-amber-700 mt-1 space-y-0.5 list-disc list-inside">
-            <li>
-              <span className="font-semibold" style={{ color: 'var(--rw-blue)' }}>Blue (Current)</span> — stress based on this year&apos;s data alone. A budget increase shows immediate improvement.
-            </li>
-            <li>
-              <span className="font-semibold text-red-600">Red (Cumulative)</span> — accounts for accumulated damage from prior years. Recovery is slow because infrastructure, institutions, and human capital take time to rebuild.
-            </li>
-            <li>
-              The <span className="font-semibold">gap between the lines</span> represents unresolved structural damage that persists despite improved funding.
-            </li>
+        <div className="mt-4 rounded-lg border border-amber-200/80 bg-amber-50/90 p-4 text-sm leading-relaxed shadow-sm">
+          <p className="font-semibold text-amber-900">{t('overview.chart_explain_title')}</p>
+          <ul className="mt-2 list-inside list-disc space-y-1.5 text-amber-900/90">
+            <li>{t('overview.chart_explain_blue')}</li>
+            <li>{t('overview.chart_explain_red')}</li>
+            <li>{t('overview.chart_explain_gap')}</li>
           </ul>
         </div>
       )}

@@ -11,10 +11,12 @@ type TranslationData = typeof en;
 
 const translations: Record<Locale, TranslationData> = { en, rw, fr };
 
+export type TranslationParams = Record<string, string | number>;
+
 interface LanguageContextType {
   locale: Locale;
   setLocale: (locale: Locale) => void;
-  t: (key: string) => string;
+  t: (key: string, params?: TranslationParams) => string;
 }
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
@@ -32,16 +34,25 @@ function getNestedValue(obj: Record<string, unknown>, path: string): string {
   return typeof current === 'string' ? current : path;
 }
 
+function interpolate(template: string, params?: TranslationParams): string {
+  if (!params || Object.keys(params).length === 0) return template;
+  return template.replace(/\{\{(\w+)\}\}/g, (match, name: string) => {
+    const v = params[name];
+    return v !== undefined && v !== null ? String(v) : match;
+  });
+}
+
 export function LanguageProvider({ children }: { children: ReactNode }) {
   const [locale, setLocale] = useState<Locale>('en');
 
   const t = useCallback(
-    (key: string): string => {
-      const result = getNestedValue(translations[locale] as unknown as Record<string, unknown>, key);
+    (key: string, params?: TranslationParams): string => {
+      let result = getNestedValue(translations[locale] as unknown as Record<string, unknown>, key);
       if (result === key && locale !== 'en') {
-        return getNestedValue(translations.en as unknown as Record<string, unknown>, key);
+        result = getNestedValue(translations.en as unknown as Record<string, unknown>, key);
       }
-      return result;
+      if (typeof result !== 'string') return key;
+      return interpolate(result, params);
     },
     [locale],
   );

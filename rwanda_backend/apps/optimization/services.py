@@ -14,8 +14,16 @@ Architecture:
 
 import json
 import logging
+import time
 
 logger = logging.getLogger(__name__)
+
+
+def _merge_computing_time_ms(result: dict, started_perf: float) -> None:
+    """Rust may report 0 ms for sub‑millisecond work; retain wall time for credibility."""
+    wall_ms = max(0, int((time.perf_counter() - started_perf) * 1000))
+    rust_ms = int(result.get("computing_time_ms") or 0)
+    result["computing_time_ms"] = max(rust_ms, wall_ms, 1)
 
 
 def _get_engine():
@@ -80,6 +88,77 @@ def _build_component_inputs_from_assessment(assessment) -> list[dict]:
     return components
 
 
+def _normalize_modeled_allocations_to_envelope(components: list[dict], envelope: float) -> None:
+    """Rescale optimal or recommended LCU so row sums equal the current envelope.
+
+    Rust rounds each component to whole LCU; after expanding per-indicator averages
+    to component totals in :func:`_stamp_assessment_fsfsi`, summed optimal can drift
+    from summed current. Re-scale shares preserves the optimal *mix* while enforcing
+    Σ optimal = Σ current = envelope for budget reconciliation.
+    """
+    if envelope <= 0 or not components:
+        return
+    sample = components[0]
+    if "optimal_allocation_lcu" in sample:
+        target_key = "optimal_allocation_lcu"
+    elif "recommended_allocation_lcu" in sample:
+        target_key = "recommended_allocation_lcu"
+    else:
+        return
+
+    sum_target = sum(float(c.get(target_key) or 0) for c in components)
+    if sum_target <= 1e-9:
+        return
+
+    factor = envelope / sum_target
+    for c in components:
+        if target_key not in c:
+            continue
+        c[target_key] = float(c[target_key]) * factor
+        cur = float(c.get("current_allocation_lcu") or 0)
+        gap = c[target_key] - cur
+
+        if target_key == "optimal_allocation_lcu":
+            c["allocation_gap_lcu"] = gap
+            if cur > 1e-6:
+                c["allocation_gap_pct"] = round(100.0 * gap / cur, 1)
+            else:
+                c["allocation_gap_pct"] = 0.0 if abs(gap) < 1e-6 else 9999.0
+            c["is_underfunded"] = bool(gap > 0.0)
+        else:
+            c["change_lcu"] = gap
+            if cur > 1e-6:
+                c["change_pct"] = round(100.0 * gap / cur, 1)
+            else:
+                c["change_pct"] = 0.0 if abs(gap) < 1e-6 else 9999.0
+
+    # Float drift after scaling: nudge largest line so the sum matches envelope exactly.
+    sum_after = sum(float(c.get(target_key) or 0) for c in components if target_key in c)
+    residual = envelope - sum_after
+    if abs(residual) >= 1.0 and components:
+        fix_i = max(
+            range(len(components)),
+            key=lambda i: float(components[i].get(target_key) or 0),
+        )
+        row = components[fix_i]
+        row[target_key] = float(row[target_key]) + residual
+        cur = float(row.get("current_allocation_lcu") or 0)
+        gap = float(row[target_key]) - cur
+        if target_key == "optimal_allocation_lcu":
+            row["allocation_gap_lcu"] = gap
+            if cur > 1e-6:
+                row["allocation_gap_pct"] = round(100.0 * gap / cur, 1)
+            else:
+                row["allocation_gap_pct"] = 0.0 if abs(gap) < 1e-6 else 9999.0
+            row["is_underfunded"] = bool(gap > 0.0)
+        else:
+            row["change_lcu"] = gap
+            if cur > 1e-6:
+                row["change_pct"] = round(100.0 * gap / cur, 1)
+            else:
+                row["change_pct"] = 0.0 if abs(gap) < 1e-6 else 9999.0
+
+
 def _stamp_assessment_fsfsi(result: dict, assessment) -> dict:
     """Override the optimizer's re-computed FSFSI with the assessment's authoritative scores.
 
@@ -137,6 +216,8 @@ def _stamp_assessment_fsfsi(result: dict, assessment) -> dict:
     if "total_budget_lcu" in result:
         result["total_budget_lcu"] = total_budget
 
+    _normalize_modeled_allocations_to_envelope(result.get("components", []), total_budget)
+
     return result
 
 
@@ -164,10 +245,13 @@ class OptimizationService:
         """
         from apps.assessments.models import AssessmentResult
 
+        t0 = time.perf_counter()
         assessment = AssessmentResult.objects.get(pk=assessment_id)
         components = _build_component_inputs_from_assessment(assessment)
         result = self.analyze_efficiency(components)
-        return _stamp_assessment_fsfsi(result, assessment)
+        result = _stamp_assessment_fsfsi(result, assessment)
+        _merge_computing_time_ms(result, t0)
+        return result
 
     def reallocation_for_assessment(
         self, assessment_id: str, target_budget: float | None = None
@@ -175,10 +259,13 @@ class OptimizationService:
         """Generate reallocation plan using a saved assessment."""
         from apps.assessments.models import AssessmentResult
 
+        t0 = time.perf_counter()
         assessment = AssessmentResult.objects.get(pk=assessment_id)
         components = _build_component_inputs_from_assessment(assessment)
         result = self.generate_reallocation_plan(components, target_budget)
-        return _stamp_assessment_fsfsi(result, assessment)
+        result = _stamp_assessment_fsfsi(result, assessment)
+        _merge_computing_time_ms(result, t0)
+        return result
 
     def budget_bundle_for_assessment(
         self, assessment_id: str, target_budget: float | None = None
@@ -200,9 +287,12 @@ class OptimizationService:
         """Calculate ROI using a saved assessment."""
         from apps.assessments.models import AssessmentResult
 
+        t0 = time.perf_counter()
         assessment = AssessmentResult.objects.get(pk=assessment_id)
         components = _build_component_inputs_from_assessment(assessment)
-        return self.calculate_roi(components)
+        result = self.calculate_roi(components)
+        _merge_computing_time_ms(result, t0)
+        return result
 
     # -----------------------------------------------------------------
     # Low-level methods (raw component inputs — used internally)

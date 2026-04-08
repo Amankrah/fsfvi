@@ -206,19 +206,21 @@ class AssessmentService:
             comp = comp_agg["component"]
             weight = hybrid_weights.get(comp, 1.0 / 8)
 
+            gap = comp_agg["average_performance_gap"]
+            stress = comp_agg.get("average_stress", gap)
+
             priority = comp_agg.get("priority_level") or comp_agg.get("risk_level")
             if not priority:
-                priority = fsfi_engine.get_stress_level(comp_agg["average_performance_gap"])
+                priority = self._classify_stress(stress)
 
-            gap = comp_agg["average_performance_gap"]
             ComponentResult.objects.create(
                 assessment=assessment,
                 component=comp,
                 weight=Decimal(str(round(weight, 6))),
                 avg_performance_gap=Decimal(str(gap)),
-                component_stress=Decimal(str(gap)),
-                weighted_stress=Decimal(str(round(gap * weight, 6))),
-                priority_level=self._classify_stress(gap),
+                component_stress=Decimal(str(stress)),
+                weighted_stress=Decimal(str(round(stress * weight, 6))),
+                priority_level=priority,
                 budget_lcu_bn=Decimal(str(comp_agg["total_weighted_lcu_bn"])),
                 budget_share_percent=Decimal(str(comp_agg["total_share_weighted_percent"])),
                 indicators_count=comp_agg["indicator_count"],

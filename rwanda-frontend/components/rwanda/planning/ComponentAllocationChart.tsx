@@ -10,21 +10,23 @@ import {
   Tooltip,
   ResponsiveContainer,
   Legend,
+  LabelList,
 } from 'recharts';
 import type { YearlyPlanOutput } from '@/lib/types/planning';
 import { formatPlanPeriodLabel } from '@/lib/utils/planningLabels';
 import { COMPONENT_DISPLAY_NAMES } from '@/lib/types/assessment';
 import type { IndicatorComponent } from '@/lib/types/assessment';
 
+/** Tol-inspired palette: maximally distinct at a glance (incl. color vision). */
 const COMPONENT_COLORS: Record<string, string> = {
-  markets: '#3b82f6',
-  crop_production: '#22c55e',
-  nutrition: '#eab308',
-  research: '#8b5cf6',
-  post_harvest: '#f97316',
-  environment: '#06b6d4',
-  animal_systems: '#ec4899',
-  finance: '#6366f1',
+  markets: '#0077BB',
+  crop_production: '#009E73',
+  nutrition: '#E69F00',
+  research: '#CC79A7',
+  post_harvest: '#D55E00',
+  environment: '#56B4E9',
+  animal_systems: '#F0E442',
+  finance: '#882255',
 };
 
 function getComponentColor(key: string): string {
@@ -108,8 +110,23 @@ export function ComponentAllocationChart({
             dataKey={key}
             stackId="alloc"
             fill={getComponentColor(key)}
+            stroke="#0f172a"
+            strokeWidth={0.35}
             radius={key === componentKeys[componentKeys.length - 1] ? [0, 4, 4, 0] : 0}
-          />
+          >
+            <LabelList
+              dataKey={key}
+              position="center"
+              fill="#0f172a"
+              fontSize={10}
+              fontWeight={600}
+              formatter={(v) => {
+                const n = Number(v);
+                if (!Number.isFinite(n) || n < 0.1) return '';
+                return `${Math.round(n * 100)}%`;
+              }}
+            />
+          </Bar>
         ))}
       </BarChart>
     </ResponsiveContainer>
