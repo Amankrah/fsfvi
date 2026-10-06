@@ -6,6 +6,7 @@ from .views import (
     ActivateSavedPlanView,
     ActivePlanExcerptView,
     AssessmentAllocationSimulateView,
+    AssessmentInvestmentScenarioView,
     AssessmentMtefView,
     AssessmentMultiYearPlanView,
     MtefView,
@@ -33,6 +34,11 @@ urlpatterns = [
         "<uuid:assessment_id>/simulate-allocation/",
         AssessmentAllocationSimulateView.as_view(),
         name="assessment-simulate-allocation",
+    ),
+    path(
+        "<uuid:assessment_id>/investment-scenario/",
+        AssessmentInvestmentScenarioView.as_view(),
+        name="assessment-investment-scenario",
     ),
 
     # Saved plans (activate before detail so paths resolve correctly)

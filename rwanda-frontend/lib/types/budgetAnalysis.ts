@@ -1,5 +1,5 @@
 /**
- * Budget analysis — financial history from IndicatorData (no FSFSI / optimization).
+ * Budget analysis: financial history from IndicatorData (no FSFSI / optimization).
  */
 
 export interface BudgetScope {

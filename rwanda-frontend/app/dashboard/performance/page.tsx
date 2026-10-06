@@ -13,7 +13,7 @@ export default function PerformancePage() {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <p className="text-gray-600">Performance gap analysis dashboard — coming in Phase 3.</p>
+        <p className="text-gray-600">Performance gap analysis. Planned for Phase 3.</p>
       </CardContent>
     </Card>
   );

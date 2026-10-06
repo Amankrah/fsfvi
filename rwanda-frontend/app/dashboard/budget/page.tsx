@@ -33,7 +33,7 @@ const COMP_LINE_COLORS = ['#1d4ed8', '#059669', '#d97706', '#7c3aed', '#db2777']
 
 const YOY_SPIKE_THRESHOLD_PCT = 15;
 const CAGR_EXTREME_ABS = 200;
-/** Billions LCU — allocations below this often produce misleading CAGR. */
+/** Billions LCU: allocations below this often produce misleading CAGR. */
 const NEAR_ZERO_FIRST_BN = 0.02;
 
 function componentLabel(key: string): string {
@@ -72,7 +72,7 @@ function MoverCagrCell({
 }): ReactNode {
   const c = row.cagr_pct;
   if (c == null) {
-    return <td className="py-2 pr-3">—</td>;
+    return <td className="py-2 pr-3">–</td>;
   }
   const nearZero = row.weighted_first_bn >= 0 && row.weighted_first_bn < NEAR_ZERO_FIRST_BN;
   const extreme = Math.abs(c) >= CAGR_EXTREME_ABS;
@@ -367,7 +367,7 @@ export default function BudgetPage() {
                     ? t('budget_page.metric_direct_mapped', {
                         pct: mappingConfidence.directPct.toFixed(1),
                       })
-                    : '—'}
+                    : '–'}
                 </p>
                 {mappingConfidence ? (
                   <p className="text-xs text-gray-500 mt-1 leading-snug">
@@ -385,7 +385,7 @@ export default function BudgetPage() {
                 <p className="text-2xl font-bold text-gray-900 mt-1 tabular-nums">
                   {data.metrics.cagr_weighted_pct != null
                     ? `${data.metrics.cagr_weighted_pct > 0 ? '+' : ''}${data.metrics.cagr_weighted_pct}%`
-                    : '—'}
+                    : '–'}
                 </p>
               </CardContent>
             </Card>
@@ -395,7 +395,7 @@ export default function BudgetPage() {
                 <p className="text-2xl font-bold text-gray-900 mt-1 tabular-nums">
                   {data.metrics.volatility_yoy_weighted_pp != null
                     ? `${data.metrics.volatility_yoy_weighted_pp} pp`
-                    : '—'}
+                    : '–'}
                 </p>
                 <p className="text-xs text-gray-500 mt-1">{t('budget_page.metric_vol_hint')}</p>
               </CardContent>
@@ -404,8 +404,8 @@ export default function BudgetPage() {
               <CardContent className="pt-5">
                 <p className="text-xs font-semibold text-gray-500 uppercase">{t('budget_page.metric_hhi')}</p>
                 <p className="text-lg font-bold text-gray-900 mt-1 tabular-nums">
-                  {data.metrics.hhi_first_year != null ? data.metrics.hhi_first_year.toFixed(0) : '—'} →{' '}
-                  {data.metrics.hhi_last_year != null ? data.metrics.hhi_last_year.toFixed(0) : '—'}
+                  {data.metrics.hhi_first_year != null ? data.metrics.hhi_first_year.toFixed(0) : '–'} →{' '}
+                  {data.metrics.hhi_last_year != null ? data.metrics.hhi_last_year.toFixed(0) : '–'}
                 </p>
                 <p className="text-xs text-gray-500 mt-1">{t('budget_page.metric_hhi_hint')}</p>
               </CardContent>
@@ -441,7 +441,7 @@ export default function BudgetPage() {
                   <Tooltip
                     formatter={(value) => {
                       const n = typeof value === 'number' ? value : Number(value);
-                      const label = Number.isFinite(n) ? `${n.toFixed(4)} bn` : '—';
+                      const label = Number.isFinite(n) ? `${n.toFixed(4)} bn` : '–';
                       return [label, t('budget_page.tooltip_weighted')];
                     }}
                     labelClassName="font-medium"
@@ -513,7 +513,7 @@ export default function BudgetPage() {
             </Card>
           )}
 
-          <Card className="border-l-4 border-l-amber-400 bg-gradient-to-br from-amber-50/50 via-white to-white shadow-sm">
+          <Card className="border-l-[3px] border-l-amber-400">
             <CardHeader className="pb-2">
               <CardTitle className="flex items-center gap-2 text-lg text-slate-900">
                 <Sparkles className="h-5 w-5 text-amber-600" />
@@ -621,12 +621,12 @@ export default function BudgetPage() {
                       </td>
                       <td className="py-2 pr-3 text-xs">{componentLabel(row.component)}</td>
                       <MoverCagrCell row={row} t={t} />
-                      <td className="py-2 pr-3">{row.total_change_pct != null ? `${row.total_change_pct}%` : '—'}</td>
+                      <td className="py-2 pr-3">{row.total_change_pct != null ? `${row.total_change_pct}%` : '–'}</td>
                       <td className="py-2 pr-3 font-mono text-xs">
                         {ppt === 0 ? '0' : `${ppt > 0 ? '+' : ''}${ppt}`}
                       </td>
                       <td className="py-2 pr-3 font-mono text-xs">
-                        {row.rank_first_year ?? '—'} → {row.rank_last_year ?? '—'}
+                        {row.rank_first_year ?? '–'} → {row.rank_last_year ?? '–'}
                       </td>
                     </tr>
                     );
@@ -697,7 +697,7 @@ export default function BudgetPage() {
             {snapshot && (
               <CardContent className="space-y-4">
                 <p className="text-sm text-slate-700">
-                  FY{snapshot.fiscal_year} — {snapshot.total_weighted_lcu_bn.toFixed(4)} bn LCU (
+                  FY{snapshot.fiscal_year}: {snapshot.total_weighted_lcu_bn.toFixed(4)} bn LCU (
                   {t('budget_page.snapshot_indicator_count', { n: snapshot.indicator_rows })})
                 </p>
                 <div className="overflow-x-auto max-h-[360px] overflow-y-auto">

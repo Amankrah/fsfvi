@@ -142,7 +142,7 @@ export function PlanVsActualCard({ plan, actuals }: PlanVsActualCardProps) {
           <div>
             <p className="text-xs text-gray-500">{t('overview.budget_allocated') || 'Budget Allocated'}</p>
             <p className="text-lg font-semibold text-gray-900">
-              {totalActualBudget > 0 ? formatRWFCompact(totalActualBudget) : '—'}
+              {totalActualBudget > 0 ? formatRWFCompact(totalActualBudget) : '–'}
             </p>
             {totalActualBudget > 0 && totalPlannedBudget > 0 && (
               <p className="text-[10px] text-gray-400">
@@ -157,7 +157,7 @@ export function PlanVsActualCard({ plan, actuals }: PlanVsActualCardProps) {
                 {latestActual.delta > 0 ? '+' : ''}{(latestActual.delta * 100).toFixed(2)}%
               </p>
             ) : (
-              <p className="text-lg font-semibold text-gray-400">—</p>
+              <p className="text-lg font-semibold text-gray-400">–</p>
             )}
           </div>
         </div>
@@ -233,7 +233,7 @@ export function PlanVsActualCard({ plan, actuals }: PlanVsActualCardProps) {
                       </span>
                     ) : (
                       <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-500">
-                        —
+                        –
                       </span>
                     )}
                   </div>

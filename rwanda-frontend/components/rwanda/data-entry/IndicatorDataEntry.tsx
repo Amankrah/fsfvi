@@ -551,7 +551,7 @@ export function IndicatorDataEntry() {
                                 handleFieldChange(ind.id, 'observed_value', e.target.value)
                               }
                               className="text-right h-8 text-sm"
-                              placeholder="—"
+                              placeholder="–"
                             />
                           </td>
                           <td className="py-2">
@@ -563,7 +563,7 @@ export function IndicatorDataEntry() {
                                 handleFieldChange(ind.id, 'benchmark_value', e.target.value)
                               }
                               className="text-right h-8 text-sm"
-                              placeholder="—"
+                              placeholder="–"
                             />
                           </td>
                         </tr>

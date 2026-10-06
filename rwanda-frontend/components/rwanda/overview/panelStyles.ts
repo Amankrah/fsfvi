@@ -1,3 +1,3 @@
 /** Shared visual shell for National Overview panels (and related dashboard home cards). */
 export const overviewPanelClass =
-  'rounded-2xl border-slate-200/80 bg-white/95 shadow-sm ring-1 ring-slate-900/[0.04] transition-shadow duration-200 hover:shadow-md supports-[backdrop-filter]:backdrop-blur-[2px]';
+  'rounded-lg border-slate-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04),0_1px_3px_rgba(15,23,42,0.06)] transition-shadow duration-200 hover:shadow-[0_2px_6px_rgba(15,23,42,0.08)]';

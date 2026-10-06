@@ -10,7 +10,7 @@ const RWANDA_API_BASE_URL =
 let refreshPromise: Promise<boolean> | null = null;
 
 /**
- * POST /api/auth/refresh/ — returns true if access (and refresh) tokens were stored.
+ * POST /api/auth/refresh/: returns true if access (and refresh) tokens were stored.
  */
 export function tryRefreshAccessToken(): Promise<boolean> {
   if (refreshPromise) return refreshPromise;

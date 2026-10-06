@@ -97,7 +97,7 @@ export function RoiAnalysis({ data }: RoiAnalysisProps) {
       {/* Highlight Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Best ROI */}
-        <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-lg p-5 border border-green-200">
+        <div className="bg-emerald-50 rounded-lg p-5 border border-emerald-200">
           <div className="flex items-start justify-between">
             <div>
               <div className="flex items-center gap-2">
@@ -122,7 +122,7 @@ export function RoiAnalysis({ data }: RoiAnalysisProps) {
         </div>
 
         {/* Lowest ROI */}
-        <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-lg p-5 border border-amber-200">
+        <div className="bg-amber-50 rounded-lg p-5 border border-amber-200">
           <div className="flex items-start justify-between">
             <div>
               <div className="flex items-center gap-2">

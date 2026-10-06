@@ -112,7 +112,7 @@ export function NationalOverview() {
             setPlanActuals(actualsData);
           }
         } catch {
-          // No plan saved — that's fine
+          // No plan saved: that's fine
           setActivePlan(null);
           setFullPlan(null);
           setPlanActuals([]);
@@ -130,7 +130,7 @@ export function NationalOverview() {
 
   if (loading) {
     return (
-      <div className="flex min-h-[400px] flex-col items-center justify-center rounded-2xl border border-slate-200/60 bg-white/60 px-6 py-16 ring-1 ring-slate-900/[0.03]">
+      <div className="flex min-h-[400px] flex-col items-center justify-center rounded-lg border border-slate-200 bg-white px-6 py-16">
         <Loader2 className="h-8 w-8 animate-spin text-[var(--rw-blue)]" />
         <span className="mt-3 text-sm text-slate-600">Loading dashboard...</span>
       </div>
@@ -144,15 +144,15 @@ export function NationalOverview() {
       <div className="space-y-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div className="relative min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-wider text-[var(--rw-blue)]">{fiscalYear.label}</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--rw-blue-deep)]">{fiscalYear.label}</p>
             <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
               {t('overview.national_fsfi')}
             </h1>
-            <div className="mt-3 h-1.5 w-24 rounded-full bg-gradient-to-r from-[var(--rw-blue)] to-[var(--rw-green)] shadow-sm shadow-[var(--rw-blue)]/20" />
+            <div className="rw-flag-rule mt-3 h-1 w-20 rounded-full" aria-hidden />
           </div>
           <FiscalYearSelector />
         </div>
-        <div className="flex min-h-[400px] flex-col items-center justify-center rounded-2xl border border-slate-200/70 bg-white/80 px-6 py-14 text-center ring-1 ring-slate-900/[0.04]">
+        <div className="flex min-h-[400px] flex-col items-center justify-center rounded-lg border border-slate-200 bg-white px-6 py-14 text-center">
           <AlertTriangle className="mb-4 h-12 w-12 text-amber-500" />
           <h2 className="mb-2 text-lg font-semibold text-slate-900">No Assessment Data</h2>
           <p className="max-w-md text-slate-600">
@@ -185,19 +185,18 @@ export function NationalOverview() {
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div className="relative min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-wider text-[var(--rw-blue)]">{fiscalYear.label}</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--rw-blue-deep)]">{fiscalYear.label}</p>
           <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
             {t('overview.national_fsfi')}
           </h1>
-          <div className="mt-3 h-1.5 w-24 rounded-full bg-gradient-to-r from-[var(--rw-blue)] to-[var(--rw-green)] shadow-sm shadow-[var(--rw-blue)]/20" />
+          <div className="rw-flag-rule mt-3 h-1 w-20 rounded-full" aria-hidden />
         </div>
         <FiscalYearSelector />
       </div>
 
       {/* Headline: national FSFSI (dominant scan layer) */}
-      <Card
-        className={`${overviewPanelClass} border-2 border-slate-200/90 bg-gradient-to-br from-white via-slate-50/40 to-[var(--rw-blue)]/[0.06] shadow-md ring-1 ring-slate-900/[0.04]`}
-      >
+      <Card className={`${overviewPanelClass} relative overflow-hidden`}>
+        <div className="rw-flag-rule absolute inset-x-0 top-0 h-[3px]" aria-hidden />
         <CardContent className="p-6 sm:p-8">
           <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
             <div className="min-w-0 flex-1">
@@ -226,7 +225,7 @@ export function NationalOverview() {
               {(dashboardData.weighting_method || dashboardData.scenario) && (
                 <p className="mt-2 text-sm leading-snug text-slate-500">
                   Latest run:{' '}
-                  <span className="font-medium text-slate-700">{dashboardData.weighting_method ?? '—'}</span>
+                  <span className="font-medium text-slate-700">{dashboardData.weighting_method ?? '–'}</span>
                   {dashboardData.scenario ? (
                     <>
                       {' '}
@@ -247,35 +246,38 @@ export function NationalOverview() {
 
       {/* Supporting KPIs */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <Card className={`${overviewPanelClass} border-l-4 ${improving ? 'border-l-emerald-500' : 'border-l-red-500'}`}>
+        <Card className={overviewPanelClass}>
           <CardContent className="p-5 sm:p-6">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="text-sm font-semibold uppercase tracking-wide text-slate-600">
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
                   {t('overview.yoy_change')}
                 </p>
-                <p className={`mt-2 text-4xl font-bold tabular-nums sm:text-5xl ${improving ? 'text-emerald-600' : 'text-red-600'}`}>
+                <p className={`mt-2 text-4xl font-bold tabular-nums sm:text-[2.75rem] ${improving ? 'text-emerald-700' : 'text-red-700'}`}>
                   {improving ? '' : '+'}
                   {yoyChange.toFixed(1)}%
                 </p>
               </div>
-              {improving ? (
-                <TrendingDown className="h-10 w-10 shrink-0 text-emerald-500" />
-              ) : (
-                <TrendingUp className="h-10 w-10 shrink-0 text-red-500" />
-              )}
+              <span
+                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-md ring-1 ${
+                  improving ? 'bg-emerald-50 text-emerald-700 ring-emerald-200' : 'bg-red-50 text-red-700 ring-red-200'
+                }`}
+                aria-hidden
+              >
+                {improving ? <TrendingDown className="h-5 w-5" /> : <TrendingUp className="h-5 w-5" />}
+              </span>
             </div>
           </CardContent>
         </Card>
 
-        <Card className={`${overviewPanelClass} border-l-4 border-l-[var(--risk-critical)]`}>
+        <Card className={overviewPanelClass}>
           <CardContent className="p-5 sm:p-6">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold uppercase tracking-wide text-slate-600">
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
                   {t('overview.critical_components')}
                 </p>
-                <p className="mt-2 text-4xl font-bold tabular-nums text-slate-900 sm:text-5xl">{criticalComponents}</p>
+                <p className="mt-2 text-4xl font-bold tabular-nums text-slate-900 sm:text-[2.75rem]">{criticalComponents}</p>
                 <p className="mt-2 text-sm leading-snug text-slate-600">
                   {t('overview.critical_components_of', { critical: criticalComponents, total: totalComponents })}
                 </p>
@@ -287,7 +289,7 @@ export function NationalOverview() {
                     ) : null}
                   </p>
                 ) : null}
-                <div className="mt-4 h-2.5 w-full overflow-hidden rounded-full bg-slate-100 ring-1 ring-slate-200/80">
+                <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-slate-100">
                   <div
                     className="h-full rounded-full bg-[var(--risk-critical)] transition-[width] duration-500"
                     style={{
@@ -296,23 +298,33 @@ export function NationalOverview() {
                   />
                 </div>
               </div>
-              <AlertTriangle className="h-10 w-10 shrink-0 text-red-500" />
+              <span
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-red-50 text-red-700 ring-1 ring-red-200"
+                aria-hidden
+              >
+                <AlertTriangle className="h-5 w-5" />
+              </span>
             </div>
           </CardContent>
         </Card>
 
-        <Card className={`${overviewPanelClass} border-l-4 border-l-[var(--rw-green)] sm:col-span-2 lg:col-span-1`}>
+        <Card className={`${overviewPanelClass} sm:col-span-2 lg:col-span-1`}>
           <CardContent className="p-5 sm:p-6">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="text-sm font-semibold uppercase tracking-wide text-slate-600">
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
                   {t('overview.total_budget')}
                 </p>
                 <p className="mt-2 text-3xl font-bold tabular-nums text-slate-900 sm:text-4xl">
                   {formatRWFCompact(dashboardData.total_budget_lcu_bn * 1_000_000_000)}
                 </p>
               </div>
-              <DollarSign className="h-10 w-10 shrink-0 text-[var(--rw-green)]" />
+              <span
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-[var(--rw-green)]/10 text-[var(--rw-green)] ring-1 ring-[var(--rw-green)]/20"
+                aria-hidden
+              >
+                <DollarSign className="h-5 w-5" />
+              </span>
             </div>
           </CardContent>
         </Card>
@@ -384,7 +396,7 @@ export function NationalOverview() {
 
       {/* Strategic Plan Excerpt */}
       {activePlan && (
-        <Card className="rounded-2xl border border-emerald-200/50 bg-gradient-to-r from-emerald-50/90 via-white/80 to-teal-50/40 shadow-sm ring-1 ring-emerald-900/[0.06] transition-shadow duration-200 hover:shadow-md supports-[backdrop-filter]:backdrop-blur-[2px]">
+        <Card className={`${overviewPanelClass} border-l-[3px] border-l-[var(--rw-green)]`}>
           <CardContent className="p-5">
             <div className="flex items-start justify-between">
               <div className="flex items-start space-x-3">

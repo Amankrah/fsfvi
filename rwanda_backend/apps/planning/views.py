@@ -4,6 +4,7 @@ Planning API – multi-year strategic plan, MTEF, and saved plans.
 Assessment-based endpoints (preferred — assessment is source of truth):
   GET  /api/planning/<assessment_id>/multi-year/
   GET  /api/planning/<assessment_id>/mtef/
+  POST /api/planning/<assessment_id>/investment-scenario/
 
 Saved plans:
   POST   /api/planning/saved-plans/              — save a plan (name unique per fiscal year, case-insensitive)
@@ -27,6 +28,7 @@ from rest_framework.views import APIView
 from .models import PlanYearActual, SavedStrategicPlan
 from .serializers import (
     AllocationSimulateSerializer,
+    InvestmentScenarioRequestSerializer,
     PlanYearActualSerializer,
     PlanYearActualSummarySerializer,
     SavedPlanExcerptSerializer,
@@ -44,6 +46,7 @@ from .services import (
     get_psta5_tracker_data,
     mtef_for_assessment,
     plan_for_assessment,
+    run_investment_scenario_for_assessment,
     simulate_user_allocation_year,
 )
 
@@ -152,6 +155,60 @@ class AssessmentAllocationSimulateView(APIView):
                     status=status.HTTP_404_NOT_FOUND,
                 )
             logger.exception("Allocation simulation failed")
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        if isinstance(result, dict) and result.get("error"):
+            return Response(result, status=status.HTTP_400_BAD_REQUEST)
+        return Response(result)
+
+
+class AssessmentInvestmentScenarioView(APIView):
+    """
+    POST /api/planning/<assessment_id>/investment-scenario/
+
+    Counterfactual **indicator-level** FSFSI after adding an envelope (bn LCU mapped budgets)
+    on top of the national baseline for the assessment year. Includes PSTA-5 alignment of the
+    envelope alone (donor / partner program mix vs PA targets).
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, assessment_id):
+        ser = InvestmentScenarioRequestSerializer(data=request.data)
+        if not ser.is_valid():
+            return Response(ser.errors, status=status.HTTP_400_BAD_REQUEST)
+        data = ser.validated_data
+        try:
+            hib_raw = data.get("higher_is_better_by_indicator")
+            result = run_investment_scenario_for_assessment(
+                str(assessment_id),
+                program_name=str(data.get("program_name") or ""),
+                indicator_codes=list(data["indicator_codes"]) if data.get("indicator_codes") else None,
+                total_investment_bn=data.get("total_investment_bn"),
+                higher_is_better_by_indicator=dict(hib_raw) if hib_raw else None,
+                by_indicator=dict(data["by_indicator"]) if data.get("by_indicator") else None,
+                by_component=dict(data["by_component"]) if data.get("by_component") else None,
+                project_fiscal_year=data.get("project_fiscal_year"),
+                investment_by_fiscal_year=(
+                    dict(data.get("investment_by_fiscal_year") or {}) or None
+                ),
+                strategic_plan_id=str(data["strategic_plan_id"])
+                if data.get("strategic_plan_id")
+                else None,
+                weighting_method=data.get("weighting_method") or "hybrid",
+                scenario=data.get("scenario") or "normal_operations",
+            )
+        except Exception as e:
+            error_name = type(e).__name__
+            if "DoesNotExist" in error_name:
+                return Response(
+                    {"error": f"Assessment {assessment_id} not found"},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+            logger.exception("Investment scenario failed")
             return Response(
                 {"error": str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,

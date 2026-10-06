@@ -168,7 +168,7 @@ class Command(BaseCommand):
             dist = ref_distributions.get(code)
             if not dist:
                 continue
-            source_label = ref_sources.get(code, "—")
+            source_label = ref_sources.get(code, "–")
             higher = ind.higher_is_better
 
             if higher:
@@ -183,10 +183,10 @@ class Command(BaseCommand):
                 gap_raw = obs - computed_bench
                 gap_note = f"Gap (obs - bench): {gap_raw:+.4f}. {'Above benchmark (good)' if higher and gap_raw >= 0 else 'Below benchmark' if higher else 'Below benchmark (good)' if not higher and gap_raw <= 0 else 'Above benchmark (worse)'}"
             else:
-                gap_note = "—"
+                gap_note = "–"
 
             direction = "higher=better" if higher else "lower=better"
-            stored = f"{float(rec.benchmark_value):.4f}" if rec.benchmark_value is not None else "—"
+            stored = f"{float(rec.benchmark_value):.4f}" if rec.benchmark_value is not None else "–"
             self.stdout.write(
                 f"  {code} ({ind.name[:40]})\n"
                 f"    Source: {source_label}\n"
@@ -194,7 +194,7 @@ class Command(BaseCommand):
                 f"    Reference: n={len(dist)} countries, min={min(dist):.2f}, max={max(dist):.2f}\n"
                 f"    Computed benchmark: {computed_bench:.4f} {ind.unit or ''}\n"
                 f"    Stored benchmark:   {stored} (from sheet/DB)\n"
-                f"    Rwanda observed:    {obs if obs is not None else '—'}\n"
+                f"    Rwanda observed:    {obs if obs is not None else '–'}\n"
                 f"    {gap_note}\n"
             )
 

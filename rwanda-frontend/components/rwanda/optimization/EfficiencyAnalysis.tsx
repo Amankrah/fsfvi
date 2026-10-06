@@ -84,19 +84,19 @@ export function EfficiencyAnalysis({ data, context }: EfficiencyAnalysisProps) {
 
     const parts: string[] = [];
     parts.push(
-      `At mapped sector budgets totaling about ${formatRWFCompact(data.total_budget_lcu)}, the assessed point-in-time FSFSI is ${formatScore(data.current_fsfsi)}. `,
+      `With mapped sector budgets of about ${formatRWFCompact(data.total_budget_lcu)}, the point-in-time FSFSI is ${formatScore(data.current_fsfsi)}. `,
     );
     parts.push(
-      `The engine’s closed-form optimal mix for the same total budget implies FSFSI near ${formatScore(data.optimal_fsfsi)} — about ${(data.waste_ratio * 100).toFixed(1)}% financing slack versus that benchmark. `,
+      `The optimal mix for the same total budget gives an FSFSI of about ${formatScore(data.optimal_fsfsi)}, which means roughly ${(data.waste_ratio * 100).toFixed(1)}% of financing slack against that benchmark. `,
     );
     if (under.length) {
       parts.push(
-        `Largest modeled shortfalls vs optimal shares: ${under.map((c) => `${displayName(c)} (${formatRWFCompact(c.allocation_gap_lcu)})`).join('; ')}. `,
+        `Largest modelled shortfalls against the optimal shares: ${under.map((c) => `${displayName(c)} (${formatRWFCompact(c.allocation_gap_lcu)})`).join('; ')}. `,
       );
     }
     if (over.length) {
       parts.push(
-        `Largest modeled surpluses (reallocation sources): ${over.map((c) => `${displayName(c)} (${formatRWFCompact(Math.abs(c.allocation_gap_lcu))})`).join('; ')}.`,
+        `Largest modelled surpluses, which are the sources for reallocation: ${over.map((c) => `${displayName(c)} (${formatRWFCompact(Math.abs(c.allocation_gap_lcu))})`).join('; ')}.`,
       );
     }
     return parts.join('').trim();
@@ -124,10 +124,10 @@ export function EfficiencyAnalysis({ data, context }: EfficiencyAnalysisProps) {
           <p>
             <strong>Point-in-time FSFSI</strong> ({formatScore(data.current_fsfsi)}) comes from the saved assessment
             for <strong>{context.fiscalYearLabel}</strong>
-            {context.assessmentName ? ` — ${context.assessmentName}` : ''} using{' '}
-            <strong>{context.weightingLabel}</strong> and scenario <strong>{context.scenarioLabel}</strong> (
-            {context.indicatorCount} indicators). National Overview may show <strong>cumulative</strong> stress
-            (higher when persistence is enabled); that is not a data error.
+            {context.assessmentName ? ` (${context.assessmentName})` : ''}, using{' '}
+            <strong>{context.weightingLabel}</strong> weighting and the <strong>{context.scenarioLabel}</strong>{' '}
+            scenario ({context.indicatorCount} indicators). The National Overview may show{' '}
+            <strong>cumulative</strong> stress instead, which is higher when persistence is enabled. That is expected.
             {context.cumulativeFsfsi != null ? (
               <>
                 {' '}
@@ -164,7 +164,7 @@ export function EfficiencyAnalysis({ data, context }: EfficiencyAnalysisProps) {
         <div className="flex items-center justify-between mb-4">
           <div>
             <h3 className="text-sm font-semibold text-gray-900">Efficiency index</h3>
-            <p className="text-xs text-gray-500">Optimal FSFSI ÷ actual FSFSI — 100% means allocations match benchmark mix</p>
+            <p className="text-xs text-gray-500">Optimal FSFSI divided by actual FSFSI. 100% means allocations match the benchmark mix.</p>
           </div>
           <div className="text-right">
             <span className={`text-3xl font-bold ${getEfficiencyColor(data.efficiency_index)}`}>
@@ -190,10 +190,10 @@ export function EfficiencyAnalysis({ data, context }: EfficiencyAnalysisProps) {
             <AlertCircle className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
             <div className="text-sm">
               <p className="font-medium text-amber-800">
-                {(data.waste_ratio * 100).toFixed(1)}% budget inefficiency vs optimal mix
+                {(data.waste_ratio * 100).toFixed(1)}% budget inefficiency against the optimal mix
               </p>
               <p className="text-amber-700 text-xs mt-0.5">
-                Current mapped allocations could be rebalanced to reduce FSFSI further without changing total envelope.
+                Current allocations could be rebalanced to reduce FSFSI further without changing the total envelope.
               </p>
             </div>
           </div>
@@ -211,8 +211,8 @@ export function EfficiencyAnalysis({ data, context }: EfficiencyAnalysisProps) {
         <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
           <h3 className="text-sm font-semibold text-gray-900">Component allocation (current vs optimal)</h3>
           <p className="text-xs text-gray-500 mt-1">
-            Percent gaps can be very large when current mapped spend in a sector is small; interpret with programme and
-            data-mapping context — not as a literal single-year spending mandate.
+            Percentage gaps can be very large when current mapped spending in a sector is small. Read them with the
+            programme and data-mapping context in mind, not as a single-year spending instruction.
           </p>
         </div>
         <div className="overflow-x-auto">
@@ -247,7 +247,7 @@ export function EfficiencyAnalysis({ data, context }: EfficiencyAnalysisProps) {
                       <span className="inline-flex items-center gap-1">
                         {displayName(item)}
                         {extremePct ? (
-                          <span title="Large % often means a tiny baseline allocation in the model, not necessarily an actionable year-one increase.">
+                          <span title="A large percentage usually reflects a very small baseline allocation in the model, not a realistic first-year increase.">
                             <Info className="h-3.5 w-3.5 text-slate-400 shrink-0" />
                           </span>
                         ) : null}

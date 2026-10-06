@@ -461,48 +461,51 @@ def _build_policy_insights(
     cagr_weighted_pct: float | None,
     vol_yoy: float,
 ) -> list[str]:
-    """Implication-first lines for ministry / IFI audiences; facts support the lead clause."""
+    """Plain-language findings for ministry and partner readers. Each line states the fact, then the action."""
     out: list[str] = []
     y0, y1 = year_list[0], year_list[-1]
     w0 = totals[y0]["weighted_lcu_bn"]
     w1 = totals[y1]["weighted_lcu_bn"]
 
     if cagr_weighted_pct is not None:
+        verb = "grew" if cagr_weighted_pct >= 0 else "fell"
         out.append(
-            f"For multi-year ceilings and partner dialogue, anchor on roughly {cagr_weighted_pct:+.1f}% "
-            f"annual growth in the mapped national total (CAGR FY{y0}–FY{y1}; {w0:.2f}→{w1:.2f} bn LCU). "
-            f"Step-changes in the series should be validated against mapping methodology—not attributed to outturn alone."
+            f"The mapped national total {verb} by about {abs(cagr_weighted_pct):.1f}% a year between FY{y0} and FY{y1} "
+            f"(from {w0:.2f} to {w1:.2f} bn LCU). Use this rate as the reference for multi-year ceilings and partner "
+            f"discussions. Check large single-year jumps against the mapping method before treating them as real spending."
         )
     else:
         out.append(
-            f"The mapped national envelope moves from {w0:.2f} bn (FY{y0}) to {w1:.2f} bn (FY{y1})—"
-            f"use the fiscal-year chart to see which jumps need a mapping vs execution explanation before briefing."
+            f"The mapped national total moved from {w0:.2f} bn LCU in FY{y0} to {w1:.2f} bn LCU in FY{y1}. "
+            f"Use the fiscal-year chart to identify which jumps reflect spending and which reflect changes in mapping."
         )
 
     if vol_yoy > 8:
         out.append(
-            f"Planning and contingency buffers should reflect high noise: YoY changes in the mapped total swing "
-            f"widely (typical scale ≈ {vol_yoy:.1f} pp). Outer-year MTEF lines remain sensitive until mapping stabilises."
+            f"Year-on-year changes in the mapped total are large, with a typical swing of about {vol_yoy:.1f} "
+            f"percentage points. Planning and contingency buffers should allow for this. Outer-year MTEF figures will "
+            f"stay uncertain until the mapping is stable."
         )
     elif vol_yoy > 0:
         out.append(
-            f"Expect moderate year-to-year variability in the national mapped total (≈{vol_yoy:.1f} pp typical YoY scale)—"
-            f"usually workable if programmes are steady, but still reconcile spikes with execution data."
+            f"Year-on-year changes in the mapped total are moderate, with a typical swing of about {vol_yoy:.1f} "
+            f"percentage points. This is manageable where programmes are steady, but spikes should still be checked "
+            f"against execution data."
         )
 
-    # Largest composition shifts — lead with reallocation / PSTA implication
+    # Largest composition shifts
     drift_sorted = [x for x in share_drift if abs(x["ppt_change"]) >= 1.0][:4]
     for d in drift_sorted:
         c = d["component"].replace("_", " ").title() or "Unknown"
         ppt = d["ppt_change"]
-        direction = "gaining" if ppt > 0 else "losing"
+        direction = "rose" if ppt > 0 else "fell"
         out.append(
-            f"Reallocation narratives for {c} need explicit review: its share of the mapped total is {direction} "
-            f"by {ppt:+.1f} pp ({d['share_first_year_pct']:.1f}%→{d['share_last_year_pct']:.1f}%). "
-            f"Do not assume continuity—align PSTA/PSTA storylines and ministerial briefings with this shift."
+            f"The share of the mapped total going to {c} {direction} by {abs(ppt):.1f} percentage points, from "
+            f"{d['share_first_year_pct']:.1f}% to {d['share_last_year_pct']:.1f}%. Review whether PSTA 5 narratives and "
+            f"ministerial briefings reflect this shift rather than assuming the earlier mix."
         )
 
-    # Steepest YoY drop — credibility / benchmark caveat
+    # Steepest year-on-year drop
     worst = None
     for p in national_trend:
         yv = p.get("yoy_weighted_pct")
@@ -512,12 +515,11 @@ def _build_policy_insights(
             worst = (yv, p["year"])
     if worst and worst[0] < -5:
         out.append(
-            f"Treat FY{worst[1]} as a credibility checkpoint before using it as a benchmark: the mapped total fell "
-            f"about {worst[0]:.1f}% YoY—disentangle in-year cuts, reclassification, and mapping updates before "
-            f"drawing policy conclusions."
+            f"The mapped total fell by about {abs(worst[0]):.1f}% in FY{worst[1]}. Before using that year as a "
+            f"benchmark, separate in-year cuts from reclassification and mapping updates."
         )
 
-    # Indicators — credible CAGR vs small-base / extreme % (misleading headline)
+    # Indicators with high growth: distinguish credible growth from a very small base
     big_growers = [m for m in indicator_movers if (m.get("cagr_pct") or 0) > 8][:3]
     for m in big_growers:
         label = _insight_short_name(m.get("name") or "")
@@ -525,24 +527,24 @@ def _build_policy_insights(
         cgr = float(m["cagr_pct"])
         if _cagr_is_unreliable_headline(m):
             out.append(
-                f"Do not prioritise on headline CAGR alone for {m['code']} ({label}): the rate is ~{cgr:.0f}% but "
-                f"opened from a very small weighted base ({v0m:.3f} bn). For trade-offs, lean on share change (ppt), "
-                f"programme delivery, and field verification—not this percentage alone."
+                f"{m['code']} ({label}) shows growth of about {cgr:.0f}% a year, but it started from a very small "
+                f"base of {v0m:.3f} bn. Do not prioritise on this percentage alone. Use the change in share, programme "
+                f"delivery and field verification instead."
             )
         else:
             out.append(
-                f"Stress-test continued protection or expansion of {m['code']} ({label}): weighted allocation "
-                f"compounded near {cgr:.1f}% per year—decide explicitly whether MTEF space here should trade off against "
-                f"other components and FSFI risk hotspots."
+                f"{m['code']} ({label}) grew at about {cgr:.1f}% a year in weighted allocation. Decide explicitly "
+                f"whether MTEF space for this indicator should continue at the expense of other components and FSFI "
+                f"risk areas."
             )
 
     fallers = [m for m in indicator_movers if (m.get("total_change_pct") or 0) < -25][:2]
     for m in fallers:
         nm = _insight_short_name(m.get("name") or "")
         out.append(
-            f"Before interpreting ~{abs(m['total_change_pct']):.0f}% lower weighted spend on {m['code']} ({nm}) as "
-            f"efficiency or de-prioritisation, confirm policy intent versus reclassification and data continuity—"
-            f"otherwise briefing lines may mis-state ministry direction."
+            f"Weighted spending on {m['code']} ({nm}) is about {abs(m['total_change_pct']):.0f}% lower than at the "
+            f"start of the window. Confirm whether this reflects a policy decision, a reclassification or a data gap "
+            f"before describing it as efficiency or de-prioritisation."
         )
 
     h0 = hhi_by_year.get(y0)
@@ -552,24 +554,23 @@ def _build_policy_insights(
         if abs(dh) > 300:
             if dh > 0:
                 out.append(
-                    f"Risk posture tightens: the budget mix became more concentrated (HHI ~{h0:.0f}→{h1:.0f}). "
-                    f"If leading components underperform, shocks propagate faster—diversify mitigation in plans and "
-                    f"donor conversations."
+                    f"The budget mix became more concentrated (HHI from about {h0:.0f} to {h1:.0f}). If the leading "
+                    f"components underperform, the effect on the whole system is larger. Build this into risk "
+                    f"mitigation in plans and donor discussions."
                 )
             else:
                 out.append(
-                    f"Spread improves oversight burden: the portfolio became less concentrated "
-                    f"(HHI ~{h0:.0f}→{h1:.0f}). More components move the needle—coordinate prioritisation so "
-                    f"messaging stays coherent across sectors."
+                    f"The budget mix became less concentrated (HHI from about {h0:.0f} to {h1:.0f}). More components "
+                    f"now matter to the total, so prioritisation across sectors needs to be coordinated."
                 )
 
     fb0 = quality_by_year[0]["fallback_share_pct"] if quality_by_year else 0
     fb1 = quality_by_year[-1]["fallback_share_pct"] if quality_by_year else 0
     if fb1 - fb0 > 3:
         out.append(
-            f"Transparency to Parliament and IFIs weakens unless addressed: fallback (estimated) mapping rose "
-            f"(~{fb0:.1f}%→~{fb1:.1f}% of lines). Prioritise firmer programme-to-indicator linkage so "
-            f"directly mapped confidence improves in future briefings."
+            f"The share of budget lines mapped by fallback estimate rose from about {fb0:.1f}% to {fb1:.1f}%. "
+            f"This weakens traceability for Parliament and development partners. Strengthen the link between "
+            f"programmes and indicators so that more lines are mapped directly."
         )
 
     return out

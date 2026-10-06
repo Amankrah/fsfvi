@@ -125,6 +125,27 @@ class AssessmentService:
         )
         return _from_json(result_json)
 
+    def run_indicator_investment_scenario(
+        self,
+        indicators: list[dict],
+        investment: dict,
+        weighting_method: str = "hybrid",
+        scenario: str = "normal_operations",
+        fiscal_year: int = 2025,
+    ) -> dict:
+        """
+        Baseline vs counterfactual FSFSI after adding an envelope (bn LCU) per indicator
+        and/or split equally across indicators in each component. Computed in Rust.
+        """
+        result_json = fsfi_engine.py_indicator_investment_scenario(
+            _to_json(indicators),
+            _to_json(investment),
+            weighting_method,
+            scenario,
+            fiscal_year,
+        )
+        return _from_json(result_json)
+
     def quick_check(self, components: list[dict]) -> dict:
         """
         Run quick FSFSI check (lightweight assessment).

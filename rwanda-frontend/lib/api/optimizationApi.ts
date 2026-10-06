@@ -55,7 +55,7 @@ interface ComponentInput {
 
 export const optimizationAPI = {
   // ==========================================================================
-  // Assessment-based methods (preferred — assessment is source of truth)
+  // Assessment-based methods (preferred: assessment is source of truth)
   // ==========================================================================
 
   /**

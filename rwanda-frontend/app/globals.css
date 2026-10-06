@@ -1,19 +1,34 @@
 @import "tailwindcss";
 
 :root {
-  /* Rwanda Flag Colors */
+  /* Rwanda flag (official) */
   --rw-blue: #00A1DE;
   --rw-green: #20603D;
   --rw-yellow: #FAD201;
+  --rw-sun: #E5BE01;
 
-  /* Government UI Colors */
-  --rw-dark: #1A1A2E;
-  --rw-gray-900: #111827;
-  --rw-gray-600: #4B5563;
-  --rw-gray-100: #F3F4F6;
+  /* Institutional palette derived from the flag.
+     --rw-blue is a light sky blue and fails contrast as text on white;
+     use --rw-blue-deep for links, active states and solid buttons. */
+  --rw-blue-deep: #0B6E9E;
+  --rw-blue-ink: #0A4F72;
+  --rw-navy: #0B1F3A;
+  --rw-navy-900: #071428;
+  --rw-green-deep: #184A2F;
+
+  /* Back-compat alias (formerly a purplish #1A1A2E). */
+  --rw-dark: var(--rw-navy);
+
+  /* Neutrals */
+  --rw-gray-900: #0F172A;
+  --rw-gray-600: #475569;
+  --rw-gray-100: #F1F5F9;
   --rw-white: #FFFFFF;
+  --surface: #F4F6F8;
+  --surface-raised: #FFFFFF;
+  --hairline: #E2E8F0;
 
-  /* FSFI Risk Scale */
+  /* FSFI risk scale */
   --risk-low: #10B981;
   --risk-moderate: #F59E0B;
   --risk-high: #F97316;
@@ -21,29 +36,83 @@
 
   /* Base */
   --background: #ffffff;
-  --foreground: #111827;
+  --foreground: var(--rw-gray-900);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-rw-blue: var(--rw-blue);
+  --color-rw-blue-deep: var(--rw-blue-deep);
+  --color-rw-blue-ink: var(--rw-blue-ink);
   --color-rw-green: var(--rw-green);
+  --color-rw-green-deep: var(--rw-green-deep);
   --color-rw-yellow: var(--rw-yellow);
+  --color-rw-sun: var(--rw-sun);
+  --color-rw-navy: var(--rw-navy);
+  --color-rw-navy-900: var(--rw-navy-900);
   --color-rw-dark: var(--rw-dark);
+  --color-surface: var(--surface);
+  --color-hairline: var(--hairline);
   --color-risk-low: var(--risk-low);
   --color-risk-moderate: var(--risk-moderate);
   --color-risk-high: var(--risk-high);
   --color-risk-critical: var(--risk-critical);
   /* Slightly larger than browser default 16px for accessibility (scales rem-based utilities). */
   --font-sans: var(--font-app), ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-display: var(--font-display), var(--font-app), Georgia, 'Times New Roman', serif;
 }
 
 html {
   font-size: 106.25%;
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
+  font-feature-settings: "kern", "liga", "calt";
+}
+
+/* Numbers in tables and KPIs align when tabular. */
+.tabular-nums,
+table {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Tricolour rule — a thin signature band using the flag's proportions (1/2 blue, 1/4 yellow, 1/4 green). */
+.rw-flag-rule {
+  background: linear-gradient(
+    90deg,
+    var(--rw-blue) 0 50%,
+    var(--rw-yellow) 50% 75%,
+    var(--rw-green) 75% 100%
+  );
+}
+
+/* Vertical variant (used as a left accent on quotes / callouts). */
+.rw-flag-rule-vertical {
+  background: linear-gradient(
+    180deg,
+    var(--rw-blue) 0 50%,
+    var(--rw-yellow) 50% 75%,
+    var(--rw-green) 75% 100%
+  );
+}
+
+/* Subtle paper texture for large flat navy areas (keeps them from looking like a plain fill). */
+.rw-navy-surface {
+  background-color: var(--rw-navy);
+  background-image:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.025), rgba(255, 255, 255, 0) 40%),
+    radial-gradient(120% 80% at 100% 0%, rgba(0, 161, 222, 0.14), transparent 60%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }

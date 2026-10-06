@@ -70,7 +70,7 @@ export interface MultiYearStrategicPlan {
   baseline_fsfvi: number;
   target_fsfvi: number;
   planning_years: number;
-  /** Stamped when plan is generated (saved JSON) — use for simulate parity vs UI dropdown. */
+  /** Stamped when plan is generated (saved JSON): use for simulate parity vs UI dropdown. */
   planning_weighting_method?: string;
   planning_scenario?: string;
   /** FY label for plan index 1 (engine Year 1). */
@@ -132,7 +132,7 @@ export interface AllocationSimulateRequest {
   plan_reference?: {
     projected_cumulative_fsfsi: number;
     year_target_fsfvi: number;
-    /** Rust optimal LCU row — lets the API rebuild the same financial_allocation_lcu as the chart. */
+    /** Rust optimal LCU row: lets the API rebuild the same financial_allocation_lcu as the chart. */
     recommended_allocations?: Record<string, number>;
     plan_total_budget_bn?: number;
     planning_weighting_method?: string;
@@ -153,6 +153,105 @@ export interface AllocationSimulateResponse {
   delta_user_minus_plan_fsfsi?: number;
   user_worse_than_plan_optimal?: boolean;
   user_on_track_vs_plan_target?: boolean;
+  error?: string;
+}
+
+/** POST /api/planning/<assessment_id>/investment-scenario/ */
+export interface InvestmentScenarioRequest {
+  program_name?: string;
+  /** Donor mode: engine splits this total evenly across these codes (bn LCU). */
+  indicator_codes?: string[];
+  total_investment_bn?: number;
+  /**
+   * Donor mode: bn RWF per implementation fiscal year (keys as string years).
+   * Years must be in the selected strategic plan horizon; engine uses the sum as envelope total.
+   */
+  investment_by_fiscal_year?: Record<string, number>;
+  /** Optional per-code gap direction (true = higher observed is better). */
+  higher_is_better_by_indicator?: Record<string, boolean>;
+  /** Legacy: single FY for schedule + total_investment_bn when not using investment_by_fiscal_year. */
+  project_fiscal_year?: number;
+  strategic_plan_id?: string;
+  by_indicator?: Record<string, number>;
+  by_component?: Record<string, number>;
+  weighting_method?: string;
+  scenario?: string;
+}
+
+/** Strategic plan row context returned with investment scenario (donor mode). */
+export interface InvestmentStrategicPlanContext {
+  plan_id: string;
+  plan_name: string;
+  baseline_assessment_fiscal_year: number;
+  project_fiscal_year: number;
+  plan_year_index: number;
+  plan_target_fsfsi: number;
+  plan_projected_fsfsi: number;
+  /** Trajectory baseline FSFSI stored on the plan JSON (assessment anchor). */
+  plan_baseline_fsfsi?: number;
+  planning_start_fiscal_year?: number;
+  investment_by_fiscal_year_bn?: Record<string, number>;
+  comparison_note?: string;
+  donor_scenario_fsfsi?: number;
+  /** scenario FSFSI − plan projected (negative often means lower stress than plan). */
+  delta_scenario_minus_plan_projected?: number;
+  /** scenario FSFSI − plan milestone. */
+  delta_scenario_minus_plan_target?: number;
+  /** plan projected − scenario: extra FSFSI reduction vs trajectory (positive = donor pulls stress below plan path). */
+  additional_fsfsi_reduction_vs_plan_projected?: number;
+  /** plan milestone − scenario: room vs milestone line (positive = ahead of milestone on stress). */
+  additional_fsfsi_reduction_vs_plan_target?: number;
+}
+
+export interface IndicatorInvestmentDeltaRow {
+  indicator_code: string;
+  indicator_component: string;
+  name: string;
+  additional_weighted_bn: number;
+  baseline_stress: number;
+  scenario_stress: number;
+  delta_stress: number;
+  baseline_weighted_stress: number;
+  scenario_weighted_stress: number;
+  delta_weighted_stress: number;
+}
+
+export interface ComponentInvestmentDeltaRow {
+  component: string;
+  baseline_average_stress: number;
+  scenario_average_stress: number;
+  delta_average_stress: number;
+}
+
+export interface InvestmentScenarioResponse {
+  baseline_fsfsi: number;
+  scenario_fsfsi: number;
+  delta_fsfsi: number;
+  baseline_risk_level: string;
+  scenario_risk_level: string;
+  fiscal_year: number;
+  weighting_method: string;
+  scenario_name: string;
+  total_envelope_bn: number;
+  indicator_deltas: IndicatorInvestmentDeltaRow[];
+  component_deltas: ComponentInvestmentDeltaRow[];
+  methodology_note: string;
+  assessment_id?: string;
+  program_name?: string;
+  indicator_selection?: {
+    codes: string[];
+    total_investment_bn: number | null;
+    investment_by_fiscal_year_bn?: Record<string, number> | null;
+    per_indicator_bn: number | null;
+    higher_is_better_by_indicator: Record<string, boolean> | null;
+  };
+  baseline_assessment_fiscal_year?: number;
+  project_fiscal_year?: number | null;
+  comparison_fiscal_year?: number | null;
+  strategic_plan_context?: InvestmentStrategicPlanContext | null;
+  psta5_envelope_alignment?: PSTA5BudgetAlignment | null;
+  envelope_by_component_bn?: Record<string, number>;
+  disclaimer?: string;
   error?: string;
 }
 
@@ -212,7 +311,7 @@ export interface SavedPlanExcerpt {
 }
 
 // ---------------------------------------------------------------------------
-// Plan Year Actuals — Record actual budget allocations per year
+// Plan Year Actuals: Record actual budget allocations per year
 // ---------------------------------------------------------------------------
 
 /** Request to save actual allocation for a plan year */

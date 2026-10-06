@@ -97,7 +97,7 @@ function SavedRunsCompareTable({
                   </td>
                   <td className="px-3 py-2.5 text-right tabular-nums">{formatScore(a.fsfsi_score)}</td>
                   <td className="px-3 py-2.5 text-right tabular-nums text-slate-700">
-                    {a.cumulative_fsfsi != null ? formatScore(a.cumulative_fsfsi) : '—'}
+                    {a.cumulative_fsfsi != null ? formatScore(a.cumulative_fsfsi) : '–'}
                   </td>
                   <td className="px-3 py-2.5">
                     <span className={`inline-flex text-xs font-bold px-2 py-0.5 rounded-full ${getRiskBgColor(level)}`}>
@@ -105,12 +105,12 @@ function SavedRunsCompareTable({
                     </span>
                   </td>
                   <td className="px-3 py-2.5 text-right tabular-nums">
-                    {a.efficiency_index != null ? formatScore(a.efficiency_index) : '—'}
+                    {a.efficiency_index != null ? formatScore(a.efficiency_index) : '–'}
                   </td>
                   <td className="px-3 py-2.5 text-xs text-gray-800">{assessmentWeightingLabel(a.weighting_method, t)}</td>
                   <td className="px-3 py-2.5 text-xs text-gray-800">{assessmentScenarioLabel(a.scenario, t)}</td>
                   <td className="px-3 py-2.5 text-right text-xs text-gray-600 whitespace-nowrap">
-                    {a.computed_at ? formatPolicyDate(a.computed_at, locale) : '—'}
+                    {a.computed_at ? formatPolicyDate(a.computed_at, locale) : '–'}
                   </td>
                 </tr>
               );
@@ -359,7 +359,7 @@ export default function AssessmentPage() {
                 {t('assessment_page.last_updated')}
               </p>
               <p className="text-sm text-gray-800 mt-1 font-medium">
-                {summary.computed_at ? formatPolicyDate(summary.computed_at, locale) : '—'}
+                {summary.computed_at ? formatPolicyDate(summary.computed_at, locale) : '–'}
               </p>
               <p className="text-xs text-gray-500 mt-2 leading-relaxed">
                 {t('assessment_page.data_vintage', { fy: fiscalYear.label })}
@@ -492,7 +492,7 @@ export default function AssessmentPage() {
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-lg">
               <List className="h-5 w-5 text-[var(--rw-blue)]" />
-              Saved assessments — {fiscalYear.label}
+              Saved assessments, {fiscalYear.label}
             </CardTitle>
             <p className="text-sm text-gray-500 font-normal leading-relaxed mt-1">{t('assessment_page.saved_list_intro')}</p>
             {compareIds.length > 0 ? (
@@ -767,8 +767,8 @@ function IndicatorsBreakdownTable({ indicators }: { indicators: SavedIndicatorRe
                   </span>
                 </td>
                 <td className="py-3 pr-4 text-gray-700">{ind.component_display}</td>
-                <td className="py-3 pr-4 text-right tabular-nums">{ind.observed_value != null ? formatScore(ind.observed_value) : '—'}</td>
-                <td className="py-3 pr-4 text-right tabular-nums">{ind.benchmark_value != null ? formatScore(ind.benchmark_value) : '—'}</td>
+                <td className="py-3 pr-4 text-right tabular-nums">{ind.observed_value != null ? formatScore(ind.observed_value) : '–'}</td>
+                <td className="py-3 pr-4 text-right tabular-nums">{ind.benchmark_value != null ? formatScore(ind.benchmark_value) : '–'}</td>
                 <td className="py-3 pr-4 text-right">
                   {(() => {
                     const { className, isGood } = getPerformanceGapDisplay(ind.performance_gap);
@@ -866,7 +866,7 @@ function AssessmentDetailPanel({
         </div>
         <p className="text-xs text-gray-600">
           <span className="font-medium text-gray-700">{t('assessment_page.last_updated')}:</span>{' '}
-          {assessment.computed_at ? formatPolicyDate(assessment.computed_at, locale) : '—'}
+          {assessment.computed_at ? formatPolicyDate(assessment.computed_at, locale) : '–'}
         </p>
         {components.length > 0 && (
           <div className="pt-2 border-t border-gray-200">

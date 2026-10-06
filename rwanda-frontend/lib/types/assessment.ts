@@ -292,6 +292,8 @@ export interface SavedIndicatorResult {
   stress_value: number;
   weighted_lcu_bn: number;
   share_weighted_percent: number;
+  /** From indicator catalog: affects performance-gap interpretation in the FSFSI engine */
+  higher_is_better?: boolean;
 }
 
 // ============================================================================

@@ -604,12 +604,36 @@ Workers **`3`** reduces SQLite lock contention vs **`5`**; raise after moving to
 
 ## Phase 6 — SSL (Let’s Encrypt)
 
+The nginx site already serves ACME challenges from **`/var/www/html`** on port 80 and redirects everything else to HTTPS. Issue and renew with **webroot**, so certbot never needs to bind port 80.
+
+**Do not use `certbot certonly --standalone` (or leave `authenticator = standalone` in the renewal config).** Standalone tries to bind port 80 itself. nginx already owns that port, so the twice-daily `certbot.timer` fails every time and the certificate expires (~90 days) with `NET::ERR_CERT_DATE_INVALID`.
+
 ```bash
 sudo apt install -y certbot python3-certbot-nginx
-sudo certbot --nginx -d rwanda.fsfvi.ai -d fsfvi.ai
+sudo mkdir -p /var/www/html/.well-known/acme-challenge
+
+sudo tee /etc/letsencrypt/renewal-hooks/deploy/reload-nginx >/dev/null << 'EOF'
+#!/bin/sh
+systemctl reload nginx
+EOF
+sudo chmod 755 /etc/letsencrypt/renewal-hooks/deploy/reload-nginx
+
+sudo certbot certonly --webroot -w /var/www/html \
+  --cert-name rwanda.fsfvi.ai \
+  -d rwanda.fsfvi.ai -d fsfvi.ai \
+  --agree-tos --non-interactive
+sudo nginx -t && sudo systemctl reload nginx
 ```
 
-Cron / timer for `certbot renew` (often installed by package).
+The **`certbot`** package enables **`certbot.timer`** (twice daily). It only renews when the cert is inside the renewal window (about 30 days before expiry). Confirm the authenticator and a dry run:
+
+```bash
+sudo grep authenticator /etc/letsencrypt/renewal/rwanda.fsfvi.ai.conf   # expect: webroot
+systemctl is-enabled certbot.timer                                       # expect: enabled
+sudo certbot renew --dry-run
+```
+
+If a cert was originally issued with standalone, the same `certbot certonly --webroot ... --cert-name rwanda.fsfvi.ai` command rewrites the renewal config. Add `--force-renewal` only when the live certificate is already expired or you must replace it immediately.
 
 ---
 
@@ -645,6 +669,7 @@ See **`RWANDA_BACKEND_PIPELINE_GUIDE.md`**: `import_budget_mapping`, `import_ind
 | `Unit sshd.service not found` | On **Ubuntu**, SSH is **`ssh`**: `sudo systemctl restart ssh` (not `sshd`). |
 | `Failed to access socket path: .../fail2ban.sock` | `sudo systemctl enable --now fail2ban` then `sudo systemctl restart fail2ban`; check `journalctl -u fail2ban`. |
 | `sshd -t` fails after editing `hardening.conf` | Fix typos (`PermitRootLogin no`, not `notion no`). See [Phase 1.6 SSH hardening](#16-ssh-hardening) and the heredoc rules above. |
+| Browser `NET::ERR_CERT_DATE_INVALID` | Cert expired. `sudo certbot certificates`. If renewal logs say port 80 is in use, the lineage is still **standalone** while nginx holds port 80. Reissue with **webroot** (see [Phase 6](#phase-6--ssl-lets-encrypt)) and confirm `authenticator = webroot` plus `sudo certbot renew --dry-run`. |
 | HTTP 502 | Gunicorn up? Socket permissions? `nginx -t` |
 | CORS errors | `CORS_ALLOWED_ORIGINS` / `CSRF_TRUSTED_ORIGINS` match browser URL |
 | “Database is locked” | SQLite timeout in `settings_production`; reduce Gunicorn workers or move to Postgres later |
@@ -712,6 +737,12 @@ sudo -u fsfvi git -C /opt/fsfvi/app pull
 
 sudo -u fsfvi bash -lc 'cd /opt/fsfvi/app/rwanda_backend && source venv/bin/activate && pip install -r requirements.txt && python manage.py migrate --noinput && python manage.py collectstatic --noinput'
 # If **`fsfi_engine`** changed: as **`fsfvi`**, **`maturin build`** then **`pip install …/target/wheels/fsfi_engine-*.whl`** inside that same **`bash -lc`** before **`migrate`**.
+
+sudo -u fsfvi bash -lc 'cd /opt/fsfvi/app/rwanda_backend/fsfi_engine && source ../venv/bin/activate && maturin build --release'
+
+sudo -u fsfvi bash -lc 'cd /opt/fsfvi/app/rwanda_backend && source venv/bin/activate && pip install --force-reinstall fsfi_engine/target/wheels/fsfi_engine-*.whl'
+
+sudo -u fsfvi bash -lc 'cd /opt/fsfvi/app/rwanda_backend && source venv/bin/activate && python manage.py run_assessments_all_years'
 
 sudo -u fsfvi bash -lc 'cd /opt/fsfvi/app/rwanda-frontend && npm ci && npm run build'
 

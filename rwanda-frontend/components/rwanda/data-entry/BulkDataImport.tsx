@@ -372,10 +372,10 @@ export function BulkDataImport() {
                           {row.weighted_lcu_bn.toFixed(2)}
                         </td>
                         <td className="py-2 pr-2 text-right font-mono">
-                          {row.observed_value?.toFixed(2) ?? '—'}
+                          {row.observed_value?.toFixed(2) ?? '–'}
                         </td>
                         <td className="py-2 text-right font-mono">
-                          {row.benchmark_value?.toFixed(2) ?? '—'}
+                          {row.benchmark_value?.toFixed(2) ?? '–'}
                         </td>
                       </tr>
                     ))}

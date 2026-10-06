@@ -3,9 +3,12 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { authAPI, getAuthErrorMessage } from '@/lib/api/authApi';
-import { RwandaLogo } from '@/components/rwanda/shared/RwandaLogo';
+import { AuthShell } from '@/components/rwanda/auth/AuthShell';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Lock, AlertCircle, CheckCircle } from 'lucide-react';
+
+const INPUT_CLASS =
+  'h-11 w-full rounded-md border border-slate-300 bg-white pl-10 pr-4 text-[15px] text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-colors hover:border-slate-400 focus:border-[var(--rw-blue-deep)] focus:outline-none focus:ring-2 focus:ring-[var(--rw-blue-deep)]/25 disabled:bg-slate-50';
 
 export default function ChangePasswordPage() {
   const router = useRouter();
@@ -44,79 +47,92 @@ export default function ChangePasswordPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[var(--rw-blue)]/5 via-[var(--rw-green)]/5 to-gray-50 flex items-center justify-center px-4">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <div className="flex justify-center mb-4">
-            <RwandaLogo size="lg" />
-          </div>
-          <h1 className="text-2xl font-bold text-gray-900">{t('auth.change_password')}</h1>
-          <p className="text-sm text-gray-600 mt-1">{t('auth.must_change_password')}</p>
-        </div>
-
-        <div className="bg-white shadow-xl rounded-2xl border border-gray-200 p-8">
-          {error && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start space-x-3">
-              <AlertCircle className="h-5 w-5 text-red-600 mt-0.5" />
-              <p className="text-sm text-red-800">{error}</p>
-            </div>
-          )}
-
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">{t('auth.current_password')}</label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-                <input
-                  type="password"
-                  value={currentPassword}
-                  onChange={(e) => setCurrentPassword(e.target.value)}
-                  required
-                  className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-[var(--rw-blue)] focus:border-transparent"
-                  disabled={isLoading}
-                />
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">{t('auth.new_password')}</label>
-              <p className="text-xs text-gray-500 mb-2">{t('auth.password_policy_hint')}</p>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-                <input
-                  type="password"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  required
-                  minLength={12}
-                  className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-[var(--rw-blue)] focus:border-transparent"
-                  disabled={isLoading}
-                />
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">{t('auth.confirm_password')}</label>
-              <div className="relative">
-                <CheckCircle className={`absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 ${newPassword && newPassword === confirmPassword ? 'text-emerald-500' : 'text-gray-400'}`} />
-                <input
-                  type="password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  required
-                  className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-[var(--rw-blue)] focus:border-transparent"
-                  disabled={isLoading}
-                />
-              </div>
-            </div>
-            <button
-              type="submit"
-              disabled={isLoading || !currentPassword || !newPassword || !confirmPassword}
-              className="w-full bg-gradient-to-r from-[var(--rw-blue)] to-[var(--rw-green)] text-white py-3 px-4 rounded-lg hover:opacity-90 disabled:opacity-50 transition-all shadow-lg font-semibold"
-            >
-              {isLoading ? 'Changing...' : t('auth.change_password')}
-            </button>
-          </form>
-        </div>
+    <AuthShell hideBackLink>
+      <div className="mb-8">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--rw-blue-deep)]">
+          {t('auth.secure_auth')}
+        </p>
+        <h1 className="font-display mt-2 text-3xl font-semibold tracking-tight text-slate-900">{t('auth.change_password')}</h1>
+        <p className="mt-2 text-sm text-slate-600">{t('auth.must_change_password')}</p>
       </div>
-    </div>
+
+      {error && (
+        <div className="mb-6 flex items-start gap-3 rounded-md border border-red-200 bg-red-50 p-4" role="alert">
+          <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-600" aria-hidden />
+          <p className="text-sm text-red-800">{error}</p>
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit} className="space-y-5">
+        <div>
+          <label htmlFor="current-password" className="mb-1.5 block text-sm font-medium text-slate-800">
+            {t('auth.current_password')}
+          </label>
+          <div className="relative">
+            <Lock className="pointer-events-none absolute left-3 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-slate-400" aria-hidden />
+            <input
+              id="current-password"
+              type="password"
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              required
+              autoComplete="current-password"
+              className={INPUT_CLASS}
+              disabled={isLoading}
+            />
+          </div>
+        </div>
+        <div>
+          <label htmlFor="new-password" className="mb-1.5 block text-sm font-medium text-slate-800">
+            {t('auth.new_password')}
+          </label>
+          <div className="relative">
+            <Lock className="pointer-events-none absolute left-3 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-slate-400" aria-hidden />
+            <input
+              id="new-password"
+              type="password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              required
+              minLength={12}
+              autoComplete="new-password"
+              className={INPUT_CLASS}
+              disabled={isLoading}
+            />
+          </div>
+          <p className="mt-2 text-xs leading-relaxed text-slate-500">{t('auth.password_policy_hint')}</p>
+        </div>
+        <div>
+          <label htmlFor="confirm-password" className="mb-1.5 block text-sm font-medium text-slate-800">
+            {t('auth.confirm_password')}
+          </label>
+          <div className="relative">
+            <CheckCircle
+              className={`pointer-events-none absolute left-3 top-1/2 h-4.5 w-4.5 -translate-y-1/2 ${
+                newPassword && newPassword === confirmPassword ? 'text-emerald-600' : 'text-slate-400'
+              }`}
+              aria-hidden
+            />
+            <input
+              id="confirm-password"
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              required
+              autoComplete="new-password"
+              className={INPUT_CLASS}
+              disabled={isLoading}
+            />
+          </div>
+        </div>
+        <button
+          type="submit"
+          disabled={isLoading || !currentPassword || !newPassword || !confirmPassword}
+          className="flex h-11 w-full items-center justify-center rounded-md bg-[var(--rw-blue-deep)] px-4 text-[15px] font-semibold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_1px_2px_rgba(2,6,23,0.2)] transition-colors hover:bg-[var(--rw-blue-ink)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rw-blue-deep)] focus-visible:ring-offset-2 disabled:opacity-50"
+        >
+          {isLoading ? 'Changing...' : t('auth.change_password')}
+        </button>
+      </form>
+    </AuthShell>
   );
 }

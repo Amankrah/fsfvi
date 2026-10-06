@@ -5,7 +5,7 @@ import { RW_AUTH_TOKEN_KEY, RW_USER_KEY } from '@/lib/auth/storageKeys';
 
 const LOGIN_SESSION_REASON = 'session_expired';
 
-/** Opaque query flag — login page maps to i18n copy only. */
+/** Opaque query flag: login page maps to i18n copy only. */
 export function redirectToLoginSessionExpired(): void {
   if (typeof window === 'undefined') return;
   clearAuthStorage();

@@ -4,6 +4,7 @@ import { Suspense, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { RwandaLoginForm } from '@/components/rwanda/auth/RwandaLoginForm';
 import { TwoFactorForm } from '@/components/rwanda/auth/TwoFactorForm';
+import { AuthShell } from '@/components/rwanda/auth/AuthShell';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { isLoginSessionExpiredReason } from '@/lib/api/authSession';
 
@@ -30,20 +31,13 @@ function LoginPageContent() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col bg-gradient-to-br from-[var(--rw-blue)]/5 via-[var(--rw-green)]/5 to-gray-50">
-      <div className="flex flex-1 items-center justify-center px-4">
-        {showTwoFactor ? (
-          <TwoFactorForm tempToken={tempToken} username={username} onBack={handleBack} />
-        ) : (
-          <RwandaLoginForm onTwoFactorRequired={handleTwoFactorRequired} sessionNotice={sessionNotice} />
-        )}
-      </div>
-      <div className="py-4 text-center">
-        <p className="text-xs text-gray-500">
-          &copy; {new Date().getFullYear()} {t('app.platform_name')}. {t('app.ministry')}.
-        </p>
-      </div>
-    </div>
+    <AuthShell>
+      {showTwoFactor ? (
+        <TwoFactorForm tempToken={tempToken} username={username} onBack={handleBack} />
+      ) : (
+        <RwandaLoginForm onTwoFactorRequired={handleTwoFactorRequired} sessionNotice={sessionNotice} />
+      )}
+    </AuthShell>
   );
 }
 
@@ -51,9 +45,7 @@ export default function LoginPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-[var(--rw-blue)]/5 via-[var(--rw-green)]/5 to-gray-50 text-sm text-slate-600">
-          Loading…
-        </div>
+        <div className="flex min-h-screen items-center justify-center bg-white text-sm text-slate-600">Loading…</div>
       }
     >
       <LoginPageContent />

@@ -50,7 +50,7 @@ function toPlanningInput(assessment: SavedAssessment): PlanningComponentInput[] 
   return assessment.component_results.map((comp) => {
     const budgetLcuBn = Number(comp.budget_lcu_bn) || 0;
     const allocationLcu = budgetLcuBn * 1_000_000;
-    // Use CUMULATIVE stress for planning — this reflects the real accumulated
+    // Use CUMULATIVE stress for planning: this reflects the real accumulated
     // damage that future budgets need to address, not just the current snapshot.
     const cumulativeGap = Number(comp.cumulative_stress) || Number(comp.avg_performance_gap) || 0;
     const weight = comp.weight != null ? Number(comp.weight) : undefined;
@@ -327,7 +327,7 @@ export default function PlanningPage() {
     setGenerating(true);
     setError(null);
     try {
-      // Use assessment-based endpoints — backend handles cumulative baseline,
+      // Use assessment-based endpoints: backend handles cumulative baseline,
       // data-driven insights, and accurate numbers. No frontend patching needed.
       const [multiYear, mtef] = await Promise.all([
         planningAPI.planForAssessment(
@@ -518,7 +518,7 @@ export default function PlanningPage() {
                             {formatScore(Number(row.baseline_fsfsi))} →{' '}
                             {row.final_projected_fsfsi != null
                               ? formatScore(Number(row.final_projected_fsfsi))
-                              : '—'}
+                              : '–'}
                           </td>
                           <td className="py-2 pr-3 text-gray-500 text-xs whitespace-nowrap">
                             {new Date(row.created_at).toLocaleString()}
@@ -678,15 +678,15 @@ export default function PlanningPage() {
             </CardHeader>
             <CardContent>
               {/* Current situation summary */}
-              <div className="mb-5 flex items-center gap-3 p-4 bg-gradient-to-r from-blue-50 to-blue-100/50 border border-blue-200 rounded-xl">
+              <div className="mb-5 flex items-center gap-3 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                 <div className="flex-shrink-0 w-14 h-14 rounded-full bg-blue-600 text-white flex items-center justify-center">
                   <span className="text-lg font-bold">{cumulativeBaseline.toFixed(2)}</span>
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-blue-900">Current Cumulative Stress (Critical)</p>
+                  <p className="text-sm font-semibold text-blue-900">Current cumulative stress (critical)</p>
                   <p className="text-xs text-blue-700 mt-0.5">
-                    A <strong>{targetReductionPct}%</strong> reduction over <strong>{planningYears} years</strong> targets <strong>{targetFsfvi.toFixed(2)}</strong>.
-                    Recovery is slow due to accumulated damage from prior years.
+                    A <strong>{targetReductionPct}%</strong> reduction over <strong>{planningYears} years</strong> gives a target of <strong>{targetFsfvi.toFixed(2)}</strong>.
+                    Recovery is slow because stress carried over from earlier years persists.
                   </p>
                 </div>
               </div>
@@ -706,10 +706,10 @@ export default function PlanningPage() {
                       aria-label="Planning horizon"
                       title="Planning horizon"
                     >
-                      <option value={3}>3 years — MTEF cycle</option>
-                      <option value={5}>5 years — PSTA-5 (2024-2029)</option>
-                      <option value={7}>7 years — NST-2 aligned</option>
-                      <option value={10}>10 years — Vision 2035</option>
+                      <option value={3}>3 years (MTEF cycle)</option>
+                      <option value={5}>5 years (PSTA 5, 2024–2029)</option>
+                      <option value={7}>7 years (NST 2)</option>
+                      <option value={10}>10 years (Vision 2035)</option>
                     </select>
                   </div>
                   <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
@@ -904,7 +904,7 @@ export default function PlanningPage() {
                 <section className="space-y-6" aria-labelledby="planning-multiyear-heading">
                   <div>
                     <h2 id="planning-multiyear-heading" className="text-lg font-semibold text-gray-900">
-                      {t('planning.section_multiyear_title')} — {multiYearPlan.planning_years} {t('planning.years_unit')}
+                      {t('planning.section_multiyear_title')} ({multiYearPlan.planning_years} {t('planning.years_unit')})
                     </h2>
                     <p className="text-sm text-gray-600 mt-0.5">{t('planning.section_multiyear_desc')}</p>
                   </div>

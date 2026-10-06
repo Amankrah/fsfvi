@@ -36,7 +36,7 @@ interface Props {
   /** If set (from plan JSON), simulate uses these weights so results match the chart even if the user changed the form. */
   planWeightingMethod?: string;
   planScenario?: string;
-  /** Saved plan ID — required to save actuals. */
+  /** Saved plan ID: required to save actuals. */
   planId?: string;
 }
 
@@ -302,13 +302,13 @@ export function PlanningBudgetAlignmentCard({
                       </td>
                       <td className="py-2 pr-2 font-mono text-xs">{planBn.toFixed(1)}</td>
                       <td className="py-2 pr-2 font-mono text-xs">
-                        {userSum != null ? userSum.toFixed(1) : '—'}
+                        {userSum != null ? userSum.toFixed(1) : '–'}
                       </td>
                       <td className="py-2 pr-2 font-mono text-xs">
-                        {deltaPct != null ? `${deltaPct > 0 ? '+' : ''}${deltaPct.toFixed(1)}%` : '—'}
+                        {deltaPct != null ? `${deltaPct > 0 ? '+' : ''}${deltaPct.toFixed(1)}%` : '–'}
                       </td>
                       <td className="py-2 pr-2">
-                        {band === 'none' && <span className="text-gray-400 text-xs">—</span>}
+                        {band === 'none' && <span className="text-gray-400 text-xs">–</span>}
                         {band === 'close' && (
                           <span className="text-green-700 text-xs font-medium">
                             {t('planning.alignment_fit_close')}
@@ -328,7 +328,7 @@ export function PlanningBudgetAlignmentCard({
                       <td className="py-2 pr-2 font-mono text-xs">
                         {sim?.user_projected_cumulative_fsfsi != null
                           ? formatScore(sim.user_projected_cumulative_fsfsi)
-                          : '—'}
+                          : '–'}
                       </td>
                       <td className="py-2">
                         {expanded ? (
@@ -419,12 +419,12 @@ export function PlanningBudgetAlignmentCard({
                                       />
                                     </td>
                                     <td className="py-1 pr-2 font-mono">
-                                      {yourPct != null ? `${yourPct.toFixed(2)}%` : '—'}
+                                      {yourPct != null ? `${yourPct.toFixed(2)}%` : '–'}
                                     </td>
                                     <td className="py-1 pr-2 font-mono">
                                       {parsed.ok && yourBn > 0
                                         ? formatRWFCompact(yourBn * 1e9)
-                                        : '—'}
+                                        : '–'}
                                     </td>
                                   </tr>
                                 );
@@ -435,7 +435,7 @@ export function PlanningBudgetAlignmentCard({
                             <span className="font-semibold text-gray-800">
                               {t('planning.alignment_auto_total')}:{' '}
                               <span className="font-mono text-[var(--rw-blue)]">
-                                {parsed.ok ? `${parsed.sum.toFixed(1)} bn RWF` : '—'}
+                                {parsed.ok ? `${parsed.sum.toFixed(1)} bn RWF` : '–'}
                               </span>
                             </span>
                             {loadingYear === yp.year && (
@@ -469,7 +469,7 @@ export function PlanningBudgetAlignmentCard({
                                   <span className="font-mono">
                                     {sim.plan_projected_cumulative_fsfsi != null
                                       ? formatScore(sim.plan_projected_cumulative_fsfsi)
-                                      : '—'}
+                                      : '–'}
                                   </span>
                                 </div>
                                 <div>
@@ -479,7 +479,7 @@ export function PlanningBudgetAlignmentCard({
                                   <span className="font-mono">
                                     {sim.plan_year_target_fsfvi != null
                                       ? formatScore(sim.plan_year_target_fsfvi)
-                                      : '—'}
+                                      : '–'}
                                   </span>
                                 </div>
                                 <div>
@@ -493,7 +493,7 @@ export function PlanningBudgetAlignmentCard({
                                   >
                                     {sim.delta_user_minus_plan_fsfsi != null
                                       ? `${sim.delta_user_minus_plan_fsfsi > 0 ? '+' : ''}${formatScore(sim.delta_user_minus_plan_fsfsi)}`
-                                      : '—'}
+                                      : '–'}
                                   </span>
                                 </div>
                               </div>

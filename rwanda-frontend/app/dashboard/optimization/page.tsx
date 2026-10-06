@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * Budget Optimization — uses latest saved assessment for the selected FY.
+ * Budget Optimization: uses latest saved assessment for the selected FY.
  * Results load automatically (same three API calls as "run") so the page is never an empty shell.
  */
 import { useEffect, useState, useCallback, useRef } from 'react';
@@ -203,7 +203,7 @@ export default function OptimizationPage() {
       )}
 
       {assessment && !hasOptimizationData && (
-        <Card className="border border-dashed border-slate-200 bg-gradient-to-br from-slate-50/80 to-white">
+        <Card className="border border-dashed border-slate-300 bg-slate-50/60">
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
               <LayoutTemplate className="h-5 w-5 text-[var(--rw-blue)]" />

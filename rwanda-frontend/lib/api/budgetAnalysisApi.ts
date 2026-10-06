@@ -1,5 +1,5 @@
 /**
- * Budget analysis API — multi-year financial history (IndicatorData).
+ * Budget analysis API: multi-year financial history (IndicatorData).
  * GET /api/budget-analysis/history/
  * GET /api/budget-analysis/snapshot/?fiscal_year=
  */

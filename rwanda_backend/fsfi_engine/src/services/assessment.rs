@@ -347,7 +347,7 @@ pub fn assess_food_system(
                 component: label.clone(),
                 action: format_legacy_component_priority(rank + 1, &label, stress_val),
                 expected_impact: format!(
-                    "{:.1}% stress reduction potential",
+                    "Potential stress reduction of {:.1}%",
                     stress_val * 100.0 * 0.3
                 ),
                 budget_implication: if optimal_alloc[idx] > allocations_m[idx] {
@@ -362,13 +362,13 @@ pub fn assess_food_system(
                     )
                 },
                 timeline: if stress_val >= 0.6 {
-                    "Immediate (0-3 months)".to_string()
+                    "Immediate (0–3 months)".to_string()
                 } else if stress_val >= 0.4 {
-                    "Short-term (3-6 months)".to_string()
+                    "Short term (3–6 months)".to_string()
                 } else if stress_val >= 0.25 {
-                    "Medium-term (6-12 months)".to_string()
+                    "Medium term (6–12 months)".to_string()
                 } else {
-                    "Long-term (12+ months)".to_string()
+                    "Long term (12 months or more)".to_string()
                 },
             }
         })
@@ -712,28 +712,28 @@ pub fn assess_indicators(
             component: comp_display,
             action,
             expected_impact: format!(
-                "{:.1}% stress reduction potential",
+                "Potential stress reduction of {:.1}%",
                 stress_val * 100.0 * 0.3
             ),
             budget_implication: if optimal_alloc[idx] > allocations[idx] {
                 format!(
-                    "Increase mapped weighted total by {:.2} bn LCU vs current (toward optimal)",
+                    "Increase the mapped weighted total by {:.2} bn LCU to reach the optimal allocation",
                     optimal_alloc[idx] - allocations[idx]
                 )
             } else {
                 format!(
-                    "Reduce mapped weighted total by {:.2} bn LCU vs current (toward optimal)",
+                    "Reduce the mapped weighted total by {:.2} bn LCU to reach the optimal allocation",
                     allocations[idx] - optimal_alloc[idx]
                 )
             },
             timeline: if stress_val >= 0.6 {
-                "Immediate (0-3 months)".to_string()
+                "Immediate (0–3 months)".to_string()
             } else if stress_val >= 0.4 {
-                "Short-term (3-6 months)".to_string()
+                "Short term (3–6 months)".to_string()
             } else if stress_val >= 0.25 {
-                "Medium-term (6-12 months)".to_string()
+                "Medium term (6–12 months)".to_string()
             } else {
-                "Long-term (12+ months)".to_string()
+                "Long term (12 months or more)".to_string()
             },
         });
     }
@@ -766,6 +766,248 @@ pub fn assess_indicators(
     })
 }
 
+// ---------------------------------------------------------------------------
+// Investment scenario (counterfactual extra budget on indicators / components)
+// ---------------------------------------------------------------------------
+
+/// JSON body from Django: additional weighted budget in **billions LCU** per indicator or component.
+#[derive(Debug, Clone, Deserialize)]
+pub struct InvestmentSpec {
+    #[serde(default)]
+    pub by_indicator: std::collections::HashMap<String, f64>,
+    #[serde(default)]
+    pub by_component: std::collections::HashMap<String, f64>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct IndicatorInvestmentDeltaRow {
+    pub indicator_code: String,
+    pub indicator_component: String,
+    pub name: String,
+    pub additional_weighted_bn: f64,
+    pub baseline_stress: f64,
+    pub scenario_stress: f64,
+    /// baseline_stress − scenario_stress (positive ⇒ lower financing stress)
+    pub delta_stress: f64,
+    pub baseline_weighted_stress: f64,
+    pub scenario_weighted_stress: f64,
+    pub delta_weighted_stress: f64,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ComponentInvestmentDeltaRow {
+    pub component: String,
+    pub baseline_average_stress: f64,
+    pub scenario_average_stress: f64,
+    pub delta_average_stress: f64,
+}
+
+#[derive(Debug, Serialize)]
+pub struct InvestmentScenarioComparison {
+    pub baseline_fsfsi: f64,
+    pub scenario_fsfsi: f64,
+    /// baseline_fsfsi − scenario_fsfsi (positive ⇒ system financing stress decreases)
+    pub delta_fsfsi: f64,
+    pub baseline_risk_level: String,
+    pub scenario_risk_level: String,
+    pub fiscal_year: i32,
+    pub weighting_method: String,
+    pub scenario_name: String,
+    pub total_envelope_bn: f64,
+    pub indicator_deltas: Vec<IndicatorInvestmentDeltaRow>,
+    pub component_deltas: Vec<ComponentInvestmentDeltaRow>,
+    pub methodology_note: &'static str,
+}
+
+fn apply_investment_to_indicators(
+    indicators: &[IndicatorInput],
+    spec: &InvestmentSpec,
+) -> FsfiResult<(Vec<IndicatorInput>, f64)> {
+    use std::collections::HashSet;
+
+    let known_codes: HashSet<&str> = indicators.iter().map(|i| i.indicator_code.as_str()).collect();
+    for code in spec.by_indicator.keys() {
+        if !known_codes.contains(code.as_str()) {
+            return Err(crate::errors::FsfiError::validation(format!(
+                "Unknown indicator_code: {}",
+                code
+            )));
+        }
+    }
+    let known_comps: HashSet<&str> = indicators
+        .iter()
+        .map(|i| i.indicator_component.as_str())
+        .collect();
+    for comp in spec.by_component.keys() {
+        if !known_comps.contains(comp.as_str()) {
+            return Err(crate::errors::FsfiError::validation(format!(
+                "Unknown component: {}",
+                comp
+            )));
+        }
+    }
+
+    let total_spec: f64 =
+        spec.by_indicator.values().copied().sum::<f64>() + spec.by_component.values().copied().sum::<f64>();
+    if !(total_spec > 0.0) {
+        return Err(crate::errors::FsfiError::validation(
+            "Investment envelope must sum to a positive amount (bn LCU weighted)",
+        ));
+    }
+
+    let mut out: Vec<IndicatorInput> = indicators.to_vec();
+
+    for (code, add) in &spec.by_indicator {
+        if *add < 0.0 {
+            return Err(crate::errors::FsfiError::validation(format!(
+                "Negative addition for indicator {}",
+                code
+            )));
+        }
+        if let Some(row) = out.iter_mut().find(|i| &i.indicator_code == code) {
+            row.weighted_lcu_bn += add;
+            row.gross_lcu_bn += add;
+        }
+    }
+    for (comp, add) in &spec.by_component {
+        if *add < 0.0 {
+            return Err(crate::errors::FsfiError::validation(format!(
+                "Negative addition for component {}",
+                comp
+            )));
+        }
+        let idxs: Vec<usize> = out
+            .iter()
+            .enumerate()
+            .filter(|(_, i)| i.indicator_component == *comp)
+            .map(|(ix, _)| ix)
+            .collect();
+        if idxs.is_empty() {
+            continue;
+        }
+        let per = add / idxs.len() as f64;
+        for ix in idxs {
+            out[ix].weighted_lcu_bn += per;
+            out[ix].gross_lcu_bn += per;
+        }
+    }
+
+    let total_w: f64 = out.iter().map(|i| i.weighted_lcu_bn).sum();
+    if !(total_w > 0.0) {
+        return Err(crate::errors::FsfiError::validation(
+            "Total weighted budget became non-positive after applying investment",
+        ));
+    }
+    for row in &mut out {
+        row.share_weighted_percent = row.weighted_lcu_bn / total_w * 100.0;
+    }
+
+    let additions: f64 = out
+        .iter()
+        .zip(indicators.iter())
+        .map(|(s, b)| (s.weighted_lcu_bn - b.weighted_lcu_bn).max(0.0))
+        .sum();
+
+    Ok((out, additions))
+}
+
+/// Baseline vs scenario indicator assessment for a donor-style **additional** envelope.
+pub fn compare_indicator_investment_scenario(
+    indicators: &[IndicatorInput],
+    spec: &InvestmentSpec,
+    weighting_method: &str,
+    scenario: &str,
+    fiscal_year: i32,
+) -> FsfiResult<InvestmentScenarioComparison> {
+    let baseline = assess_indicators(indicators, weighting_method, scenario, fiscal_year)?;
+    let (scenario_inputs, tracked_envelope) = apply_investment_to_indicators(indicators, spec)?;
+    let scenario_result = assess_indicators(&scenario_inputs, weighting_method, scenario, fiscal_year)?;
+
+    let scen_by_code: std::collections::HashMap<&str, &IndicatorAssessment> = scenario_result
+        .indicator_results
+        .iter()
+        .map(|r| (r.indicator_code.as_str(), r))
+        .collect();
+
+    let mut indicator_deltas: Vec<IndicatorInvestmentDeltaRow> = Vec::new();
+    for b in &baseline.indicator_results {
+        let s = scen_by_code
+            .get(b.indicator_code.as_str())
+            .ok_or_else(|| crate::errors::FsfiError::calculation("Scenario missing indicator"))?;
+        let orig = indicators
+            .iter()
+            .find(|i| i.indicator_code == b.indicator_code)
+            .ok_or_else(|| crate::errors::FsfiError::calculation("Baseline indicator not in input"))?;
+        let scen_in = scenario_inputs
+            .iter()
+            .find(|i| i.indicator_code == b.indicator_code)
+            .ok_or_else(|| crate::errors::FsfiError::calculation("Scenario input missing indicator"))?;
+        let add_bn = round_to_precision(
+            (scen_in.weighted_lcu_bn - orig.weighted_lcu_bn).max(0.0),
+            Some(6),
+        );
+        let d_stress = round_to_precision(b.stress - s.stress, Some(6));
+        let d_w = round_to_precision(b.weighted_stress - s.weighted_stress, Some(6));
+        indicator_deltas.push(IndicatorInvestmentDeltaRow {
+            indicator_code: b.indicator_code.clone(),
+            indicator_component: b.indicator_component.clone(),
+            name: b.name.clone(),
+            additional_weighted_bn: add_bn,
+            baseline_stress: b.stress,
+            scenario_stress: s.stress,
+            delta_stress: d_stress,
+            baseline_weighted_stress: b.weighted_stress,
+            scenario_weighted_stress: s.weighted_stress,
+            delta_weighted_stress: d_w,
+        });
+    }
+    indicator_deltas.sort_by(|a, b| {
+        b.delta_weighted_stress
+            .partial_cmp(&a.delta_weighted_stress)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+
+    let scen_comp: std::collections::HashMap<&str, &ComponentAggregation> = scenario_result
+        .component_aggregations
+        .iter()
+        .map(|c| (c.component.as_str(), c))
+        .collect();
+    let mut component_deltas: Vec<ComponentInvestmentDeltaRow> = Vec::new();
+    for b in &baseline.component_aggregations {
+        let s = scen_comp
+            .get(b.component.as_str())
+            .ok_or_else(|| crate::errors::FsfiError::calculation("Scenario missing component"))?;
+        let d = round_to_precision(b.average_stress - s.average_stress, Some(6));
+        component_deltas.push(ComponentInvestmentDeltaRow {
+            component: b.component.clone(),
+            baseline_average_stress: b.average_stress,
+            scenario_average_stress: s.average_stress,
+            delta_average_stress: d,
+        });
+    }
+    component_deltas.sort_by(|a, b| a.component.cmp(&b.component));
+
+    let bf = baseline.overall_fsfsi;
+    let sf = scenario_result.overall_fsfsi;
+
+    Ok(InvestmentScenarioComparison {
+        baseline_fsfsi: bf,
+        scenario_fsfsi: sf,
+        delta_fsfsi: round_to_precision(bf - sf, Some(6)),
+        baseline_risk_level: baseline.risk_level.clone(),
+        scenario_risk_level: scenario_result.risk_level.clone(),
+        fiscal_year,
+        weighting_method: weighting_method.to_string(),
+        scenario_name: scenario.to_string(),
+        total_envelope_bn: round_to_precision(tracked_envelope, Some(6)),
+        indicator_deltas,
+        component_deltas,
+        methodology_note: "This scenario adds the specified envelope to the mapped weighted budgets, \
+recalculates the shares and re-runs the same FSFSI indicator model. It compares financing stress with and \
+without the envelope. It does not predict development outcomes.",
+    })
+}
+
 fn truncate_indicator_name(name: &str, max_len: usize) -> String {
     let t = name.trim();
     if t.chars().count() <= max_len {
@@ -784,8 +1026,8 @@ fn format_indicator_priority_action(
     stress: f64,
 ) -> String {
     format!(
-        "#{rank} · {code} ({name_short}) — financing stress {stress:.3} in {component_display}. \
-         Reallocate toward this line using the modelled optimal mix (see budget implication).",
+        "#{rank} {code} ({name_short}): financing stress {stress:.3} in {component_display}. \
+         Reallocate towards this line in line with the modelled optimal mix. See the budget implication for the amount.",
         rank = rank,
         code = code,
         name_short = name_short,
@@ -796,8 +1038,8 @@ fn format_indicator_priority_action(
 
 fn format_legacy_component_priority(rank: usize, component_label: &str, stress: f64) -> String {
     format!(
-        "#{rank}: {component_label} — component financing stress {stress:.3}. \
-         Adjust sector envelopes and PSTA alignment; use budget implication vs optimal allocation.",
+        "#{rank} {component_label}: component financing stress {stress:.3}. \
+         Adjust the sector envelope and PSTA alignment. Compare the budget implication with the optimal allocation.",
         rank = rank,
         component_label = component_label,
         stress = stress,
@@ -890,11 +1132,43 @@ pub fn py_get_indicator_sensitivity(component: &str) -> PyResult<f64> {
     Ok(get_indicator_component_sensitivity(component))
 }
 
+/// Compare baseline indicator assessment vs scenario with additional envelope (bn LCU).
+///
+/// `investment_json`: `{"by_indicator":{"IND-01":0.5},"by_component":{"markets":2.0}}`
+#[pyfunction]
+#[pyo3(signature = (indicators_json, investment_json, weighting_method="hybrid", scenario="normal_operations", fiscal_year=2025))]
+pub fn py_indicator_investment_scenario(
+    indicators_json: &str,
+    investment_json: &str,
+    weighting_method: &str,
+    scenario: &str,
+    fiscal_year: i32,
+) -> PyResult<String> {
+    let indicators: Vec<IndicatorInput> = serde_json::from_str(indicators_json)
+        .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Invalid indicators JSON: {}", e)))?;
+
+    let spec: InvestmentSpec = serde_json::from_str(investment_json)
+        .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Invalid investment JSON: {}", e)))?;
+
+    let result = compare_indicator_investment_scenario(
+        &indicators,
+        &spec,
+        weighting_method,
+        scenario,
+        fiscal_year,
+    )
+    .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+
+    serde_json::to_string(&result)
+        .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))
+}
+
 pub fn register_functions(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(py_run_assessment, m)?)?;
     m.add_function(wrap_pyfunction!(py_quick_check, m)?)?;
     m.add_function(wrap_pyfunction!(py_run_indicator_assessment, m)?)?;
     m.add_function(wrap_pyfunction!(py_get_indicator_sensitivity, m)?)?;
+    m.add_function(wrap_pyfunction!(py_indicator_investment_scenario, m)?)?;
     Ok(())
 }
 
@@ -1204,5 +1478,26 @@ mod tests {
         assert!(get_indicator_component_sensitivity("finance") > 0.0);
         // Nutrition should have higher sensitivity than research
         assert!(get_indicator_component_sensitivity("nutrition") > get_indicator_component_sensitivity("research"));
+    }
+
+    #[test]
+    fn test_investment_scenario_reduces_fsfsi() {
+        let indicators = sample_indicators();
+        let spec = InvestmentSpec {
+            by_indicator: std::collections::HashMap::from([("IND-01".to_string(), 5.0)]),
+            by_component: std::collections::HashMap::from([("finance".to_string(), 10.0)]),
+        };
+        let cmp = compare_indicator_investment_scenario(
+            &indicators,
+            &spec,
+            "hybrid",
+            "normal_operations",
+            2025,
+        )
+        .unwrap();
+        assert!(cmp.delta_fsfsi > 0.0, "extra financing should lower FSFSI");
+        assert!(cmp.scenario_fsfsi < cmp.baseline_fsfsi);
+        assert!(cmp.total_envelope_bn > 0.0);
+        assert!(cmp.indicator_deltas.iter().any(|r| r.additional_weighted_bn > 0.0));
     }
 }

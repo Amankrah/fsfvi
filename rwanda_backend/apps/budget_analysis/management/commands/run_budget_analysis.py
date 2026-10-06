@@ -27,7 +27,7 @@ class Command(BaseCommand):
             options.get("end_year"),
         )
         if not payload:
-            raise CommandError("No IndicatorData — run import_budget_mapping first.")
+            raise CommandError("No IndicatorData found. Run import_budget_mapping first.")
 
         if options["json"]:
             self.stdout.write(json.dumps(payload, default=str, indent=2))

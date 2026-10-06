@@ -242,7 +242,7 @@ export function BudgetTrendCard() {
                 <p className="text-lg font-semibold text-gray-900">
                   {data.metrics.cagr_weighted_pct != null
                     ? `${data.metrics.cagr_weighted_pct > 0 ? '+' : ''}${data.metrics.cagr_weighted_pct}%`
-                    : '—'}
+                    : '–'}
                 </p>
               </div>
               <div>
@@ -263,7 +263,7 @@ export function BudgetTrendCard() {
                   <Tooltip
                     formatter={(value) => {
                       const n = typeof value === 'number' ? value : Number(value);
-                      return [Number.isFinite(n) ? `${n.toFixed(4)} bn LCU` : '—', 'Weighted Total'];
+                      return [Number.isFinite(n) ? `${n.toFixed(4)} bn LCU` : '–', 'Weighted Total'];
                     }}
                     labelClassName="font-medium"
                   />
@@ -342,7 +342,7 @@ export function BudgetTrendCard() {
                 <p className="text-sm font-bold text-blue-900">
                   {data.metrics.cagr_weighted_pct != null
                     ? `${data.metrics.cagr_weighted_pct > 0 ? '+' : ''}${data.metrics.cagr_weighted_pct}%`
-                    : '—'}
+                    : '–'}
                 </p>
               </div>
               <div className="p-2 rounded-lg bg-amber-50">
@@ -354,7 +354,7 @@ export function BudgetTrendCard() {
               <div className="p-2 rounded-lg bg-purple-50">
                 <p className="text-[10px] text-purple-600 font-medium">Concentration (HHI)</p>
                 <p className="text-sm font-bold text-purple-900">
-                  {data.metrics.hhi_last_year?.toFixed(0) ?? '—'}
+                  {data.metrics.hhi_last_year?.toFixed(0) ?? '–'}
                 </p>
               </div>
               <div className="p-2 rounded-lg bg-gray-50">

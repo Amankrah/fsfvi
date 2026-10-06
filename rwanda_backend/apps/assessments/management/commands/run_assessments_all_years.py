@@ -60,7 +60,7 @@ class Command(BaseCommand):
             for fy in years:
                 indicators = service.load_indicators_from_db(fy)
                 self.stdout.write(f"  FY{fy}: {len(indicators)} indicators")
-            self.stdout.write(self.style.WARNING("Dry run — no assessments run or saved."))
+            self.stdout.write(self.style.WARNING("Dry run. No assessments were run or saved."))
             return
 
         service = AssessmentService()

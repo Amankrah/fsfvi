@@ -167,7 +167,7 @@ export default function PSTA5Page() {
             PSTA-5 Alignment Tracker
           </h1>
           <p className="text-sm text-gray-500 mt-1">
-            Strategic Plan for Agriculture Transformation (2024-2029) — KPI Progress & Budget Alignment
+            Strategic Plan for Agriculture Transformation (2024–2029): KPI progress and budget alignment
           </p>
         </div>
         <div className="flex flex-col items-stretch sm:items-end gap-2 text-right max-w-md">
@@ -194,9 +194,9 @@ export default function PSTA5Page() {
           <CardContent>
             <div className="flex flex-col items-center">
               <p className="text-[11px] text-gray-600 text-center leading-snug mb-2 px-1">
-                <strong>Weighted</strong> budget fit: each Priority Area gets a fit score, then averages using PSTA-5
-                weights (58% · 17% · 24%). This can differ from the plan card gauge, which uses a single{' '}
-                <strong>unweighted</strong> mix check — both are valid; they are not duplicates of the same number.
+                <strong>Weighted</strong> budget fit: each priority area receives a fit score, and the scores are
+                averaged using PSTA 5 weights (58% · 17% · 24%). This can differ from the plan card gauge, which uses a
+                single <strong>unweighted</strong> mix check. Both are valid measures of different things.
               </p>
               {/* Budget Alignment - Primary (what the plan controls) */}
               <div className="relative w-36 h-36">
@@ -382,8 +382,8 @@ export default function PSTA5Page() {
               <p className="flex flex-wrap items-start gap-2">
                 <span className="mt-0.5 inline-flex h-0 w-10 shrink-0 border-t-2 border-dashed border-slate-600" aria-hidden />
                 <span>
-                  <span className="font-semibold text-slate-900">Dashed vertical line at 40%</span>
-                  — same cutoff as &quot;at risk&quot; KPIs; bars ending left of the line are in the attention band.
+                  <span className="font-semibold text-slate-900">Dashed vertical line at 40%:</span> the same cutoff
+                  used for &quot;at risk&quot; KPIs. Bars that end left of the line need attention.
                 </span>
               </p>
             </div>
@@ -409,12 +409,12 @@ export default function PSTA5Page() {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Budget Alignment Score — unweighted mix metric from API */}
+              {/* Budget Alignment Score: unweighted mix metric from API */}
               <div className="flex flex-col items-center justify-center p-4 bg-white rounded-lg border border-gray-200">
                 <p className="text-[11px] text-gray-600 text-center leading-snug mb-2 max-w-xs">
-                  <strong>Unweighted</strong> mix score: 100 minus twice the <em>simple average</em> of absolute
-                  gaps between actual and target PSTA-5 shares (58% / 17% / 24%). The summary card uses the{' '}
-                  <em>same gaps</em> but weights them by PSTA-5 priority — so the two percentages usually differ
+                  <strong>Unweighted</strong> mix score: 100 minus twice the <em>simple average</em> of the absolute
+                  gaps between actual and target PSTA 5 shares (58% / 17% / 24%). The summary card uses the{' '}
+                  <em>same gaps</em> but weights them by PSTA 5 priority, so the two percentages usually differ
                   slightly.
                 </p>
                 <div className="relative w-32 h-32 mb-3">
@@ -520,27 +520,27 @@ export default function PSTA5Page() {
                 })}
                 <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-gray-700 space-y-1">
                   <p>
-                    <strong>Mapped</strong> through FSFSI→PSTA-5 links:{' '}
+                    <strong>Mapped</strong> through FSFSI to PSTA 5 links:{' '}
                     <span className="font-mono font-semibold">
-                      {summary.budget_alignment.total_mapped_bn?.toFixed(2) ?? '—'} Bn
+                      {summary.budget_alignment.total_mapped_bn?.toFixed(2) ?? '–'} Bn
                     </span>{' '}
-                    RWF (only spend routed via mapped components).
+                    RWF (only spending routed through mapped components).
                   </p>
                   <p>
                     Full plan envelope (final plan year):{' '}
                     <span className="font-mono font-semibold">
-                      {summary.budget_alignment.total_budget_bn?.toFixed(2) ?? '—'} Bn
+                      {summary.budget_alignment.total_budget_bn?.toFixed(2) ?? '–'} Bn
                     </span>{' '}
-                    RWF · Not mapped to a PA with current bridges:{' '}
+                    RWF · Not mapped to a priority area with the current bridges:{' '}
                     <span className="font-mono font-semibold">
-                      {summary.budget_alignment.unmapped_bn?.toFixed(2) ?? '—'} Bn
+                      {summary.budget_alignment.unmapped_bn?.toFixed(2) ?? '–'} Bn
                     </span>{' '}
                     RWF.
                   </p>
                   <p className="text-amber-900 bg-amber-50 border border-amber-100 rounded px-2 py-1.5 text-[11px] leading-snug">
-                    A small &quot;mapped&quot; total means much of the plan sits in lines not attributed to Priority Areas
-                    in this mapping — it is <strong>not</strong> the full national agriculture budget (e.g. national
-                    ~2.2T RWF). Treat this panel as a <strong>traceability slice</strong>, not complete coverage.
+                    A small mapped total means that much of the plan sits in lines not attributed to priority areas in
+                    this mapping. It is <strong>not</strong> the full national agriculture budget (about 2.2T RWF).
+                    Treat this panel as a <strong>traceability slice</strong>, not complete coverage.
                   </p>
                 </div>
               </div>
@@ -675,7 +675,7 @@ export default function PSTA5Page() {
                       <Tooltip
                         formatter={(value) => {
                           const n = Number(value);
-                          if (!Number.isFinite(n)) return ['—', 'Budget'];
+                          if (!Number.isFinite(n)) return ['–', 'Budget'];
                           return [`${n.toFixed(1)} Bn RWF`, 'Budget'];
                         }}
                         labelFormatter={(l) => String(l)}
@@ -749,7 +749,7 @@ export default function PSTA5Page() {
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">Budget Alignment:</span>
                     <span className="font-bold text-blue-600">
-                      {summary.overall_score?.toFixed(0) ?? '—'}%
+                      {summary.overall_score?.toFixed(0) ?? '–'}%
                     </span>
                   </div>
                   <p className="text-[10px] text-gray-400">
@@ -856,7 +856,7 @@ export default function PSTA5Page() {
         </CardContent>
       </Card>
 
-      {/* Priority Areas Requiring Attention — surfaced before the full KPI table for executive scan */}
+      {/* Priority Areas Requiring Attention: surfaced before the full KPI table for executive scan */}
       {(() => {
         const atRiskPAs = summary.pillar_scores.filter((ps) => (ps.indicator_improvement ?? 0) < 40);
         if (atRiskPAs.length === 0) return null;
@@ -1116,7 +1116,7 @@ export default function PSTA5Page() {
                               color: getProgressColor(compImprovement),
                             }}
                           >
-                            {compImprovement > 0 ? `+${compImprovement.toFixed(0)}%` : '—'}
+                            {compImprovement > 0 ? `+${compImprovement.toFixed(0)}%` : '–'}
                           </span>
                         </div>
                       );

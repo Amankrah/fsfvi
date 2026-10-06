@@ -10,6 +10,8 @@ import { attachAuthInterceptors } from '@/lib/api/attachAuthInterceptors';
 import type {
   AllocationSimulateRequest,
   AllocationSimulateResponse,
+  InvestmentScenarioRequest,
+  InvestmentScenarioResponse,
   MultiYearPlanRequest,
   MultiYearStrategicPlan,
   MtefPlan,
@@ -40,7 +42,7 @@ attachAuthInterceptors(planningClient);
 
 export const planningAPI = {
   // ==========================================================================
-  // Assessment-based (preferred — cumulative stress as baseline)
+  // Assessment-based (preferred: cumulative stress as baseline)
   // ==========================================================================
 
   /**
@@ -93,6 +95,21 @@ export const planningAPI = {
   ): Promise<AllocationSimulateResponse> => {
     const response = await planningClient.post<AllocationSimulateResponse>(
       `/${assessmentId}/simulate-allocation/`,
+      body,
+    );
+    return response.data;
+  },
+
+  /**
+   * Donor/partner envelope: extra mapped budget (bn LCU) by component and/or indicator code.
+   * POST /api/planning/<assessment_id>/investment-scenario/
+   */
+  investmentScenario: async (
+    assessmentId: string,
+    body: InvestmentScenarioRequest,
+  ): Promise<InvestmentScenarioResponse> => {
+    const response = await planningClient.post<InvestmentScenarioResponse>(
+      `/${assessmentId}/investment-scenario/`,
       body,
     );
     return response.data;
@@ -203,7 +220,7 @@ export const planningAPI = {
   },
 
   // ==========================================================================
-  // Plan Year Actuals — Record actual budget allocations per year
+  // Plan Year Actuals: Record actual budget allocations per year
   // ==========================================================================
 
   /** List all actuals for a saved plan. */

@@ -130,6 +130,102 @@ class PlanReferenceSnapshotSerializer(serializers.Serializer):
     planning_scenario = serializers.CharField(max_length=64, required=False, allow_blank=True)
 
 
+class InvestmentScenarioRequestSerializer(serializers.Serializer):
+    """POST body for /planning/<assessment_id>/investment-scenario/."""
+
+    program_name = serializers.CharField(max_length=255, required=False, allow_blank=True)
+    # Donor mode: one envelope split evenly across these indicator codes (bn LCU each).
+    indicator_codes = serializers.ListField(
+        child=serializers.CharField(max_length=32),
+        required=False,
+    )
+    total_investment_bn = serializers.FloatField(required=False, min_value=0)
+    # Per selected code: True = higher observed values are better, False = lower is better (overrides catalog).
+    higher_is_better_by_indicator = serializers.DictField(
+        child=serializers.BooleanField(),
+        required=False,
+    )
+    by_indicator = serializers.DictField(
+        child=serializers.FloatField(min_value=0),
+        required=False,
+    )
+    by_component = serializers.DictField(
+        child=serializers.FloatField(min_value=0),
+        required=False,
+    )
+    weighting_method = serializers.CharField(max_length=32, default="hybrid", required=False)
+    scenario = serializers.CharField(max_length=64, default="normal_operations", required=False)
+    # Implementation FY (legacy): required with total_investment_bn if investment_by_fiscal_year is omitted.
+    project_fiscal_year = serializers.IntegerField(
+        required=False, allow_null=True, min_value=1990, max_value=2100
+    )
+    strategic_plan_id = serializers.UUIDField(required=False, allow_null=True)
+    # Donor mode: {"2026": 1.5, "2027": 2.0} bn RWF — years must fall in the strategic plan horizon (validated in service).
+    investment_by_fiscal_year = serializers.DictField(
+        child=serializers.FloatField(min_value=0),
+        required=False,
+    )
+
+    def validate(self, attrs):
+        codes = [str(c).strip() for c in (attrs.get("indicator_codes") or []) if str(c).strip()]
+        total_inv = attrs.get("total_investment_bn")
+        by_i = dict(attrs.get("by_indicator") or {})
+        by_c = dict(attrs.get("by_component") or {})
+        hib = dict(attrs.get("higher_is_better_by_indicator") or {})
+
+        raw_sched = attrs.get("investment_by_fiscal_year") or {}
+        sched_bn: dict[int, float] = {}
+        if isinstance(raw_sched, dict):
+            for key, val in raw_sched.items():
+                try:
+                    fy = int(str(key).strip())
+                except (TypeError, ValueError):
+                    continue
+                amt = float(val or 0)
+                if amt > 0:
+                    sched_bn[fy] = sched_bn.get(fy, 0.0) + amt
+
+        if codes:
+            has_sched = bool(sched_bn)
+            has_total = total_inv is not None and float(total_inv) > 0
+            if not has_sched and not has_total:
+                raise serializers.ValidationError(
+                    "Provide investment_by_fiscal_year with at least one positive amount, "
+                    "or total_investment_bn with project_fiscal_year.",
+                )
+            if not has_sched and not attrs.get("project_fiscal_year"):
+                raise serializers.ValidationError(
+                    {
+                        "project_fiscal_year": (
+                            "Required when using total_investment_bn without investment_by_fiscal_year "
+                            "(pick the plan horizon year for policy comparison)."
+                        ),
+                    },
+                )
+            unknown_hib = set(hib.keys()) - set(codes)
+            if unknown_hib:
+                raise serializers.ValidationError(
+                    f"higher_is_better_by_indicator has keys not in indicator_codes: {sorted(unknown_hib)}",
+                )
+            attrs["indicator_codes"] = list(dict.fromkeys(codes))
+        else:
+            if attrs.get("investment_by_fiscal_year"):
+                raise serializers.ValidationError(
+                    "investment_by_fiscal_year is only used together with indicator_codes.",
+                )
+            if hib:
+                raise serializers.ValidationError(
+                    "higher_is_better_by_indicator is only used together with indicator_codes.",
+                )
+            if not by_i and not by_c:
+                raise serializers.ValidationError(
+                    "Provide indicator_codes + (investment_by_fiscal_year or total_investment_bn) (donor mode), "
+                    "or by_indicator / by_component (advanced split).",
+                )
+            attrs["indicator_codes"] = []
+        return attrs
+
+
 class AllocationSimulateSerializer(serializers.Serializer):
     """POST body for /planning/<assessment_id>/simulate-allocation/."""
 

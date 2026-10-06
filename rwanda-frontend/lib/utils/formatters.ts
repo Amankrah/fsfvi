@@ -118,13 +118,13 @@ export function formatRWFCompact(amount: number): string {
 /** Format score/index for display (backend may send number or string). Uses 4 decimal places for index precision. */
 export function formatScore(score: number | string | null | undefined, decimals: number = 4): string {
   const n = score == null ? NaN : Number(score);
-  return Number.isFinite(n) ? n.toFixed(decimals) : '—';
+  return Number.isFinite(n) ? n.toFixed(decimals) : '–';
 }
 
 /** Human-readable engine run duration (avoid raw "0 ms" when work was negligible). */
 export function formatEngineDurationMs(ms: number | null | undefined): string {
   const n = ms == null ? NaN : Number(ms);
-  if (!Number.isFinite(n) || n < 0) return '—';
+  if (!Number.isFinite(n) || n < 0) return '–';
   if (n >= 1000) return `${(n / 1000).toFixed(n >= 10_000 ? 0 : 1)} s`;
   if (n < 1) return '< 1 ms';
   return `${Math.round(n)} ms`;
@@ -148,9 +148,9 @@ export function formatPolicyDate(
   iso: string | null | undefined,
   locale: 'en' | 'fr' | 'rw' = 'en',
 ): string {
-  if (!iso) return '—';
+  if (!iso) return '–';
   const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '—';
+  if (Number.isNaN(d.getTime())) return '–';
   const tag = POLICY_DATE_LOCALE[locale] ?? 'en-US';
   try {
     return new Intl.DateTimeFormat(tag, {

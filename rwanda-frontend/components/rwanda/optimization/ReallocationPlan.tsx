@@ -29,7 +29,7 @@ export function ReallocationPlan({ data }: ReallocationPlanProps) {
   return (
     <div className="space-y-6">
       {/* Summary Header */}
-      <div className="bg-gradient-to-r from-blue-50 to-green-50 rounded-lg p-6 border border-blue-200">
+      <div className="bg-slate-50 rounded-lg p-6 border border-slate-200">
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             <div className="text-center sm:text-left">

@@ -64,7 +64,7 @@ export interface PasswordChangeRequest {
   new_password: string;
 }
 
-/** POST /api/auth/2fa/setup/ — aligns with Django + Rust `mfa.rs` (otpauth URL + backup codes). */
+/** POST /api/auth/2fa/setup/: aligns with Django + Rust `mfa.rs` (otpauth URL + backup codes). */
 export interface MfaSetupResponse {
   secret: string;
   qr_code_url: string;

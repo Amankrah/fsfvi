@@ -235,11 +235,26 @@ class QuickCheckOutputSerializer(serializers.Serializer):
 # Model Serializers (for database models)
 # ---------------------------------------------------------------------------
 
+_indicator_higher_is_better_map: dict[str, bool] | None = None
+
+
+def _get_indicator_higher_is_better_map() -> dict[str, bool]:
+    """Cached code -> higher_is_better from fsfvi_data (small fixed catalog ~37 rows)."""
+    global _indicator_higher_is_better_map
+    if _indicator_higher_is_better_map is None:
+        from apps.fsfvi_data.models import Indicator
+
+        _indicator_higher_is_better_map = dict(
+            Indicator.objects.values_list("code", "higher_is_better")
+        )
+    return _indicator_higher_is_better_map
+
 
 class IndicatorResultSerializer(serializers.ModelSerializer):
     """Serializer for IndicatorResult model."""
 
     component_display = serializers.SerializerMethodField()
+    higher_is_better = serializers.SerializerMethodField()
 
     class Meta:
         model = IndicatorResult
@@ -257,11 +272,16 @@ class IndicatorResultSerializer(serializers.ModelSerializer):
             "stress_value",
             "weighted_lcu_bn",
             "share_weighted_percent",
+            "higher_is_better",
         ]
         read_only_fields = fields
 
     def get_component_display(self, obj):
         return obj.get_component_display()
+
+    def get_higher_is_better(self, obj):
+        m = _get_indicator_higher_is_better_map()
+        return bool(m.get(obj.indicator_code, True))
 
 
 class ComponentResultSerializer(serializers.ModelSerializer):

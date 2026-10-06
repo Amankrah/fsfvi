@@ -65,7 +65,7 @@ export function MtefSummaryCards({ plan }: MtefSummaryCardsProps) {
         {t('planning.mtef_diff_note')}
       </p>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Card className="bg-gradient-to-br from-[var(--rw-blue)]/5 to-white border-[var(--rw-blue)]/20">
+        <Card className="border-t-[3px] border-t-[var(--rw-blue-deep)]">
           <CardHeader className="pb-1">
             <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
               <Calendar className="h-4 w-4" />
@@ -89,7 +89,7 @@ export function MtefSummaryCards({ plan }: MtefSummaryCardsProps) {
             <p className="text-sm text-gray-700 mt-1">{formatRWFCompact(year_1_plan.total_budget)}</p>
           </CardContent>
         </Card>
-        <Card className="bg-gradient-to-br from-[var(--rw-blue)]/5 to-white border-[var(--rw-blue)]/20">
+        <Card className="border-t-[3px] border-t-[var(--rw-blue-deep)]">
           <CardHeader className="pb-1">
             <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
               <Calendar className="h-4 w-4" />
@@ -113,7 +113,7 @@ export function MtefSummaryCards({ plan }: MtefSummaryCardsProps) {
             <p className="text-sm text-gray-700 mt-1">{formatRWFCompact(year_2_plan.total_budget)}</p>
           </CardContent>
         </Card>
-        <Card className="bg-gradient-to-br from-[var(--rw-green)]/10 to-white border-[var(--rw-green)]/30">
+        <Card className="border-t-[3px] border-t-[var(--rw-green)]">
           <CardHeader className="pb-1">
             <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
               <TrendingDown className="h-4 w-4 text-[var(--rw-green)]" />

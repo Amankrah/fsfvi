@@ -7,7 +7,7 @@ import { RW_AUTH_TOKEN_KEY } from '@/lib/auth/storageKeys';
 import { redirectToLoginSessionExpired } from '@/lib/api/authSession';
 import { tryRefreshAccessToken } from '@/lib/api/tokenRefresh';
 
-/** Do not run “session recovery\" on these paths — 401 is expected for wrong password / 2FA code, etc. */
+/** Do not run “session recovery\" on these paths: 401 is expected for wrong password / 2FA code, etc. */
 const SKIP_SESSION_RECOVERY_PARTS = [
   '/api/auth/login',
   '/api/auth/2fa/verify',

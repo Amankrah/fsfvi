@@ -13,7 +13,7 @@ export default function DistrictsPage() {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <p className="text-gray-600">District comparison & ranking — coming in Phase 2.</p>
+        <p className="text-gray-600">District comparison and ranking. Planned for Phase 2.</p>
       </CardContent>
     </Card>
   );

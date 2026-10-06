@@ -13,7 +13,7 @@ export default function DistrictDetailPage() {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <p className="text-gray-600">District detail view — coming in Phase 2.</p>
+        <p className="text-gray-600">District detail. Planned for Phase 2.</p>
       </CardContent>
     </Card>
   );

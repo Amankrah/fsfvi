@@ -13,7 +13,7 @@ export default function ProvincesPage() {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <p className="text-gray-600">Province-level breakdown — coming in Phase 2.</p>
+        <p className="text-gray-600">Province-level breakdown. Planned for Phase 2.</p>
       </CardContent>
     </Card>
   );

@@ -49,10 +49,10 @@ def imputed_observed(rec, n_indicators: int):
         higher = rec.indicator.higher_is_better if hasattr(rec, 'indicator') else True
         if higher:
             # Higher is better: observed = 50% of benchmark (underperforming)
-            return bench_f * 0.5, "imputed (50% of benchmark — no observed data)"
+            return bench_f * 0.5, "imputed (50% of benchmark, no observed data)"
         else:
             # Lower is better: observed = 150% of benchmark (worse than target)
-            return bench_f * 1.5, "imputed (150% of benchmark — no observed data)"
+            return bench_f * 1.5, "imputed (150% of benchmark, no observed data)"
     # Both null: synthetic
     share = float(rec.share_weighted_percent or 0)
     return share * 100.0, "share_weighted_percent * 100"

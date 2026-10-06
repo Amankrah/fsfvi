@@ -4,7 +4,6 @@ import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { authAPI, getAuthErrorMessage } from '@/lib/api/authApi';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { RwandaLogo } from '@/components/rwanda/shared/RwandaLogo';
 import { Shield, AlertCircle, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -76,103 +75,90 @@ export function TwoFactorForm({ tempToken, username, onBack }: TwoFactorFormProp
   };
 
   return (
-    <div className="w-full max-w-md">
-      <div className="text-center mb-8">
-        <div className="flex justify-center mb-4">
-          <RwandaLogo size="lg" />
-        </div>
-        <h1 className="text-2xl font-bold text-gray-900 mb-1">{t('auth.two_factor_title')}</h1>
-        <p className="text-sm text-gray-600">
+    <div className="w-full">
+      <div className="mb-8">
+        <p className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--rw-blue-deep)]">
+          <Shield className="h-3.5 w-3.5" aria-hidden />
+          {t('auth.verify_identity')}
+        </p>
+        <h1 className="font-display mt-2 text-3xl font-semibold tracking-tight text-slate-900">{t('auth.two_factor_title')}</h1>
+        <p className="mt-2 text-sm text-slate-600">
           {useBackup ? t('auth.backup_code_placeholder') : t('auth.two_factor_subtitle')}
+        </p>
+        <p className="mt-1 text-sm text-slate-600">
+          {t('auth.signing_in_as')} <strong className="font-semibold text-slate-900">{username}</strong>
         </p>
       </div>
 
-      <div className="bg-white shadow-xl rounded-2xl border border-gray-200 overflow-hidden">
-        <div className="bg-gradient-to-r from-[var(--rw-blue)]/10 to-[var(--rw-green)]/10 px-8 py-5 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900 flex items-center">
-            <Shield className="h-5 w-5 mr-2 text-[var(--rw-blue)]" />
-            {t('auth.verify_identity')}
-          </h2>
-          <p className="text-sm text-gray-600 mt-1">
-            {t('auth.signing_in_as')} <strong>{username}</strong>
-          </p>
+      {error && (
+        <div className="mb-6 rounded-md border border-red-200 bg-red-50 p-4" role="alert">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-600" aria-hidden />
+            <p className="text-sm text-red-800">{error}</p>
+          </div>
         </div>
+      )}
 
-        <div className="p-8">
-          <button
-            type="button"
-            onClick={() => {
-              setUseBackup(!useBackup);
-              setError('');
-              setBackupCode('');
-              setCode(['', '', '', '', '', '']);
-            }}
-            className="text-sm font-medium text-[var(--rw-blue)] hover:underline mb-4"
-          >
-            {useBackup ? t('auth.use_totp_code') : t('auth.use_backup_code')}
-          </button>
-
-          {error && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-              <div className="flex items-start space-x-3">
-                <AlertCircle className="h-5 w-5 text-red-600 mt-0.5 flex-shrink-0" />
-                <p className="text-sm text-red-800">{error}</p>
-              </div>
-            </div>
-          )}
-
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {useBackup ? (
+      <form onSubmit={handleSubmit} className="space-y-6">
+        {useBackup ? (
+          <input
+            type="text"
+            autoComplete="one-time-code"
+            maxLength={8}
+            value={backupCode}
+            onChange={(e) => setBackupCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8))}
+            placeholder={t('auth.backup_code_placeholder')}
+            className="h-12 w-full rounded-md border border-slate-300 px-4 text-center font-mono text-lg tracking-[0.3em] text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.04)] placeholder:tracking-normal placeholder:text-slate-400 focus:border-[var(--rw-blue-deep)] focus:outline-none focus:ring-2 focus:ring-[var(--rw-blue-deep)]/25"
+            disabled={isLoading}
+          />
+        ) : (
+          <div className="flex justify-between gap-2">
+            {code.map((digit, i) => (
               <input
+                key={i}
+                ref={(el) => {
+                  inputRefs.current[i] = el;
+                }}
                 type="text"
-                autoComplete="one-time-code"
-                maxLength={8}
-                value={backupCode}
-                onChange={(e) => setBackupCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8))}
-                placeholder={t('auth.backup_code_placeholder')}
-                className="w-full text-center text-lg font-mono tracking-wider border-2 border-gray-200 rounded-lg py-3 px-4 focus:outline-none focus:ring-2 focus:ring-[var(--rw-blue)]"
+                inputMode="numeric"
+                maxLength={1}
+                value={digit}
+                onChange={(e) => handleDigitChange(i, e.target.value)}
+                onKeyDown={(e) => handleKeyDown(i, e)}
+                aria-label={`Digit ${i + 1}`}
+                className="h-14 w-full rounded-md border border-slate-300 text-center text-xl font-semibold tabular-nums text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.04)] focus:border-[var(--rw-blue-deep)] focus:outline-none focus:ring-2 focus:ring-[var(--rw-blue-deep)]/25"
                 disabled={isLoading}
               />
-            ) : (
-              <div className="flex justify-center gap-2">
-                {code.map((digit, i) => (
-                  <input
-                    key={i}
-                    ref={(el) => {
-                      inputRefs.current[i] = el;
-                    }}
-                    type="text"
-                    inputMode="numeric"
-                    maxLength={1}
-                    value={digit}
-                    onChange={(e) => handleDigitChange(i, e.target.value)}
-                    onKeyDown={(e) => handleKeyDown(i, e)}
-                    className="w-12 h-14 text-center text-xl font-bold border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--rw-blue)] focus:border-transparent"
-                    disabled={isLoading}
-                  />
-                ))}
-              </div>
-            )}
+            ))}
+          </div>
+        )}
 
-            <button
-              type="submit"
-              disabled={
-                isLoading ||
-                (useBackup ? backupCode.trim().length !== 8 : code.some((d) => !d))
-              }
-              className="w-full bg-gradient-to-r from-[var(--rw-blue)] to-[var(--rw-green)] text-white py-3 px-4 rounded-lg hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-[var(--rw-blue)] focus:ring-offset-2 disabled:opacity-50 transition-all shadow-lg font-semibold"
-            >
-              {isLoading ? t('auth.verifying') : t('auth.verify_code')}
-            </button>
-          </form>
-        </div>
+        <button
+          type="submit"
+          disabled={isLoading || (useBackup ? backupCode.trim().length !== 8 : code.some((d) => !d))}
+          className="flex h-11 w-full items-center justify-center rounded-md bg-[var(--rw-blue-deep)] px-4 text-[15px] font-semibold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_1px_2px_rgba(2,6,23,0.2)] transition-colors hover:bg-[var(--rw-blue-ink)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rw-blue-deep)] focus-visible:ring-offset-2 disabled:opacity-50"
+        >
+          {isLoading ? t('auth.verifying') : t('auth.verify_code')}
+        </button>
+      </form>
 
-        <div className="px-8 py-4 bg-gray-50 border-t border-gray-200">
-          <Button variant="ghost" size="sm" onClick={onBack} className="text-gray-600">
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            {t('auth.back_to_login')}
-          </Button>
-        </div>
+      <div className="mt-6 flex items-center justify-between gap-4 border-t border-slate-200 pt-5">
+        <Button variant="ghost" size="sm" onClick={onBack} className="-ml-2 text-slate-600">
+          <ArrowLeft className="h-4 w-4" aria-hidden />
+          {t('auth.back_to_login')}
+        </Button>
+        <button
+          type="button"
+          onClick={() => {
+            setUseBackup(!useBackup);
+            setError('');
+            setBackupCode('');
+            setCode(['', '', '', '', '', '']);
+          }}
+          className="text-sm font-medium text-[var(--rw-blue-deep)] underline-offset-4 hover:underline"
+        >
+          {useBackup ? t('auth.use_totp_code') : t('auth.use_backup_code')}
+        </button>
       </div>
     </div>
   );

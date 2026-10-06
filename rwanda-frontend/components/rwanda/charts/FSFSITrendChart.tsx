@@ -148,7 +148,7 @@ export function FSFSITrendChart({ data, height = 500 }: FSFSITrendChartProps) {
   return (
     <div className="rounded-xl border border-slate-100 bg-slate-50/40 p-2 sm:p-3">
       <ResponsiveContainer width="100%" height={height}>
-        <ComposedChart data={chartData} margin={{ top: 24, right: 28, left: 8, bottom: 8 }}>
+        <ComposedChart data={chartData} margin={{ top: 24, right: 28, left: 8, bottom: 28 }}>
           <defs>
             <linearGradient id="fsfsiGradient" x1="0" y1="0" x2="0" y2="1">
               <stop offset="5%" stopColor={LINE_CURRENT} stopOpacity={0.22} />
@@ -184,6 +184,12 @@ export function FSFSITrendChart({ data, height = 500 }: FSFSITrendChartProps) {
             tick={{ fontSize: 13, fill: '#475569', fontWeight: 500 }}
             tickLine={{ stroke: '#94a3b8' }}
             axisLine={{ stroke: '#94a3b8' }}
+            label={{
+              value: t('common.fiscal_year'),
+              position: 'insideBottom',
+              offset: -18,
+              style: { textAnchor: 'middle', fill: '#64748b', fontSize: 12 },
+            }}
           />
           <YAxis
             domain={yDomain}
@@ -226,10 +232,17 @@ export function FSFSITrendChart({ data, height = 500 }: FSFSITrendChartProps) {
             y={STRESS_THRESHOLDS.high}
             stroke={STRESS_COLORS.high}
             strokeDasharray="4 4"
-            strokeOpacity={0.8}
+            strokeOpacity={0.9}
+            label={{
+              value: `${t('overview.chart_threshold_high')} (${STRESS_THRESHOLDS.high.toFixed(2)})`,
+              position: 'insideBottomRight',
+              fill: STRESS_COLORS.high,
+              fontSize: 11,
+              fontWeight: 600,
+            }}
           />
 
-          <Area type="monotone" dataKey="fsfsi" stroke="none" fill="url(#fsfsiGradient)" />
+          <Area type="monotone" dataKey="fsfsi" stroke="none" fill="url(#fsfsiGradient)" legendType="none" tooltipType="none" />
           <Line
             type="monotone"
             dataKey="fsfsi"
@@ -242,7 +255,14 @@ export function FSFSITrendChart({ data, height = 500 }: FSFSITrendChartProps) {
 
           {hasCumulative && (
             <>
-              <Area type="monotone" dataKey="cumulative" stroke="none" fill="url(#cumulativeGradient)" />
+              <Area
+                type="monotone"
+                dataKey="cumulative"
+                stroke="none"
+                fill="url(#cumulativeGradient)"
+                legendType="none"
+                tooltipType="none"
+              />
               <Line
                 type="monotone"
                 dataKey="cumulative"
@@ -265,6 +285,7 @@ export function FSFSITrendChart({ data, height = 500 }: FSFSITrendChartProps) {
             <li>{t('overview.chart_explain_blue')}</li>
             <li>{t('overview.chart_explain_red')}</li>
             <li>{t('overview.chart_explain_gap')}</li>
+            <li>{t('overview.chart_explain_threshold', { value: STRESS_THRESHOLDS.high.toFixed(2) })}</li>
           </ul>
         </div>
       )}

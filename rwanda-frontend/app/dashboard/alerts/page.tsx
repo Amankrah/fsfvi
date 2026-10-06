@@ -13,7 +13,7 @@ export default function AlertsPage() {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <p className="text-gray-600">Notification center & threshold alerts — coming in Phase 4.</p>
+        <p className="text-gray-600">Notification centre and threshold alerts. Planned for Phase 4.</p>
       </CardContent>
     </Card>
   );

@@ -283,34 +283,34 @@ def _stamp_planning_result(result, assessment, target_fsfvi, planning_years, gro
     reduction_pct = (cumulative_fsfsi - final_projected) / cumulative_fsfsi * 100 if cumulative_fsfsi > 0 else 0
 
     outcomes = [
-        f"Cumulative stress reduction from {cumulative_fsfsi:.4f} to {final_projected:.4f} "
-        f"({reduction_pct:.1f}% improvement over {planning_years} years)",
+        f"Cumulative stress falls from {cumulative_fsfsi:.4f} to {final_projected:.4f}, "
+        f"an improvement of {reduction_pct:.1f}% over {planning_years} years.",
     ]
     if final_projected <= target_fsfvi:
-        outcomes.append(f"Target of {target_fsfvi:.2f} achieved within {planning_years}-year planning horizon")
+        outcomes.append(f"The target of {target_fsfvi:.2f} is reached within the {planning_years}-year horizon.")
     else:
         outcomes.append(
-            f"Target of {target_fsfvi:.2f} not fully achieved — "
-            f"consider extending the planning horizon or increasing budget growth rate"
+            f"The target of {target_fsfvi:.2f} is not reached within the horizon. "
+            f"Consider a longer planning period or a higher budget growth rate."
         )
     if fastest:
         outcomes.append(
-            f"Fastest recovery: {fastest['name']} ({fastest['change_pct']:.0f}%) — "
-            f"benefits most from optimal reallocation"
+            f"Fastest recovery: {fastest['name']} ({fastest['change_pct']:.0f}%). "
+            f"This component gains most from the optimal reallocation."
         )
     if slowest and slowest != fastest:
         outcomes.append(
-            f"Slowest recovery: {slowest['name']} ({slowest['change_pct']:.0f}%) — "
-            f"requires sustained long-term investment"
+            f"Slowest recovery: {slowest['name']} ({slowest['change_pct']:.0f}%). "
+            f"This component needs sustained investment over the full period."
         )
     if len(recovering) == len(comp_changes):
         outcomes.append(
-            f"All {len(recovering)} components projected to recover with optimal allocation"
+            f"All {len(recovering)} components are projected to recover under the optimal allocation."
         )
     elif worsening:
         outcomes.append(
-            f"{len(worsening)} component(s) at risk: {', '.join(c['name'] for c in worsening)} — "
-            f"may need additional targeted intervention"
+            f"{len(worsening)} component(s) at risk: {', '.join(c['name'] for c in worsening)}. "
+            f"These may need additional targeted intervention."
         )
     result["expected_outcomes"] = outcomes
 
@@ -332,13 +332,13 @@ def _stamp_planning_result(result, assessment, target_fsfvi, planning_years, gro
             "risk_type": "Residual Stress",
             "severity": "high",
             "description": (
-                f"{still_critical} component(s) still above critical threshold (>0.30) at end of plan: "
+                f"{still_critical} component(s) remain above the critical threshold (0.30) at the end of the plan: "
                 f"{', '.join(still_names[:3])}{'...' if len(still_names) > 3 else ''}. "
-                f"Even with optimal allocation, accumulated damage takes longer to resolve."
+                f"Even under the optimal allocation, accumulated damage takes longer to clear."
             ),
             "mitigation": (
-                f"Extend planning horizon beyond {planning_years} years for these components, "
-                f"or increase targeted funding above the {growth_rate*100:.0f}% baseline growth"
+                f"Extend the planning horizon beyond {planning_years} years for these components, "
+                f"or raise their funding above the {growth_rate*100:.0f}% baseline growth."
             ),
         })
 
@@ -347,31 +347,31 @@ def _stamp_planning_result(result, assessment, target_fsfvi, planning_years, gro
             "risk_type": "Damage Persistence",
             "severity": "critical",
             "description": (
-                f"Accumulated damage lag of {damage_lag:.3f} means current-year snapshot ({current_fsfsi:.4f}) "
-                f"understates the real situation ({cumulative_fsfsi:.4f}). Structural damage persists."
+                f"The accumulated damage lag is {damage_lag:.3f}. The current-year figure ({current_fsfsi:.4f}) "
+                f"understates the real position ({cumulative_fsfsi:.4f}) because structural damage persists."
             ),
-            "mitigation": "Sustained multi-year investment required — single-year budget increases are insufficient",
+            "mitigation": "Sustain investment over several years. A single-year budget increase is not enough to clear accumulated damage.",
         })
 
     risks.append({
         "risk_type": "Budget Commitment",
         "severity": "medium",
         "description": (
-            f"Plan requires {planning_years} years of sustained "
+            f"The plan depends on {planning_years} years of sustained "
             f"{growth_rate * 100:.0f}% annual budget growth. "
-            f"Political or fiscal disruptions could derail recovery."
+            f"Political or fiscal disruption would slow the recovery."
         ),
-        "mitigation": "Lock in multi-year budget commitments through MTEF framework and donor coordination",
+        "mitigation": "Secure multi-year budget commitments through the MTEF and coordinate with development partners.",
     })
     result["implementation_risks"] = risks
 
     # --- Success Factors (policy-relevant) ---
     result["success_factors"] = [
-        "Political commitment across electoral cycles",
-        "Adequate and predictable financing through MTEF",
-        "Strong M&E for course correction",
-        "Coordination across sectors (agriculture, health, environment, finance)",
-        "Community-level implementation capacity",
+        "Political commitment that holds across electoral cycles",
+        "Adequate and predictable financing through the MTEF",
+        "Strong monitoring and evaluation to allow course correction",
+        "Coordination across agriculture, health, environment and finance",
+        "Implementation capacity at community level",
     ]
 
     return result
@@ -794,8 +794,8 @@ def simulate_user_allocation_year(
                 new_comp[c] = pc + cd["rho_down"] * (pit - pc)
 
         note = (
-            "Your allocation matches the optimal plan exactly. Using the plan's pre-computed "
-            "cumulative FSFSI projection to ensure consistency with the trajectory chart."
+            "Your allocation matches the optimal plan exactly, so the projection shown is the plan's own "
+            "cumulative FSFSI for this year. This keeps it consistent with the trajectory chart."
         )
     else:
         try:
@@ -824,15 +824,12 @@ def simulate_user_allocation_year(
             new_comp[c] = pc + cd["rho_down"] * (pit - pc)
 
         note = (
-            "System FSFSI uses Rust calculate_system_fsfsi (py_analyze_efficiency) and the same "
-            "cumulative EMA as plan_for_assessment. Per-component stress uses δ·e^(−α·f) with the "
-            "same per-indicator bn as the Rust payload."
+            "The system FSFSI is recalculated with the same engine and the same cumulative smoothing "
+            "used for the national plan. Component stress is recalculated from the financing you entered, "
+            "using each component's gap and sensitivity from the assessment."
         )
         if use_engine_optimal:
-            note += (
-                " Allocations are taken from recommended_allocations (not re-derived from "
-                "rounded bn inputs)."
-            )
+            note += " Allocations are taken directly from the plan's recommended amounts, not from rounded inputs."
 
     out: dict[str, object] = {
         "user_projected_cumulative_fsfsi": round(new_sys, 4),
@@ -997,6 +994,267 @@ def mtef_for_assessment(
 
 
 # =============================================================================
+# Investment strategy scenario (donor / partner envelope on indicators)
+# =============================================================================
+
+
+def run_investment_scenario_for_assessment(
+    assessment_id: str,
+    *,
+    program_name: str = "",
+    indicator_codes: list[str] | None = None,
+    total_investment_bn: float | None = None,
+    higher_is_better_by_indicator: dict[str, bool] | None = None,
+    by_indicator: dict[str, float] | None = None,
+    by_component: dict[str, float] | None = None,
+    project_fiscal_year: int | None = None,
+    investment_by_fiscal_year: dict[str, float] | dict[int, float] | None = None,
+    strategic_plan_id: str | None = None,
+    weighting_method: str = "hybrid",
+    scenario: str = "normal_operations",
+) -> dict:
+    """
+    Load indicators for the assessment fiscal year, run Rust baseline vs envelope comparison,
+    and attach PSTA-5 alignment for the **envelope only** (how the project mix lines up with PA targets).
+
+    **Donor mode:** pass ``indicator_codes`` and either ``investment_by_fiscal_year`` (bn per
+    implementation FY on the strategic-plan horizon) or legacy ``total_investment_bn`` +
+    ``project_fiscal_year``. The envelope **total** is split evenly across selected codes.
+
+    **Strategic plan:** Policy comparison uses the plan row for **comparison_fiscal_year**
+    (latest FY in ``investment_by_fiscal_year``, or ``project_fiscal_year`` for legacy).
+    """
+    import copy
+    from collections import defaultdict
+
+    from apps.assessments.models import AssessmentResult
+    from apps.assessments.services import AssessmentService
+    from .models import SavedStrategicPlan
+
+    assessment = AssessmentResult.objects.get(pk=assessment_id)
+
+    codes_list = [c.strip() for c in (indicator_codes or []) if c and str(c).strip()]
+    codes_list = list(dict.fromkeys(codes_list))
+
+    schedule_bn: dict[int, float] = {}
+    comparison_fy: int | None = None
+    if codes_list:
+        if investment_by_fiscal_year:
+            for key, val in dict(investment_by_fiscal_year).items():
+                try:
+                    fy = int(str(key).strip())
+                except (TypeError, ValueError):
+                    continue
+                amt = float(val or 0)
+                if amt > 0:
+                    schedule_bn[fy] = schedule_bn.get(fy, 0.0) + amt
+        if schedule_bn:
+            comparison_fy = max(schedule_bn.keys())
+        elif project_fiscal_year is not None and float(total_investment_bn or 0) > 0:
+            comparison_fy = int(project_fiscal_year)
+            schedule_bn = {comparison_fy: float(total_investment_bn)}
+        elif project_fiscal_year is not None:
+            comparison_fy = int(project_fiscal_year)
+
+    strategic_plan_context: dict | None = None
+    if comparison_fy is not None:
+        pfy = int(comparison_fy)
+        plan = None
+        if strategic_plan_id:
+            try:
+                plan = SavedStrategicPlan.objects.get(pk=strategic_plan_id)
+            except SavedStrategicPlan.DoesNotExist:
+                return {"error": "Strategic plan not found."}
+            if str(plan.assessment_id) != str(assessment_id):
+                return {"error": "That strategic plan does not belong to this assessment."}
+        else:
+            plan = SavedStrategicPlan.objects.filter(
+                assessment_id=assessment_id,
+                is_active=True,
+            ).first()
+            if not plan:
+                return {
+                    "error": "No active strategic plan for this assessment. Save and activate a plan under Strategic Planning first.",
+                }
+        yearly = plan.plan_json.get("yearly_plans") or []
+        avail = sorted(
+            {int(y["fiscal_year"]) for y in yearly if y.get("fiscal_year") is not None}
+        )
+        avail_set = set(avail)
+        if schedule_bn:
+            bad = sorted({y for y in schedule_bn if y not in avail_set})
+            if bad:
+                return {
+                    "error": (
+                        f"Implementation year(s) {bad} are not in this strategic plan horizon. "
+                        f"Available: {avail}"
+                    ),
+                }
+        yp = next(
+            (y for y in yearly if int(y.get("fiscal_year") or 0) == pfy),
+            None,
+        )
+        if not yp:
+            return {
+                "error": (
+                    f"Fiscal year {pfy} is not in this strategic plan horizon. "
+                    f"Available implementation years: {avail}"
+                ),
+            }
+        plan_projected = float(yp.get("projected_fsfvi") or 0)
+        plan_target = float(yp.get("year_target") or yp.get("target_fsfvi") or 0)
+        plan_baseline_fsfsi = float(plan.plan_json.get("baseline_fsfvi") or 0)
+        strategic_plan_context = {
+            "plan_id": str(plan.pk),
+            "plan_name": (plan.plan_name or "").strip(),
+            "baseline_assessment_fiscal_year": int(plan.fiscal_year),
+            "project_fiscal_year": pfy,
+            "plan_year_index": int(yp.get("year") or 0),
+            "plan_target_fsfsi": round(plan_target, 6),
+            "plan_projected_fsfsi": round(plan_projected, 6),
+            "plan_baseline_fsfsi": round(plan_baseline_fsfsi, 6),
+            "planning_start_fiscal_year": plan.plan_json.get("planning_start_fiscal_year"),
+            "investment_by_fiscal_year_bn": {
+                str(k): round(v, 6) for k, v in sorted(schedule_bn.items())
+            }
+            if schedule_bn
+            else {},
+            "comparison_note": (
+                "The projected and milestone FSFSI values come from the saved national plan for that "
+                "fiscal year. Your envelope is modelled as mapped financing added to the assessment "
+                "baseline. The additive fields show how much lower national financing stress is with "
+                "your programme than under the plan alone (lower is better on this index). This is an "
+                "illustrative comparison, not a forecast of actual outcomes."
+            ),
+        }
+
+    svc = AssessmentService()
+    indicators = svc.load_indicators_from_db(int(assessment.fiscal_year))
+    if not indicators:
+        return {
+            "error": "No indicator data for this fiscal year. Import budgets and re-run the assessment.",
+        }
+
+    loaded_codes = {i["indicator_code"] for i in indicators}
+
+    by_ind_work: dict[str, float] | None = None
+    by_comp_work: dict[str, float] | None = None
+    per_indicator_bn: float | None = None
+
+    if codes_list:
+        total_bn = sum(schedule_bn.values()) if schedule_bn else float(total_investment_bn or 0)
+        if total_bn <= 0:
+            return {
+                "error": "Provide a positive total: use investment_by_fiscal_year and/or total_investment_bn.",
+            }
+        missing = [c for c in codes_list if c not in loaded_codes]
+        if missing:
+            return {
+                "error": f"Unknown or missing indicator codes for this fiscal year: {missing}",
+            }
+        per_indicator_bn = total_bn / len(codes_list)
+        by_ind_work = {c: per_indicator_bn for c in codes_list}
+        by_comp_work = None
+    else:
+        by_ind_work = {str(k): float(v) for k, v in (by_indicator or {}).items()} or None
+        by_comp_work = {str(k): float(v) for k, v in (by_component or {}).items()} or None
+        if by_ind_work is not None and not by_ind_work:
+            by_ind_work = None
+        if by_comp_work is not None and not by_comp_work:
+            by_comp_work = None
+
+    inv: dict = {}
+    if by_ind_work:
+        inv["by_indicator"] = by_ind_work
+    if by_comp_work:
+        inv["by_component"] = by_comp_work
+    if not inv:
+        return {"error": "No investment envelope to apply."}
+
+    indicators_engine = indicators
+    hib = {str(k): bool(v) for k, v in (higher_is_better_by_indicator or {}).items()}
+    if hib:
+        indicators_engine = copy.deepcopy(indicators)
+        row_by_code = {r["indicator_code"]: r for r in indicators_engine}
+        for code, val in hib.items():
+            if code in row_by_code:
+                row_by_code[code]["higher_is_better"] = val
+
+    wm = (weighting_method or "hybrid").strip() or "hybrid"
+    sc = (scenario or "normal_operations").strip() or "normal_operations"
+    try:
+        rust = svc.run_indicator_investment_scenario(
+            indicators_engine,
+            inv,
+            wm,
+            sc,
+            int(assessment.fiscal_year),
+        )
+    except Exception as e:
+        logger.exception("run_indicator_investment_scenario failed")
+        return {"error": str(e)}
+
+    code_to_comp = {i["indicator_code"]: i["indicator_component"] for i in indicators}
+    env: dict[str, float] = defaultdict(float)
+    for code, bn in (by_ind_work or {}).items():
+        c = code_to_comp.get(str(code))
+        if c:
+            env[c] += float(bn or 0)
+    for comp, bn in (by_comp_work or {}).items():
+        env[str(comp)] += float(bn or 0)
+    env_dict = {k: float(v) for k, v in env.items() if float(v) > 0}
+    total_env = sum(env_dict.values())
+
+    psta = None
+    if total_env > 0:
+        psta = compute_psta5_budget_alignment(env_dict, total_env)
+        if isinstance(psta, dict) and psta.get("error"):
+            psta = None
+
+    if strategic_plan_context:
+        sf = float(rust["scenario_fsfsi"])
+        pp = float(strategic_plan_context["plan_projected_fsfsi"])
+        pt = float(strategic_plan_context["plan_target_fsfsi"])
+        strategic_plan_context["donor_scenario_fsfsi"] = round(sf, 6)
+        # Signed gaps (scenario − plan); kept for APIs / diagnostics.
+        strategic_plan_context["delta_scenario_minus_plan_projected"] = round(sf - pp, 6)
+        strategic_plan_context["delta_scenario_minus_plan_target"] = round(sf - pt, 6)
+        # Additionality: extra FSFSI reduction vs plan (plan − scenario); positive ⇒ lower stress than trajectory.
+        strategic_plan_context["additional_fsfsi_reduction_vs_plan_projected"] = round(pp - sf, 6)
+        strategic_plan_context["additional_fsfsi_reduction_vs_plan_target"] = round(pt - sf, 6)
+
+    out: dict = {
+        **rust,
+        "assessment_id": str(assessment_id),
+        "program_name": (program_name or "").strip(),
+        "baseline_assessment_fiscal_year": int(assessment.fiscal_year),
+        "project_fiscal_year": int(comparison_fy) if comparison_fy is not None else None,
+        "comparison_fiscal_year": int(comparison_fy) if comparison_fy is not None else None,
+        "weighting_method": wm,
+        "scenario": sc,
+        "psta5_envelope_alignment": psta,
+        "envelope_by_component_bn": {k: round(v, 4) for k, v in sorted(env_dict.items())},
+        "indicator_selection": {
+            "codes": codes_list,
+            "total_investment_bn": round(total_bn, 6) if codes_list and total_bn else None,
+            "investment_by_fiscal_year_bn": {
+                str(k): round(v, 6) for k, v in sorted(schedule_bn.items())
+            }
+            if schedule_bn
+            else None,
+            "per_indicator_bn": round(per_indicator_bn, 6) if per_indicator_bn is not None else None,
+            "higher_is_better_by_indicator": hib if hib else None,
+        },
+        "strategic_plan_context": strategic_plan_context,
+        "disclaimer": (
+            "This is an illustrative financing-stress scenario under the FSFSI model, not a forecast of "
+            "development outcomes. Interpret it alongside MINAGRI and PSTA 5 priorities."
+        ),
+    }
+    return out
+
+
+# =============================================================================
 # PSTA-5 Alignment Computation
 # =============================================================================
 
@@ -1120,9 +1378,9 @@ def compute_psta5_budget_alignment(
         "total_mapped_bn": round(total_mapped, 2),
         "unmapped_bn": round(total_bn - total_mapped, 2),
         "methodology": (
-            "Budget alignment computed by mapping FSFSI component allocations to PSTA-5 Priority Areas "
-            "using contribution weights (e.g., crop_production→PA1 at 40%). Alignment score = 100 - "
-            "2×(average absolute deviation from target %). Perfect alignment with 58/17/24 split = 100."
+            "Budget alignment maps FSFSI component allocations to PSTA 5 Priority Areas using contribution "
+            "weights (for example, 40% of crop production to PA1). The alignment score is 100 minus twice the "
+            "average absolute deviation from the target shares. A 58/17/24 split scores 100."
         ),
     }
 
