@@ -7,6 +7,9 @@ import { Card, CardContent } from '@/components/ui/card';
 import { overviewPanelClass } from '@/components/rwanda/overview/panelStyles';
 import type { StressThreshold, StressThresholds } from '@/lib/types/assessment';
 
+/** Mirrors backend `classification.MIN_SYSTEM_OBS`: below this the national score inherits the component scale. */
+const MIN_SYSTEM_OBS = 30;
+
 const LEVEL_DOT: Record<'low' | 'medium' | 'high' | 'critical', string> = {
   low: 'bg-emerald-500',
   medium: 'bg-yellow-500',
@@ -127,7 +130,35 @@ export function StressScaleExplainer({ thresholds }: { thresholds?: StressThresh
                 </p>
               )}
 
-              <div className="mt-3 overflow-x-auto rounded-lg border border-slate-200">
+              {/* Narrow screens: one card per level */}
+              <ul className="mt-3 space-y-2 md:hidden">
+                {levels.map((lvl) => (
+                  <li key={lvl} className="rounded-lg border border-slate-200 bg-slate-50/60 p-3">
+                    <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                      <span className="inline-flex items-center gap-2 font-semibold text-slate-900">
+                        <span className={`h-2.5 w-2.5 rounded-full ${LEVEL_DOT[lvl]}`} aria-hidden />
+                        {t(lvl === 'medium' ? 'risk.moderate' : `risk.${lvl}`)}
+                      </span>
+                    </div>
+                    <dl className="mt-1.5 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-xs text-slate-600">
+                      <dt>{sameScale ? t('explainer.col_system_component') : t('explainer.col_system')}</dt>
+                      <dd className="tabular-nums font-medium text-slate-800">{sysR ? sysR[lvl] : '–'}</dd>
+                      {!sameScale && (
+                        <>
+                          <dt>{t('explainer.col_component')}</dt>
+                          <dd className="tabular-nums font-medium text-slate-800">{compR ? compR[lvl] : '–'}</dd>
+                        </>
+                      )}
+                      <dt>{t('explainer.col_indicator')}</dt>
+                      <dd className="tabular-nums font-medium text-slate-800">{indR ? indR[lvl] : '–'}</dd>
+                    </dl>
+                    <p className="mt-1.5 text-slate-600">{t(`explainer.meaning_${lvl}`)}</p>
+                  </li>
+                ))}
+              </ul>
+
+              {/* Wider screens: table */}
+              <div className="mt-3 hidden overflow-x-auto rounded-lg border border-slate-200 md:block">
                 <table className="w-full text-sm">
                   <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
                     <tr>
@@ -167,7 +198,7 @@ export function StressScaleExplainer({ thresholds }: { thresholds?: StressThresh
                     ind_n: indicator?.n_observations ?? 0,
                     ind_gvf: f3(indicator?.gvf),
                   })}
-                  {sameScale && system ? ` ${t('explainer.system_inherits', { n: system.n_observations })}` : ''}
+                  {system?.method === 'inherited_component_scale' ? ` ${t('explainer.system_inherits', { min: MIN_SYSTEM_OBS })}` : ''}
                 </p>
               )}
             </section>
@@ -182,7 +213,25 @@ export function StressScaleExplainer({ thresholds }: { thresholds?: StressThresh
             <section>
               <h4 className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">{t('explainer.why_title')}</h4>
               <p className="mt-2">{t('explainer.why_p1')}</p>
-              <div className="mt-3 overflow-x-auto rounded-lg border border-slate-200">
+
+              <ul className="mt-3 space-y-2 md:hidden">
+                {diags.map((d) => (
+                  <li key={d} className="rounded-lg border border-slate-200 bg-slate-50/60 p-3">
+                    <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                      <span className="inline-flex items-center gap-2 font-semibold text-slate-900">
+                        <span className={`h-2.5 w-2.5 rounded-full ${DIAG_DOT[d]}`} aria-hidden />
+                        {t(`diagnosis.${d}`)}
+                      </span>
+                      <span className="text-xs text-slate-600">
+                        {t('explainer.col_coverage')}: <span className="tabular-nums font-medium text-slate-800">{covRange[d]}</span>
+                      </span>
+                    </div>
+                    <p className="mt-1.5 text-slate-600">{t(`explainer.diag_${d}`)}</p>
+                  </li>
+                ))}
+              </ul>
+
+              <div className="mt-3 hidden overflow-x-auto rounded-lg border border-slate-200 md:block">
                 <table className="w-full text-sm">
                   <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
                     <tr>

@@ -11,6 +11,7 @@ import type { SavedStrategicPlanFull, PlanYearActualSummary } from '@/lib/types/
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PlanVsActualCard } from './PlanVsActualCard';
 import { BudgetTrendCard } from './BudgetTrendCard';
+import { StressScaleExplainer } from './StressScaleExplainer';
 import { FSFSITrendChart, ComponentStressTrend, StressHeatmap } from '@/components/rwanda/charts';
 import {
   TrendingUp,
@@ -272,6 +273,9 @@ export function NationalOverview() {
           </div>
         </CardContent>
       </Card>
+
+      {/* How to read the index: what it measures, how levels are derived, what "why" means */}
+      <StressScaleExplainer thresholds={dashboardData.stress_thresholds ?? null} />
 
       {/* Supporting KPIs */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
