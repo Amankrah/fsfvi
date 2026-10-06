@@ -592,14 +592,54 @@ The **authoritative** \(\alpha\) values for each indicator come from the Excel p
 
 ## 16. Constants, Thresholds, and Defaults
 
-### Stress Level Classification
+### Stress Level Classification (empirically calibrated)
 
-| Level | Condition | Policy implication |
-|-------|-----------|-------------------|
-| Low | \(\text{FSFSI} \le 0.05\) | Well-funded; monitor |
-| Medium | \(0.05 < \text{FSFSI} \le 0.15\) | Targeted investment advised |
-| High | \(0.15 < \text{FSFSI} \le 0.30\) | Reallocation intervention needed |
-| Critical | \(\text{FSFSI} > 0.30\) | Urgent action; systemic risk |
+Cut-points are **not fixed constants**. They are calibrated from the stored assessment record with **Fisher–Jenks natural breaks** (the optimal 1-D partition that minimises within-class variance), **separately per aggregation level**, and frozen in `StressThresholdConfig` until `manage.py calibrate_stress_thresholds` is run again. Implementation: `apps/assessments/classification.py`.
+
+Why per level: indicator stress \(\upsilon_i\), component stress (mean of \(\upsilon_i\)) and the system FSFSI (weighted mean of component stresses) have progressively compressed variance; one set of cut-points cannot be meaningful on all three. The engine's original fixed set (0.05 / 0.15 / 0.30) is kept only as the **fallback when no calibration exists**, and is reported under `engine_default_stress_thresholds` in `/api/assessments/config/`.
+
+| Level | Sample pooled | Classes | Minimum n | Rule when below minimum |
+|-------|---------------|---------|-----------|-------------------------|
+| `indicator` | \(\upsilon_i\) and \(CS_i\), one assessment per fiscal year | 4 (3 breaks) | 40 | engine defaults |
+| `component` | \(\upsilon_c\) and \(CS_c\) | 4 | 16 | engine defaults |
+| `system` | FSFSI and CumFSFSI | 4 | 30 | **inherits component breaks** (FSFSI \(=\sum_c \omega_c \upsilon_c\) is a weighted mean of component stresses, hence on the component scale) |
+| `coverage` | \(1-\upsilon_i/\delta_i = 1-e^{-\alpha_i f_i}\) for \(\delta_i>0\) | 3 (2 breaks) | 40 | half-life anchors 0.25 / 0.50 |
+
+Assessments with fewer than 20 indicators are excluded from the sample (degenerate runs). Cumulative values are pooled with point-in-time values because the same labels are applied to both.
+
+**Calibration on Rwanda's record (FY2018–FY2024, run 2026-10-06):**
+
+| Level | low ≤ | medium ≤ | high ≤ | critical > | n | GVF |
+|-------|-------|----------|--------|------------|---|-----|
+| indicator | 0.176 | 0.399 | 0.653 | 0.653 | 436 | 0.924 |
+| component | 0.202 | 0.342 | 0.461 | 0.461 | 112 | 0.897 |
+| system (inherited) | 0.202 | 0.342 | 0.461 | 0.461 | 112 | 0.897 |
+| coverage (3-class) | 0.168 | 0.552 | — | — | 196 | 0.927 |
+
+Stability: leave-one-year-out recalibration moves the indicator breaks by ≤ 0.02 and the component breaks by ≤ 0.015. Under the old fixed set, 147 of 218 indicator-years (67 %) were "critical" and 35 of 56 component-years (63 %); under the calibrated set the indicator classes are 53 / 71 / 81 / 13 and component classes 7 / 25 / 14 / 10. The headline system label no longer sits on a cut-point: FY2018–22 are "high", FY2023–24 point-in-time are "medium" while cumulative remains "high" (lingering damage), and "critical" at system level requires a weighted-mean component stress above anything Rwanda has recorded.
+
+**Interpretation of a calibrated label:** "critical" means *in the worst natural grouping of Rwanda's own 2018–2024 financing-stress record at that aggregation level*. Because thresholds are frozen between calibrations, if stress falls the count of critical items falls — the scale does not re-centre on the new data until a calibration is deliberately re-run (recommended: once per PSTA cycle, or when ≥ 2 new fiscal years are added).
+
+### Two-axis diagnosis (gap × financing coverage)
+
+Since \(\upsilon = \delta \, e^{-\alpha f}\), the factor \(e^{-\alpha f}\) is a pure financing term. The **financing coverage** \(c = 1 - \upsilon/\delta = 1 - e^{-\alpha f} \in [0,1]\) is the share of the performance gap absorbed by current funding. Stored on `ComponentResult.financing_coverage` and `IndicatorResult.financing_coverage`, with a `diagnosis`:
+
+| Diagnosis | Condition | Meaning |
+|-----------|-----------|---------|
+| `at_benchmark` | \(\delta \le\) indicator `low_max` | Would be "low" even unfunded |
+| `unfunded_gap` | \(c \le\) coverage `low_max` | Gap present; funding has barely dented it (e.g. finance FY2024: δ 0.72, c 0.06) |
+| `partially_funded_gap` | coverage `low_max` \(< c \le\) `medium_max` | Funding is working but has not caught up |
+| `funded_gap` | \(c >\) coverage `medium_max` | Stress is low because funding is high, but the outcome gap persists — an outcome lag, not under-funding (e.g. nutrition FY2024: δ 0.60, c 0.99) |
+
+This resolves the ambiguity of a one-dimensional "low" label on a component with a large gap.
+
+### API and tooling
+
+- `GET /api/assessments/stress-thresholds/` — active thresholds per level with provenance (method, n, GVF, years, timestamp).
+- `POST /api/assessments/stress-thresholds/calibrate/` (admin) — recalibrate and relabel; `{"dry_run": true}` to preview.
+- `GET /api/assessments/stress-level/?score=…&level=system|component|indicator`.
+- `manage.py calibrate_stress_thresholds [--dry-run] [--show] [--point-only] [--no-relabel]`.
+- Dashboard summary includes `stress_thresholds` and per-component `cumulative_priority_level`, `financing_coverage`, `diagnosis`; the frontend draws bands, legends and critical counts from these rather than from constants.
 
 ### Weighting Blend (Hybrid)
 
@@ -616,7 +656,7 @@ The **authoritative** \(\alpha\) values for each indicator come from the Excel p
 |-----------|-------|-------------|
 | On-track tolerance | ±0.02 FSFSI | Yearly on-track check tolerance |
 | Damage lag threshold | 0.10 | If \(CS - \text{point} > 0.10\), "damage lag risk" |
-| Critical stress threshold | 0.30 | Component flagged as critical |
+| Critical stress threshold | component `high_max` (calibrated; 0.461 at present) | Component flagged as critical in plan risks |
 | Share match tolerance | 0.5 pp | For simulation plan matching |
 | Total budget match tolerance | 0.05% | Relative tolerance for plan match |
 

@@ -202,7 +202,7 @@
     "fsfsi_scale_hint": "Indice 0–1,0 · Des valeurs plus élevées indiquent un stress de financement plus fort",
     "fsfsi_point_in_time": "Exercice en cours (instantané)",
     "risk_label_suffix": "risque",
-    "critical_components_of": "{{critical}} composantes sur {{total}} au-dessus du seuil de stress élevé",
+    "critical_components_of": "{{critical}} composantes sur {{total}} classées critiques (stress cumulé, seuils par composante)",
     "critical_components_includes": "Dont : {{names}}",
     "critical_components_more": "+{{count}} autres",
     "historical_trend_title": "Analyse de la tendance historique",
@@ -214,6 +214,7 @@
     "chart_explain_red": "Rouge (tirets) : stress cumulé, y compris la pression reportée des années précédentes. La reprise est plus lente.",
     "chart_explain_gap": "L’écart entre les deux courbes correspond à la pression structurelle qui persiste même quand les budgets s’améliorent.",
     "chart_explain_threshold": "Ligne orange en tirets : seuil de stress élevé ({{value}}). Au-dessus, le niveau est jugé critique.",
+    "chart_explain_calibrated": "Les seuils des bandes ne sont pas des chiffres fixes : ce sont des ruptures naturelles (Jenks) dans l'historique de stress du Rwanda, exercices {{years}}, {{n}} observations ; ils ne changent qu'au prochain étalonnage.",
     "chart_threshold_high": "Seuil de stress élevé",
     "chart_tooltip_gap": "Écart de stress (cumulé vs courant)",
     "trend_tab_fsfsi": "Tendance FSFSI",
@@ -223,7 +224,22 @@
     "trend_subtitle_components": "Évolution du stress par composante dans le temps",
     "trend_subtitle_heatmap": "Vue d’ensemble des niveaux de stress par composante et par année",
     "scale_0": "0",
-    "scale_1": "1,0"
+    "scale_1": "1,0",
+    "scale_cutpoints": "Faible ≤ {{low}} · Modéré ≤ {{medium}} · Élevé ≤ {{high}} · Critique au-delà.",
+    "scale_calibrated": "Seuils = ruptures naturelles dans l'historique du Rwanda, exercices {{years}} ({{n}} observations).",
+    "scale_uncalibrated": "Seuils par défaut du moteur ; lancez l'étalonnage pour les dériver des données."
+  },
+  "diagnosis": {
+    "column": "Pourquoi",
+    "at_benchmark": "Au niveau de référence",
+    "unfunded_gap": "Écart non financé",
+    "partially_funded_gap": "Écart partiellement financé",
+    "funded_gap": "Écart financé, résultat en retard",
+    "unknown": "—",
+    "coverage_hint": "Pourcentage = part de l'écart de performance absorbée par le financement actuel (1 − stress/écart).",
+    "cumulative_abbrev": "cum.",
+    "cumulative_level_hint": "Classe du stress cumulé (avec mémoire), lorsqu'elle diffère de celle de l'année.",
+    "table_footnote": "Priorité = classe de stress selon les seuils étalonnés par composante. « Pourquoi » distingue un écart qui n'est pas financé d'un écart fortement financé mais pas encore comblé ; le pourcentage est la part de l'écart absorbée par le financement."
   },
   "assessment_page": {
     "page_title": "Évaluation du stress du financement du système alimentaire",

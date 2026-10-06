@@ -623,23 +623,101 @@ class StressLevelView(APIView):
     """
     Get stress level for a score.
 
-    GET /api/assessments/stress-level/?score=0.25
+    GET /api/assessments/stress-level/?score=0.25[&level=system|component|indicator]
 
-    Delegates to Rust engine only. Frontend must use this (or stored assessment) for stress level.
+    Uses the calibrated thresholds for the requested aggregation level (default: system).
+    Frontend must use this (or stored assessment labels) rather than its own cut-points.
     """
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
+        from . import classification
+
         score = request.query_params.get("score")
         if not score:
             return Response(
                 {"error": "Score parameter required"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        level = request.query_params.get("level", classification.LEVEL_SYSTEM)
+        if level not in (classification.LEVEL_SYSTEM, classification.LEVEL_COMPONENT, classification.LEVEL_INDICATOR):
+            return Response({"error": "level must be system, component or indicator"}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            score_f = float(score)
+        except ValueError:
+            return Response({"error": "score must be numeric"}, status=status.HTTP_400_BAD_REQUEST)
 
         service = get_config_service()
-        level = service.get_stress_level(float(score))
-        return Response({"score": float(score), "stress_level": level})
+        return Response({
+            "score": score_f,
+            "level": level,
+            "stress_level": service.get_stress_level(score_f, level),
+            "thresholds": classification.get_thresholds(level).as_dict(),
+        })
+
+
+class StressThresholdsView(APIView):
+    """
+    Active stress-classification thresholds and their provenance.
+
+    GET  /api/assessments/stress-thresholds/
+         → { indicator: {...}, component: {...}, system: {...}, coverage: {...} }
+
+    POST /api/assessments/stress-thresholds/calibrate/   (admin)
+         Body (optional): { "dry_run": bool, "scenario": str, "point_only": bool }
+         Recomputes Jenks natural breaks from the stored assessment record,
+         persists them and relabels all stored results.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        from . import classification
+
+        return Response(classification.get_all_thresholds())
+
+    def post(self, request):
+        from . import classification
+
+        if not (request.user.is_staff or request.user.is_superuser or getattr(request.user, "role", "") == "admin"):
+            return Response({"error": "Admin privileges required"}, status=status.HTTP_403_FORBIDDEN)
+
+        body = request.data if isinstance(request.data, dict) else {}
+        dry_run = bool(body.get("dry_run", False))
+        scenario = body.get("scenario", "normal_operations") or None
+        point_only = bool(body.get("point_only", False))
+
+        sample = classification.collect_sample(scenario=scenario, include_cumulative=not point_only)
+        if not sample.years:
+            return Response(
+                {"error": "No qualifying assessments found; thresholds unchanged."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        results = classification.calibrate(sample, dry_run=dry_run)
+        relabelled = None if dry_run else classification.reclassify_all()
+        return Response({
+            "dry_run": dry_run,
+            "sample": {
+                "years": sample.years,
+                "indicator_n": len(sample.indicator_stress),
+                "component_n": len(sample.component_stress),
+                "system_n": len(sample.system_stress),
+                "coverage_n": len(sample.coverage),
+            },
+            "results": [
+                {
+                    "level": r.level,
+                    "breaks": [round(b, 6) for b in r.breaks],
+                    "gvf": round(r.gvf, 4) if r.gvf is not None else None,
+                    "n": r.n,
+                    "method": r.method,
+                    "applied": r.applied,
+                    "reason": r.reason,
+                }
+                for r in results
+            ],
+            "relabelled": relabelled,
+            "active": classification.get_all_thresholds(),
+        })
 
 
 class PersistenceConfigView(APIView):

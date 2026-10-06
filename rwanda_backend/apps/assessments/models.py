@@ -38,11 +38,72 @@ class Scenario(models.TextChoices):
 
 
 class StressLevel(models.TextChoices):
-    """FSFSI stress classification — aligned with Rust backend thresholds."""
-    LOW = "low", "Low (≤ 0.05)"
-    MEDIUM = "medium", "Medium (0.05 - 0.15)"
-    HIGH = "high", "High (0.15 - 0.30)"
-    CRITICAL = "critical", "Critical (> 0.30)"
+    """FSFSI stress classification.
+
+    Cut-points are NOT fixed: they are calibrated from the stored assessment
+    record per aggregation level (see ``StressThresholdConfig`` and
+    ``apps.assessments.classification``). Labels carry no numbers on purpose.
+    """
+    LOW = "low", "Low"
+    MEDIUM = "medium", "Medium"
+    HIGH = "high", "High"
+    CRITICAL = "critical", "Critical"
+
+
+class StressDiagnosis(models.TextChoices):
+    """Two-axis diagnosis: performance gap × financing coverage (1 − e^(−αf))."""
+    AT_BENCHMARK = "at_benchmark", "At / near benchmark"
+    UNFUNDED_GAP = "unfunded_gap", "Gap, largely unfunded"
+    PARTIALLY_FUNDED_GAP = "partially_funded_gap", "Gap, partially funded"
+    FUNDED_GAP = "funded_gap", "Gap funded; outcome lag"
+
+
+class StressThresholdConfig(models.Model):
+    """
+    Calibrated stress-classification cut-points for one aggregation level.
+
+    One row per level: ``indicator``, ``component``, ``system`` (4 classes →
+    three upper bounds) and ``coverage`` (3 classes → two upper bounds,
+    ``high_max`` is NULL). Rows are written by
+    ``manage.py calibrate_stress_thresholds`` (Fisher–Jenks natural breaks on
+    the pooled historical record) and frozen until the next calibration so that
+    labels remain comparable across fiscal years.
+    """
+
+    class Level(models.TextChoices):
+        INDICATOR = "indicator", "Indicator stress"
+        COMPONENT = "component", "Component stress"
+        SYSTEM = "system", "System FSFSI"
+        COVERAGE = "coverage", "Financing coverage"
+
+    level = models.CharField(max_length=20, choices=Level.choices, unique=True)
+    low_max = models.DecimalField(max_digits=8, decimal_places=6, help_text="Upper bound of 'low'")
+    medium_max = models.DecimalField(max_digits=8, decimal_places=6, help_text="Upper bound of 'medium'")
+    high_max = models.DecimalField(
+        max_digits=8, decimal_places=6, null=True, blank=True,
+        help_text="Upper bound of 'high' (above → 'critical'); NULL for 3-class levels",
+    )
+    method = models.CharField(
+        max_length=40, default="jenks_natural_breaks",
+        help_text="jenks_natural_breaks | inherited_component_scale | engine_default | manual",
+    )
+    n_observations = models.IntegerField(default=0)
+    gvf = models.DecimalField(
+        max_digits=8, decimal_places=6, null=True, blank=True,
+        help_text="Goodness-of-variance fit of the Jenks partition (0–1)",
+    )
+    calibration_years = models.JSONField(default=list, blank=True)
+    calibrated_at = models.DateTimeField(null=True, blank=True)
+    notes = models.TextField(blank=True, default="")
+
+    class Meta:
+        db_table = "stress_threshold_config"
+        verbose_name = "Stress Threshold Config"
+        ordering = ["level"]
+
+    def __str__(self):
+        hi = f" / {self.high_max}" if self.high_max is not None else ""
+        return f"{self.level}: ≤{self.low_max} / ≤{self.medium_max}{hi} ({self.method})"
 
 
 class ComponentPersistenceConfig(models.Model):
@@ -267,7 +328,7 @@ class ComponentResult(models.Model):
     priority_level = models.CharField(
         max_length=20,
         choices=StressLevel.choices,
-        help_text="Priority level for this component"
+        help_text="Classification of component_stress (component-level calibrated thresholds)"
     )
 
     # Cumulative stress (asymmetric EMA)
@@ -278,6 +339,20 @@ class ComponentResult(models.Model):
     cumulative_weighted_stress = models.DecimalField(
         max_digits=8, decimal_places=6, null=True, blank=True,
         help_text="ωᵢ · CS_i(t) contribution to system cumulative FSFSI"
+    )
+    cumulative_priority_level = models.CharField(
+        max_length=20, choices=StressLevel.choices, null=True, blank=True,
+        help_text="Classification of cumulative_stress (component-level calibrated thresholds)"
+    )
+
+    # Two-axis diagnosis
+    financing_coverage = models.DecimalField(
+        max_digits=8, decimal_places=6, null=True, blank=True,
+        help_text="1 − stress/gap = share of the performance gap absorbed by financing (0–1)"
+    )
+    diagnosis = models.CharField(
+        max_length=30, choices=StressDiagnosis.choices, null=True, blank=True,
+        help_text="Gap × financing-coverage diagnosis"
     )
 
     # Budget data
@@ -365,11 +440,25 @@ class IndicatorResult(models.Model):
         max_digits=8, decimal_places=6,
         help_text="υᵢ(fᵢ) = δᵢ · e^(-αᵢfᵢ)"
     )
+    stress_level = models.CharField(
+        max_length=20, choices=StressLevel.choices, null=True, blank=True,
+        help_text="Classification of stress_value (indicator-level calibrated thresholds)"
+    )
 
     # Cumulative stress (asymmetric EMA at indicator level)
     cumulative_stress = models.DecimalField(
         max_digits=8, decimal_places=6, null=True, blank=True,
         help_text="Cumulative indicator stress: accounts for damage persistence"
+    )
+
+    # Two-axis diagnosis
+    financing_coverage = models.DecimalField(
+        max_digits=8, decimal_places=6, null=True, blank=True,
+        help_text="1 − υ/δ = 1 − e^(−αf): share of the gap absorbed by financing (0–1)"
+    )
+    diagnosis = models.CharField(
+        max_length=30, choices=StressDiagnosis.choices, null=True, blank=True,
+        help_text="Gap × financing-coverage diagnosis"
     )
 
     # Budget share from original data

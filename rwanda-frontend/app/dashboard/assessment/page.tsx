@@ -11,6 +11,8 @@ import {
   getPerformanceGapDisplay,
   formatPolicyDate,
   riskBadgeTranslationKey,
+  diagnosisTranslationKey,
+  getDiagnosisChipClass,
 } from '@/lib/utils/formatters';
 import { assessmentAPI } from '@/lib/api/assessmentApi';
 import type {
@@ -576,6 +578,21 @@ export default function AssessmentPage() {
   );
 }
 
+function DiagnosisChip({ diagnosis, coverage }: { diagnosis?: string | null; coverage?: number | null }) {
+  const { t } = useLanguage();
+  if (!diagnosis) return null;
+  const pct = coverage != null ? ` · ${Math.round(coverage * 100)}%` : '';
+  return (
+    <span
+      className={`inline-flex items-center rounded border px-1.5 py-0.5 text-[11px] font-medium ${getDiagnosisChipClass(diagnosis)}`}
+      title={t('diagnosis.coverage_hint')}
+    >
+      {t(diagnosisTranslationKey(diagnosis))}
+      {pct}
+    </span>
+  );
+}
+
 function ComponentSummaryCard({ component }: { component: ComponentSummary }) {
   const level = (component.priority_level || 'medium') as StressLevel;
   return (
@@ -589,11 +606,15 @@ function ComponentSummaryCard({ component }: { component: ComponentSummary }) {
       <p className="text-xs text-gray-500">
         {component.indicator_count} indicators · {formatScore(component.budget_share_percent)}% budget
       </p>
+      <div className="mt-2">
+        <DiagnosisChip diagnosis={component.diagnosis} coverage={component.financing_coverage} />
+      </div>
     </div>
   );
 }
 
 function ComponentsBreakdownTable({ components }: { components: ComponentResult[] }) {
+  const { t } = useLanguage();
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
@@ -603,6 +624,7 @@ function ComponentsBreakdownTable({ components }: { components: ComponentResult[
             <th className="pb-2 pr-4 font-medium text-right">Avg performance gap</th>
             <th className="pb-2 pr-4 font-medium text-right">Stress</th>
             <th className="pb-2 pr-4 font-medium">Priority</th>
+            <th className="pb-2 pr-4 font-medium">{t('diagnosis.column')}</th>
             <th className="pb-2 pr-4 font-medium text-right">Budget share</th>
             <th className="pb-2 font-medium text-right">Indicators</th>
           </tr>
@@ -621,6 +643,17 @@ function ComponentsBreakdownTable({ components }: { components: ComponentResult[
                 <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${getRiskBgColor((c.priority_level as StressLevel) || 'medium')}`}>
                   {c.priority_level}
                 </span>
+                {c.cumulative_priority_level && c.cumulative_priority_level !== c.priority_level ? (
+                  <span
+                    className={`ml-1 text-[11px] font-semibold px-1.5 py-0.5 rounded-full ${getRiskBgColor(c.cumulative_priority_level as StressLevel)}`}
+                    title={t('diagnosis.cumulative_level_hint')}
+                  >
+                    {t('diagnosis.cumulative_abbrev')} {c.cumulative_priority_level}
+                  </span>
+                ) : null}
+              </td>
+              <td className="py-3 pr-4">
+                <DiagnosisChip diagnosis={c.diagnosis} coverage={c.financing_coverage} />
               </td>
               <td className="py-3 pr-4 text-right">{formatScore(c.budget_share_percent)}%</td>
               <td className="py-3 text-right">{c.indicators_count}</td>
@@ -628,6 +661,7 @@ function ComponentsBreakdownTable({ components }: { components: ComponentResult[
           ))}
         </tbody>
       </table>
+      <p className="mt-2 text-xs text-slate-500">{t('diagnosis.table_footnote')}</p>
     </div>
   );
 }
@@ -754,6 +788,8 @@ function IndicatorsBreakdownTable({ indicators }: { indicators: SavedIndicatorRe
               <th className="py-2.5 pr-4 font-medium text-right">Benchmark</th>
               <th className="py-2.5 pr-4 font-medium text-right">Performance gap</th>
               <th className="py-2.5 pr-4 font-medium text-right">Stress</th>
+              <th className="py-2.5 pr-4 font-medium">Level</th>
+              <th className="py-2.5 pr-4 font-medium">{t('diagnosis.column')}</th>
               <th className="py-2.5 pr-2 font-medium text-right">Budget %</th>
             </tr>
           </thead>
@@ -788,6 +824,18 @@ function IndicatorsBreakdownTable({ indicators }: { indicators: SavedIndicatorRe
                   })()}
                 </td>
                 <td className="py-3 pr-4 text-right font-medium tabular-nums text-slate-900">{formatScore(ind.stress_value)}</td>
+                <td className="py-3 pr-4">
+                  {ind.stress_level ? (
+                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${getRiskBgColor(ind.stress_level as StressLevel)}`}>
+                      {ind.stress_level}
+                    </span>
+                  ) : (
+                    <span className="text-xs text-slate-400">–</span>
+                  )}
+                </td>
+                <td className="py-3 pr-4">
+                  <DiagnosisChip diagnosis={ind.diagnosis} coverage={ind.financing_coverage} />
+                </td>
                 <td className="py-3 pr-3 text-right tabular-nums">{formatScore(ind.share_weighted_percent)}%</td>
               </tr>
             ))}

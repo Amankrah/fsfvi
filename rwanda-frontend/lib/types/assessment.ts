@@ -273,6 +273,9 @@ export interface ComponentResult {
   budget_share_percent: number;
   cumulative_stress?: number;
   cumulative_weighted_stress?: number;
+  cumulative_priority_level?: string | null;
+  financing_coverage?: number | null;
+  diagnosis?: StressDiagnosis | null;
   optimal_allocation_lcu?: number;
   allocation_gap_lcu?: number;
   indicators_count: number;
@@ -290,6 +293,11 @@ export interface SavedIndicatorResult {
   sensitivity: number;
   performance_gap: number;
   stress_value: number;
+  /** Backend classification of stress_value (indicator-level thresholds) */
+  stress_level?: string | null;
+  cumulative_stress?: number | null;
+  financing_coverage?: number | null;
+  diagnosis?: StressDiagnosis | null;
   weighted_lcu_bn: number;
   share_weighted_percent: number;
   /** From indicator catalog: affects performance-gap interpretation in the FSFSI engine */
@@ -300,10 +308,40 @@ export interface SavedIndicatorResult {
 // Dashboard Summary (all fields from backend API only)
 // ============================================================================
 
+// ============================================================================
+// Stress classification thresholds (calibrated on the backend)
+// ============================================================================
+
+export type StressThresholdLevel = 'indicator' | 'component' | 'system' | 'coverage';
+
+/**
+ * Cut-points for one aggregation level. A score s is
+ * low if s ≤ low_max, medium if s ≤ medium_max, high if s ≤ high_max, else critical.
+ * `coverage` has three classes (high_max is null).
+ */
+export interface StressThreshold {
+  level: StressThresholdLevel;
+  low_max: number;
+  medium_max: number;
+  high_max: number | null;
+  /** jenks_natural_breaks | inherited_component_scale | engine_default | manual */
+  method: string;
+  n_observations: number;
+  gvf: number | null;
+  calibration_years: number[];
+  calibrated_at: string | null;
+  is_calibrated: boolean;
+}
+
+export type StressThresholds = Record<StressThresholdLevel, StressThreshold>;
+
+/** Gap × financing-coverage diagnosis (backend). */
+export type StressDiagnosis = 'at_benchmark' | 'unfunded_gap' | 'partially_funded_gap' | 'funded_gap';
+
 export interface DashboardSummary {
   assessment_id?: string | null;
   overall_fsfsi: number;
-  /** From backend (Rust): low | medium | high | critical */
+  /** Backend classification (calibrated system-level thresholds): low | medium | high | critical */
   stress_level: string;
   fiscal_year: number;
   total_budget_lcu_bn: number;
@@ -318,11 +356,13 @@ export interface DashboardSummary {
   /** Weighting used for the saved assessment shown (latest run for this fiscal year). */
   weighting_method?: string | null;
   scenario?: string | null;
+  /** Active calibrated thresholds per level (for scale bars, legends, reference lines). */
+  stress_thresholds?: StressThresholds;
   /** True when no assessment has been run yet for this fiscal year. */
   empty?: boolean;
 }
 
-/** Per-component summary; stress and priority_level from backend only. */
+/** Per-component summary; stress and levels from backend only. */
 export interface ComponentSummary {
   component: IndicatorComponent;
   component_display: string;
@@ -331,10 +371,16 @@ export interface ComponentSummary {
   budget_lcu_bn: number;
   budget_share_percent: number;
   indicator_count: number;
-  /** From backend (Rust): low | medium | high | critical */
+  /** Backend classification of `stress` (component-level thresholds): low | medium | high | critical */
   priority_level: string;
   /** Cumulative stress: accounts for accumulated damage from prior years */
   cumulative_stress?: number | null;
+  /** Backend classification of `cumulative_stress` (component-level thresholds) */
+  cumulative_priority_level?: string | null;
+  avg_performance_gap?: number | null;
+  /** 1 − stress/gap: share of the performance gap absorbed by financing (0–1) */
+  financing_coverage?: number | null;
+  diagnosis?: StressDiagnosis | null;
 }
 
 // ============================================================================
@@ -387,12 +433,10 @@ export interface IndicatorComponentSensitivity {
 export interface FsfsiConfig {
   config: {
     alpha_default: number;
-    stress_thresholds: {
-      low: number;
-      moderate: number;
-      high: number;
-      critical: number;
-    };
+    /** Calibrated thresholds per level (replaces the engine's fixed cut-points). */
+    stress_thresholds: StressThresholds;
+    /** Rust engine defaults, for reference only. */
+    engine_default_stress_thresholds?: Record<string, number>;
     weighting_blend_ratios: {
       expert: number;
       pagerank: number;

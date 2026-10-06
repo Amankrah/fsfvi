@@ -202,7 +202,7 @@
     "fsfsi_scale_hint": "Imibare 0–1,0 · Irengeza risumba risobanura umutekano mwinshi w'imari",
     "fsfsi_point_in_time": "Umwaka w'imari uriho (igihe gito)",
     "risk_label_suffix": "umutekano",
-    "critical_components_of": "Ibice {{critical}} kuri {{total}} birenze intera y'umutekano",
+    "critical_components_of": "Ibice {{critical}} kuri {{total}} bishyizwe mu rwego rukomeye cyane (umutekano w'amateka, intera z'ibice)",
     "critical_components_includes": "Harimo: {{names}}",
     "critical_components_more": "+{{count}} indi",
     "historical_trend_title": "Isesengura ry'amateka",
@@ -214,6 +214,7 @@
     "chart_explain_red": "Umutuku (imirongo): umutekano w'amateka n'ingaruka ; kugaruka biratora igihe.",
     "chart_explain_gap": "Itandukaniro hagati y'imirongo ≈ uburemere bw'imari busigara nubwo ingengo zitera imbere.",
     "chart_explain_threshold": "Umurongo w'utudomo w'umuhondo-mutuku: urugero rw'uburemere bukabije ({{value}}). Ibiri hejuru yarwo bifatwa nk'ibikomeye cyane.",
+    "chart_explain_calibrated": "Intera z'amabara si imibare ihoraho: zikomoka ku macakubiri karemano (Jenks) mu mateka y'umutekano w'u Rwanda, imyaka {{years}}, ibipimo {{n}}; zihinduka gusa iyo ibarwa ryongeye gukorwa.",
     "chart_threshold_high": "Urugero rw'uburemere bukabije",
     "chart_tooltip_gap": "Itandukaniro ry'umutekano (amateka vs ubu)",
     "trend_tab_fsfsi": "Imigendekere y'FSFSI",
@@ -223,7 +224,22 @@
     "trend_subtitle_components": "Imigendekere y'umutekano ku ibice mu gihe",
     "trend_subtitle_heatmap": "Isesengura ry'ubushyuhe bw'umutekano ku bice no ku myaka",
     "scale_0": "0",
-    "scale_1": "1,0"
+    "scale_1": "1,0",
+    "scale_cutpoints": "Hasi ≤ {{low}} · Hagati ≤ {{medium}} · Hejuru ≤ {{high}} · Gikomeye cyane hejuru yaho.",
+    "scale_calibrated": "Intera = amacakubiri karemano mu mateka y'u Rwanda, imyaka {{years}} (ibipimo {{n}}).",
+    "scale_uncalibrated": "Intera z'ibanze za moteri; kora ibarwa ry'intera kugira ngo zikomoke ku makuru."
+  },
+  "diagnosis": {
+    "column": "Impamvu",
+    "at_benchmark": "Ku rugero",
+    "unfunded_gap": "Icyuho kidafite inkunga",
+    "partially_funded_gap": "Icyuho gifite inkunga igice",
+    "funded_gap": "Icyuho gifite inkunga, umusaruro uratinda",
+    "unknown": "—",
+    "coverage_hint": "Ijanisha = igice cy'icyuho cy'imikorere cyakiriwe n'inkunga iriho (1 − umutekano/icyuho).",
+    "cumulative_abbrev": "amat.",
+    "cumulative_level_hint": "Urwego rw'umutekano w'amateka, iyo rutandukanye n'urw'uyu mwaka.",
+    "table_footnote": "Icyihutirwa = urwego rw'umutekano ku ntera zabazwe ku bice. 'Impamvu' itandukanya icyuho kidaterwa inkunga n'icyuho giterwa inkunga nyinshi ariko kitarafunga; ijanisha ni igice cy'icyuho cyakiriwe n'inkunga."
   },
   "assessment_page": {
     "page_title": "Isesengura ry’Umutekano w’Imari y’Igitiribwa",

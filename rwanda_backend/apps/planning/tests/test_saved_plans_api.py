@@ -1,4 +1,4 @@
-"""Saved strategic plan API: uniqueness, PATCH, DELETE (plan_for_assessment mocked)."""
+﻿"""Saved strategic plan API: uniqueness, PATCH, DELETE (plan_for_assessment mocked)."""
 
 from decimal import Decimal
 from unittest.mock import patch
@@ -37,7 +37,7 @@ class SavedPlansApiTests(TestCase):
         self.user = GovernmentUser.objects.create_user(
             username="plan_tester",
             email="plan_tester@gov.rw",
-            password="PlanTester@Secure123",
+            password="PlanTester@SecureZq8x",
         )
         self.client.force_authenticate(user=self.user)
         self.assessment = AssessmentResult.objects.create(

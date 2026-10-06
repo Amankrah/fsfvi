@@ -6,7 +6,7 @@ import { useFiscalYear } from '@/contexts/FiscalYearContext';
 import { FiscalYearSelector } from '@/components/rwanda/shared/FiscalYearSelector';
 import { formatRWFCompact, formatScore, getRiskBgColor, riskBadgeTranslationKey } from '@/lib/utils/formatters';
 import { assessmentAPI } from '@/lib/api/assessmentApi';
-import type { DashboardSummary, AssessmentHistory } from '@/lib/types/assessment';
+import type { DashboardSummary, AssessmentHistory, StressThreshold } from '@/lib/types/assessment';
 import type { SavedStrategicPlanFull, PlanYearActualSummary } from '@/lib/types/planning';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PlanVsActualCard } from './PlanVsActualCard';
@@ -26,35 +26,45 @@ import { overviewPanelClass } from '@/components/rwanda/overview/panelStyles';
 
 type TrendView = 'fsfsi' | 'components' | 'heatmap';
 
-/** Matches FSFSITrendChart stress band widths on 0–1 scale */
-const FSFSI_STRESS_BANDS = [
-  { pct: 5, className: 'bg-emerald-500' },
-  { pct: 10, className: 'bg-yellow-500' },
-  { pct: 15, className: 'bg-orange-500' },
-  { pct: 70, className: 'bg-red-600' },
-] as const;
-
-const CRITICAL_STRESS_THRESHOLD = 0.3;
 const MAX_CRITICAL_NAMES = 3;
+
+/** Band widths (percent of the 0–1 scale) derived from the backend's system-level cut-points. */
+function bandsFromThresholds(t: StressThreshold | null | undefined) {
+  if (!t) return null;
+  const hi = t.high_max ?? t.medium_max;
+  return [
+    { key: 'low', pct: t.low_max * 100, className: 'bg-emerald-500' },
+    { key: 'medium', pct: (t.medium_max - t.low_max) * 100, className: 'bg-yellow-500' },
+    { key: 'high', pct: (hi - t.medium_max) * 100, className: 'bg-orange-500' },
+    { key: 'critical', pct: (1 - hi) * 100, className: 'bg-red-600' },
+  ];
+}
 
 function FsfsiStressScaleBar({
   score,
   labelLow,
   labelHigh,
+  thresholds,
 }: {
   score: number;
   labelLow: string;
   labelHigh: string;
+  thresholds?: StressThreshold | null;
 }) {
   const clamped = Math.max(0, Math.min(1, Number.isFinite(score) ? score : 0));
   const leftPct = clamped * 100;
+  const bands = bandsFromThresholds(thresholds);
   return (
     <div className="mt-5 max-w-xl space-y-1.5">
       <div className="relative h-3 w-full overflow-hidden rounded-full ring-1 ring-slate-200/80">
         <div className="flex h-full w-full">
-          {FSFSI_STRESS_BANDS.map((b) => (
-            <div key={b.pct} className={`h-full opacity-90 ${b.className}`} style={{ width: `${b.pct}%` }} />
-          ))}
+          {bands ? (
+            bands.map((b) => (
+              <div key={b.key} className={`h-full opacity-90 ${b.className}`} style={{ width: `${b.pct}%` }} />
+            ))
+          ) : (
+            <div className="h-full w-full bg-slate-200" />
+          )}
         </div>
         <div
           className="pointer-events-none absolute top-1/2 z-10 h-6 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-sm bg-slate-950 shadow-md ring-2 ring-white"
@@ -168,8 +178,11 @@ export function NationalOverview() {
   const yoyChange = dashboardData.yoy_change_percent ?? 0;
   const improving = yoyChange < 0;
   const headlineStressLevel = (dashboardData.cumulative_stress_level || stressLevel) as StressLevel;
+  const systemThresholds = dashboardData.stress_thresholds?.system ?? null;
+  const componentThresholds = dashboardData.stress_thresholds?.component ?? null;
+  // "Critical" is the backend's component-level label (cumulative when available), not a client-side cut.
   const criticalList = dashboardData.components.filter(
-    (c) => (c.cumulative_stress ?? c.stress) > CRITICAL_STRESS_THRESHOLD,
+    (c) => (c.cumulative_priority_level ?? c.priority_level) === 'critical',
   );
   const criticalComponents = criticalList.length;
   const totalComponents = dashboardData.components.length;
@@ -238,7 +251,23 @@ export function NationalOverview() {
                 score={headlineScoreNum}
                 labelLow={t('overview.scale_0')}
                 labelHigh={t('overview.scale_1')}
+                thresholds={systemThresholds}
               />
+              {systemThresholds && (
+                <p className="mt-2 text-xs leading-snug text-slate-500">
+                  {t('overview.scale_cutpoints', {
+                    low: systemThresholds.low_max.toFixed(3),
+                    medium: systemThresholds.medium_max.toFixed(3),
+                    high: (systemThresholds.high_max ?? systemThresholds.medium_max).toFixed(3),
+                  })}
+                  {systemThresholds.is_calibrated
+                    ? ` ${t('overview.scale_calibrated', {
+                        years: `${systemThresholds.calibration_years[0]}–${systemThresholds.calibration_years[systemThresholds.calibration_years.length - 1]}`,
+                        n: systemThresholds.n_observations,
+                      })}`
+                    : ` ${t('overview.scale_uncalibrated')}`}
+                </p>
+              )}
             </div>
           </div>
         </CardContent>
@@ -384,9 +413,9 @@ export function NationalOverview() {
             </p>
           </CardHeader>
           <CardContent>
-            {trendView === 'fsfsi' && <FSFSITrendChart data={historyData} />}
+            {trendView === 'fsfsi' && <FSFSITrendChart data={historyData} thresholds={systemThresholds} />}
             {trendView === 'components' && <ComponentStressTrend data={historyData} />}
-            {trendView === 'heatmap' && <StressHeatmap data={historyData} />}
+            {trendView === 'heatmap' && <StressHeatmap data={historyData} thresholds={componentThresholds} />}
           </CardContent>
         </Card>
       )}

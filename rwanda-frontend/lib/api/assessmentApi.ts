@@ -24,6 +24,8 @@ import type {
   WeightingMethod,
   Scenario,
   IndicatorInput,
+  StressThresholds,
+  StressThresholdLevel,
 } from '@/lib/types/assessment';
 
 // ============================================================================
@@ -230,13 +232,37 @@ export const assessmentAPI = {
    * @param score - FSFSI score (0-1)
    * @returns Stress level classification
    */
-  getStressLevel: async (score: number): Promise<{ score: number; stress_level: string }> => {
+  getStressLevel: async (
+    score: number,
+    level: Exclude<StressThresholdLevel, 'coverage'> = 'system'
+  ): Promise<{ score: number; level: string; stress_level: string }> => {
     const params = new URLSearchParams();
     params.append('score', score.toString());
+    params.append('level', level);
 
-    const response = await assessmentClient.get<{ score: number; stress_level: string }>(
+    const response = await assessmentClient.get<{ score: number; level: string; stress_level: string }>(
       `/stress-level/?${params.toString()}`
     );
+    return response.data;
+  },
+
+  /**
+   * Active calibrated stress thresholds per level (indicator / component / system / coverage).
+   *
+   * GET /api/assessments/stress-thresholds/
+   */
+  getStressThresholds: async (): Promise<StressThresholds> => {
+    const response = await assessmentClient.get<StressThresholds>('/stress-thresholds/');
+    return response.data;
+  },
+
+  /**
+   * Recalibrate thresholds from the stored assessment record (admin only).
+   *
+   * POST /api/assessments/stress-thresholds/calibrate/
+   */
+  calibrateStressThresholds: async (opts: { dry_run?: boolean; point_only?: boolean } = {}) => {
+    const response = await assessmentClient.post('/stress-thresholds/calibrate/', opts);
     return response.data;
   },
 

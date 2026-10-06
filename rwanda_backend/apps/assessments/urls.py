@@ -35,6 +35,7 @@ from .views import (
     ConfigView,
     PersistenceConfigView,
     StressLevelView,
+    StressThresholdsView,
 )
 
 app_name = "assessments"
@@ -99,6 +100,10 @@ urlpatterns = [
     path("config/", ConfigView.as_view(), name="config"),
     # GET /api/assessments/stress-level/ - Get stress level
     path("stress-level/", StressLevelView.as_view(), name="stress-level"),
+    # GET /api/assessments/stress-thresholds/ - Active calibrated thresholds (per level)
+    path("stress-thresholds/", StressThresholdsView.as_view(), name="stress-thresholds"),
+    # POST /api/assessments/stress-thresholds/calibrate/ - Recalibrate (admin)
+    path("stress-thresholds/calibrate/", StressThresholdsView.as_view(), name="stress-thresholds-calibrate"),
     # GET/PUT /api/assessments/persistence-config/ - Cumulative stress parameters
     path("persistence-config/", PersistenceConfigView.as_view(), name="persistence-config"),
 ]

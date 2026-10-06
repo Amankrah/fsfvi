@@ -202,7 +202,7 @@
     "fsfsi_scale_hint": "Scale 0–1.0. Higher values mean greater financing stress.",
     "fsfsi_point_in_time": "This fiscal year (point-in-time)",
     "risk_label_suffix": "risk",
-    "critical_components_of": "{{critical}} of {{total}} components above the high-stress threshold",
+    "critical_components_of": "{{critical}} of {{total}} components rated critical (component-level cumulative stress)",
     "critical_components_includes": "Includes: {{names}}",
     "critical_components_more": "+{{count}} more",
     "historical_trend_title": "Historical trend",
@@ -214,6 +214,7 @@
     "chart_explain_red": "Red (dashed): cumulative stress, including pressure carried forward from earlier years. It recovers more slowly.",
     "chart_explain_gap": "The gap between the two lines is the structural pressure that remains after budgets improve.",
     "chart_explain_threshold": "Orange dashed line: the high-stress threshold ({{value}}). Values above it are rated critical.",
+    "chart_explain_calibrated": "Band cut-points are not fixed numbers: they are natural breaks (Jenks) in Rwanda's own stress record, FY{{years}}, {{n}} observations, and are re-derived only when the calibration is run again.",
     "chart_threshold_high": "High-stress threshold",
     "chart_tooltip_gap": "Stress gap (cumulative minus current)",
     "trend_tab_fsfsi": "FSFSI trend",
@@ -223,7 +224,22 @@
     "trend_subtitle_components": "Component-level stress over time",
     "trend_subtitle_heatmap": "Stress levels by component and year",
     "scale_0": "0",
-    "scale_1": "1.0"
+    "scale_1": "1.0",
+    "scale_cutpoints": "Low ≤ {{low}} · Medium ≤ {{medium}} · High ≤ {{high}} · Critical above.",
+    "scale_calibrated": "Cut-points are natural breaks in Rwanda's FY{{years}} record ({{n}} observations).",
+    "scale_uncalibrated": "Cut-points are engine defaults; run the threshold calibration to derive them from data."
+  },
+  "diagnosis": {
+    "column": "Why",
+    "at_benchmark": "At benchmark",
+    "unfunded_gap": "Unfunded gap",
+    "partially_funded_gap": "Partly funded gap",
+    "funded_gap": "Funded gap, outcome lag",
+    "unknown": "—",
+    "coverage_hint": "Percentage = share of the performance gap absorbed by current financing (1 − stress/gap).",
+    "cumulative_abbrev": "cum.",
+    "cumulative_level_hint": "Classification of the cumulative (memory-adjusted) stress, when it differs from this year's.",
+    "table_footnote": "Priority = stress class on component-level calibrated cut-points. 'Why' separates a gap that is not being financed from a gap that is heavily financed but has not yet closed; the percentage is the share of the gap absorbed by financing."
   },
   "assessment_page": {
     "page_title": "Food System Financing Stress Assessment",

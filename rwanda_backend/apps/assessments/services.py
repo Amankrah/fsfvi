@@ -16,12 +16,12 @@ import fsfi_engine
 
 from apps.fsfvi_data.models import Indicator, IndicatorData
 
+from . import classification
 from .models import (
     AssessmentHistory,
     AssessmentResult,
     ComponentResult,
     IndicatorResult,
-    StressLevel,
 )
 
 logger = logging.getLogger(__name__)
@@ -39,6 +39,39 @@ def _to_json(data: list[dict] | dict) -> str:
 def _from_json(json_str: str) -> dict | list:
     """Parse JSON string from Rust engine."""
     return json.loads(json_str)
+
+
+def _relabel_engine_result(result: dict) -> dict:
+    """Replace the engine's fixed-threshold labels with calibrated ones, in place.
+
+    The Rust engine labels with its built-in 0.05/0.15/0.30 cut-points. Every
+    label that leaves the service layer must come from the calibrated
+    thresholds, so the known label/score pairs are rewritten here.
+    """
+    if not isinstance(result, dict):
+        return result
+    sys_lvl = classification.LEVEL_SYSTEM
+    pairs = (
+        ("overall_fsfsi", "risk_level"),
+        ("fsfi_score", "risk_level"),
+        ("baseline_fsfsi", "baseline_risk_level"),
+        ("scenario_fsfsi", "scenario_risk_level"),
+    )
+    for score_key, label_key in pairs:
+        if label_key in result and result.get(score_key) is not None:
+            try:
+                result[label_key] = classification.classify(float(result[score_key]), sys_lvl)
+            except (TypeError, ValueError):
+                pass
+    for ind in result.get("indicator_results") or []:
+        if isinstance(ind, dict) and "risk_level" in ind and ind.get("stress") is not None:
+            ind["risk_level"] = classification.classify(float(ind["stress"]), classification.LEVEL_INDICATOR)
+    for agg in result.get("component_aggregations") or []:
+        if isinstance(agg, dict) and "priority_level" in agg:
+            s = agg.get("average_stress", agg.get("average_performance_gap"))
+            if s is not None:
+                agg["priority_level"] = classification.classify(float(s), classification.LEVEL_COMPONENT)
+    return result
 
 
 # =============================================================================
@@ -86,7 +119,7 @@ class AssessmentService:
             scenario,
             fiscal_year,
         )
-        return _from_json(result_json)
+        return _relabel_engine_result(_from_json(result_json))
 
     def run_indicator_assessment(
         self,
@@ -123,7 +156,7 @@ class AssessmentService:
             scenario,
             fiscal_year,
         )
-        return _from_json(result_json)
+        return _relabel_engine_result(_from_json(result_json))
 
     def run_indicator_investment_scenario(
         self,
@@ -144,7 +177,7 @@ class AssessmentService:
             scenario,
             fiscal_year,
         )
-        return _from_json(result_json)
+        return _relabel_engine_result(_from_json(result_json))
 
     def quick_check(self, components: list[dict]) -> dict:
         """
@@ -154,7 +187,7 @@ class AssessmentService:
             QuickCheckResult dict with fsfi_score, risk_level, critical_components
         """
         result_json = fsfi_engine.py_quick_check(_to_json(components))
-        return _from_json(result_json)
+        return _relabel_engine_result(_from_json(result_json))
 
     # -------------------------------------------------------------------------
     # Database Operations
@@ -180,8 +213,11 @@ class AssessmentService:
             indicators, weighting_method, scenario, fiscal_year
         )
 
-        # Map risk level
-        stress_level = self._map_stress_level(result["risk_level"])
+        # Classify with the calibrated system-level thresholds (not the engine's
+        # fixed 0.05/0.15/0.30). The Rust risk_level is overwritten so stored
+        # JSON and DB columns agree.
+        stress_level = classification.classify(float(result["overall_fsfsi"]), classification.LEVEL_SYSTEM)
+        result["risk_level"] = stress_level
 
         # Create main assessment record
         assessment = AssessmentResult.objects.create(
@@ -230,26 +266,26 @@ class AssessmentService:
             gap = comp_agg["average_performance_gap"]
             stress = comp_agg.get("average_stress", gap)
 
-            priority = comp_agg.get("priority_level") or comp_agg.get("risk_level")
-            if not priority:
-                priority = self._classify_stress(stress)
-
-            ComponentResult.objects.create(
+            comp_result = ComponentResult(
                 assessment=assessment,
                 component=comp,
                 weight=Decimal(str(round(weight, 6))),
                 avg_performance_gap=Decimal(str(gap)),
                 component_stress=Decimal(str(stress)),
                 weighted_stress=Decimal(str(round(stress * weight, 6))),
-                priority_level=priority,
                 budget_lcu_bn=Decimal(str(comp_agg["total_weighted_lcu_bn"])),
                 budget_share_percent=Decimal(str(comp_agg["total_share_weighted_percent"])),
                 indicators_count=comp_agg["indicator_count"],
             )
+            # Component-level calibrated classification + gap × coverage diagnosis
+            classification.apply_component_labels(comp_result)
+            comp_result.save()
+            # keep the stored engine JSON consistent with the DB label
+            comp_agg["priority_level"] = comp_result.priority_level
 
         # Save indicator results (observed_value and benchmark_value from Rust output)
         for ind in result["indicator_results"]:
-            IndicatorResult.objects.create(
+            ind_result = IndicatorResult(
                 assessment=assessment,
                 indicator_code=ind["indicator_code"],
                 indicator_name=ind["name"],
@@ -261,6 +297,12 @@ class AssessmentService:
                 observed_value=Decimal(str(ind["observed_value"])) if ind.get("observed_value") is not None else None,
                 benchmark_value=Decimal(str(ind["benchmark_value"])) if ind.get("benchmark_value") is not None else None,
             )
+            classification.apply_indicator_labels(ind_result)
+            ind_result.save()
+
+        # result_json was captured at create(); persist the relabelled copy
+        assessment.result_json = result
+        assessment.save(update_fields=["result_json"])
 
         # Compute cumulative stress (asymmetric EMA)
         self._compute_cumulative_stress(assessment)
@@ -365,7 +407,10 @@ class AssessmentService:
             comp_weight = float(comp_result.weight)
             comp_result.cumulative_stress = Decimal(str(round(avg_cum, 6)))
             comp_result.cumulative_weighted_stress = Decimal(str(round(comp_weight * avg_cum, 6)))
-            comp_result.save(update_fields=["cumulative_stress", "cumulative_weighted_stress"])
+            comp_result.cumulative_priority_level = classification.classify(avg_cum, classification.LEVEL_COMPONENT)
+            comp_result.save(update_fields=[
+                "cumulative_stress", "cumulative_weighted_stress", "cumulative_priority_level",
+            ])
 
         # --- Step 3: Compute system-level cumulative FSFSI ---
         # Instead of re-weighting indicators (which requires matching Rust's exact
@@ -395,37 +440,17 @@ class AssessmentService:
                 cumulative_fsfsi = rust_fsfsi
 
         assessment.cumulative_fsfsi = Decimal(str(round(cumulative_fsfsi, 6)))
-        assessment.cumulative_stress_level = self._classify_stress(cumulative_fsfsi)
+        assessment.cumulative_stress_level = classification.classify(cumulative_fsfsi, classification.LEVEL_SYSTEM)
         assessment.save(update_fields=["cumulative_fsfsi", "cumulative_stress_level"])
 
-    def _map_stress_level(self, level: str) -> str:
-        """Map Rust stress level string to Django enum."""
-        mapping = {
-            "low": StressLevel.LOW,
-            "medium": StressLevel.MEDIUM,
-            "high": StressLevel.HIGH,
-            "critical": StressLevel.CRITICAL,
-        }
-        return mapping.get(level.lower(), StressLevel.MEDIUM)
-
     @staticmethod
-    def _classify_stress(score: float) -> str:
-        """Classify a stress/gap score using the same thresholds as the Rust engine config.
+    def _classify_stress(score: float, level: str = classification.LEVEL_SYSTEM) -> str:
+        """Classify a stress score with the calibrated thresholds for ``level``.
 
-        Thresholds (from fsfi_engine config.rs):
-          low    <= 0.050
-          medium <= 0.150
-          high   <= 0.300
-          critical > 0.300
+        Kept as a thin shim for callers that imported it; see
+        ``apps.assessments.classification`` for the calibration logic.
         """
-        if score <= 0.050:
-            return StressLevel.LOW
-        elif score <= 0.150:
-            return StressLevel.MEDIUM
-        elif score <= 0.300:
-            return StressLevel.HIGH
-        else:
-            return StressLevel.CRITICAL
+        return classification.classify(score, level)
 
     def _update_history(self, assessment: AssessmentResult):
         """Update or create history record for trend analysis."""
@@ -536,6 +561,7 @@ class AssessmentService:
                 "computed_at": None,
                 "weighting_method": None,
                 "scenario": None,
+                "stress_thresholds": classification.get_all_thresholds(),
                 "empty": True,
             }
 
@@ -550,6 +576,10 @@ class AssessmentService:
                 "indicator_count": comp.indicators_count,
                 "priority_level": comp.priority_level,
                 "cumulative_stress": float(comp.cumulative_stress) if comp.cumulative_stress else None,
+                "cumulative_priority_level": comp.cumulative_priority_level,
+                "avg_performance_gap": float(comp.avg_performance_gap),
+                "financing_coverage": float(comp.financing_coverage) if comp.financing_coverage is not None else None,
+                "diagnosis": comp.diagnosis,
             }
             for comp in assessment.component_results.all()
         ]
@@ -590,6 +620,7 @@ class AssessmentService:
             "computed_at": assessment.computed_at.isoformat(),
             "weighting_method": assessment.weighting_method,
             "scenario": assessment.scenario,
+            "stress_thresholds": classification.get_all_thresholds(),
             "empty": False,
         }
 
@@ -936,12 +967,21 @@ class ConfigService:
     """
 
     def get_config(self) -> dict:
-        """Get default FSFSI configuration."""
-        return _from_json(fsfi_engine.get_default_config())
+        """Engine configuration, with stress thresholds replaced by the calibrated set.
 
-    def get_stress_level(self, fsfsi_score: float) -> str:
-        """Get stress level for a given FSFSI score."""
-        return fsfi_engine.get_stress_level(fsfsi_score)
+        The Rust defaults (0.05/0.15/0.30) are kept under ``engine_default_stress_thresholds``
+        for reference only; classification uses ``stress_thresholds`` (per level).
+        """
+        cfg = _from_json(fsfi_engine.get_default_config())
+        if isinstance(cfg, dict):
+            if "stress_thresholds" in cfg:
+                cfg["engine_default_stress_thresholds"] = cfg["stress_thresholds"]
+            cfg["stress_thresholds"] = classification.get_all_thresholds()
+        return cfg
+
+    def get_stress_level(self, fsfsi_score: float, level: str = classification.LEVEL_SYSTEM) -> str:
+        """Classify a score with the calibrated thresholds for ``level`` (default: system)."""
+        return classification.classify(fsfsi_score, level)
 
     def get_indicator_components(self) -> list[str]:
         """Get list of 8 indicator component names."""

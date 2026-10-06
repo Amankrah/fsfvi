@@ -440,14 +440,25 @@ python manage.py compute_benchmark_sample \
 
 ## FSFSI Stress Thresholds
 
-The FSFSI is bounded on (0, 1). Classification thresholds (aligned with the Rust engine):
+The FSFSI is bounded on (0, 1). Classification cut-points are **calibrated from the stored
+assessment record** (Fisher–Jenks natural breaks, per aggregation level) and stored in
+`StressThresholdConfig`; the Rust engine's fixed 0.05/0.15/0.30 are only the fallback when no
+calibration exists. See `docs/TECHNICAL_NOTE.md` §16 and `apps/assessments/classification.py`.
 
-| Stress Level | FSFSI Range | Color |
-|---|---|---|
-| **Low** | ≤ 0.05 | Green |
-| **Medium** | 0.05 – 0.15 | Yellow |
-| **High** | 0.15 – 0.30 | Orange |
-| **Critical** | > 0.30 | Red |
+### Step 6b: Calibrate stress thresholds (after running assessments)
+
+```bash
+python manage.py calibrate_stress_thresholds --dry-run   # preview breaks + sample sizes
+python manage.py calibrate_stress_thresholds             # persist + relabel all stored results
+python manage.py calibrate_stress_thresholds --show      # print active thresholds
+```
+
+Re-run after adding ≥ 2 new fiscal years or at the start of a PSTA cycle. Calibration is also
+available to admins via `POST /api/assessments/stress-thresholds/calibrate/`. The active values
+and their provenance are served by `GET /api/assessments/stress-thresholds/`.
+
+Current calibration (FY2018–2024): indicator 0.176 / 0.399 / 0.653; component and system
+0.202 / 0.342 / 0.461; financing-coverage 0.168 / 0.552.
 
 ---
 

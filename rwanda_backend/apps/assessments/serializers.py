@@ -270,6 +270,10 @@ class IndicatorResultSerializer(serializers.ModelSerializer):
             "sensitivity",
             "performance_gap",
             "stress_value",
+            "stress_level",
+            "cumulative_stress",
+            "financing_coverage",
+            "diagnosis",
             "weighted_lcu_bn",
             "share_weighted_percent",
             "higher_is_better",
@@ -306,6 +310,9 @@ class ComponentResultSerializer(serializers.ModelSerializer):
             "allocation_gap_usd",
             "cumulative_stress",
             "cumulative_weighted_stress",
+            "cumulative_priority_level",
+            "financing_coverage",
+            "diagnosis",
             "indicators_count",
         ]
         read_only_fields = fields
@@ -411,19 +418,39 @@ class ComponentSummarySerializer(serializers.Serializer):
     budget_lcu_bn = serializers.FloatField()
     budget_share_percent = serializers.FloatField()
     indicator_count = serializers.IntegerField()
-    priority_level = serializers.CharField()  # From Rust: low | medium | high | critical
+    priority_level = serializers.CharField()  # calibrated component-level: low | medium | high | critical
     cumulative_stress = serializers.FloatField(required=False, allow_null=True)
+    cumulative_priority_level = serializers.CharField(required=False, allow_null=True)
+    avg_performance_gap = serializers.FloatField(required=False, allow_null=True)
+    financing_coverage = serializers.FloatField(required=False, allow_null=True)
+    diagnosis = serializers.CharField(required=False, allow_null=True)
+
+
+class StressThresholdSerializer(serializers.Serializer):
+    """Active cut-points for one classification level (see classification.Thresholds.as_dict)."""
+
+    level = serializers.CharField()
+    low_max = serializers.FloatField()
+    medium_max = serializers.FloatField()
+    high_max = serializers.FloatField(allow_null=True)
+    method = serializers.CharField()
+    n_observations = serializers.IntegerField()
+    gvf = serializers.FloatField(allow_null=True)
+    calibration_years = serializers.ListField(child=serializers.IntegerField())
+    calibrated_at = serializers.CharField(allow_null=True)
+    is_calibrated = serializers.BooleanField()
 
 
 class DashboardSummarySerializer(serializers.Serializer):
-    """Dashboard summary data. All fields from backend (stored assessment / Rust engine)."""
+    """Dashboard summary data. All fields from backend (stored assessment / calibrated classification)."""
 
     assessment_id = serializers.CharField(allow_null=True)
     overall_fsfsi = serializers.FloatField()
-    stress_level = serializers.CharField()  # From Rust: low | medium | high | critical
+    stress_level = serializers.CharField()  # calibrated system-level: low | medium | high | critical
     fiscal_year = serializers.IntegerField()
     total_budget_lcu_bn = serializers.FloatField()
-    components = ComponentSummarySerializer(many=True)  # priority_level from Rust
+    components = ComponentSummarySerializer(many=True)
+    stress_thresholds = serializers.DictField(child=StressThresholdSerializer(), required=False)
     top_priorities = ActionPriorityOutputSerializer(many=True)
     efficiency_index = serializers.FloatField()
     yoy_change_percent = serializers.FloatField(allow_null=True)

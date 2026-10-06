@@ -14,19 +14,19 @@ import {
   Legend,
   ReferenceArea,
 } from 'recharts';
-import type { AssessmentHistory } from '@/lib/types/assessment';
+import type { AssessmentHistory, StressThreshold } from '@/lib/types/assessment';
 import { useLanguage } from '@/contexts/LanguageContext';
 
 interface FSFSITrendChartProps {
   data: AssessmentHistory[];
   height?: number;
+  /**
+   * System-level cut-points from the backend (`stress_thresholds.system`).
+   * Bands and reference lines are drawn from these; when absent the chart
+   * draws no bands rather than inventing its own numbers.
+   */
+  thresholds?: StressThreshold | null;
 }
-
-const STRESS_THRESHOLDS = {
-  low: 0.05,
-  medium: 0.15,
-  high: 0.3,
-};
 
 const STRESS_COLORS = {
   low: '#22c55e',
@@ -39,8 +39,18 @@ const STRESS_COLORS = {
 const LINE_CURRENT = '#0284c7';
 const LINE_CUMULATIVE = '#b91c1c';
 
-export function FSFSITrendChart({ data, height = 500 }: FSFSITrendChartProps) {
+export function FSFSITrendChart({ data, height = 500, thresholds = null }: FSFSITrendChartProps) {
   const { t } = useLanguage();
+
+  // Cut-points: low ≤ lowMax < medium ≤ mediumMax < high ≤ highMax < critical
+  const bands = useMemo(() => {
+    if (!thresholds) return null;
+    return {
+      low: thresholds.low_max,
+      medium: thresholds.medium_max,
+      high: thresholds.high_max ?? thresholds.medium_max,
+    };
+  }, [thresholds]);
 
   const chartData = useMemo(() => {
     return [...data]
@@ -73,10 +83,16 @@ export function FSFSITrendChart({ data, height = 500 }: FSFSITrendChartProps) {
     }
     const span = Math.max(0.06, max - min);
     const pad = Math.min(0.12, Math.max(0.04, span * 0.2));
-    const low = Math.max(0, min - pad);
-    const high = Math.min(1, max + pad);
+    let low = Math.max(0, min - pad);
+    let high = Math.min(1, max + pad);
+    // Keep the labelled cut-points on-chart: the explainer refers to the
+    // medium→high and high→critical lines, so the zoomed domain must contain them.
+    if (bands) {
+      low = Math.min(low, Math.max(0, bands.medium - 0.02));
+      high = Math.max(high, Math.min(1, bands.high + 0.02));
+    }
     return [low, high];
-  }, [chartData]);
+  }, [chartData, bands]);
 
   interface TooltipEntry {
     value: number;
@@ -162,21 +178,15 @@ export function FSFSITrendChart({ data, height = 500 }: FSFSITrendChartProps) {
             )}
           </defs>
 
-          {/* Risk zones (y-bands; Y domain zooms to data so trends read clearly) */}
-          <ReferenceArea y1={0} y2={STRESS_THRESHOLDS.low} fill={STRESS_COLORS.low} fillOpacity={0.16} />
-          <ReferenceArea
-            y1={STRESS_THRESHOLDS.low}
-            y2={STRESS_THRESHOLDS.medium}
-            fill={STRESS_COLORS.medium}
-            fillOpacity={0.12}
-          />
-          <ReferenceArea
-            y1={STRESS_THRESHOLDS.medium}
-            y2={STRESS_THRESHOLDS.high}
-            fill={STRESS_COLORS.high}
-            fillOpacity={0.1}
-          />
-          <ReferenceArea y1={STRESS_THRESHOLDS.high} y2={1} fill={STRESS_COLORS.critical} fillOpacity={0.09} />
+          {/* Risk zones (y-bands from calibrated thresholds; Y domain zooms to data so trends read clearly) */}
+          {bands && (
+            <>
+              <ReferenceArea y1={0} y2={bands.low} fill={STRESS_COLORS.low} fillOpacity={0.16} />
+              <ReferenceArea y1={bands.low} y2={bands.medium} fill={STRESS_COLORS.medium} fillOpacity={0.12} />
+              <ReferenceArea y1={bands.medium} y2={bands.high} fill={STRESS_COLORS.high} fillOpacity={0.1} />
+              <ReferenceArea y1={bands.high} y2={1} fill={STRESS_COLORS.critical} fillOpacity={0.09} />
+            </>
+          )}
 
           <CartesianGrid strokeDasharray="3 3" stroke="#cbd5e1" vertical={false} />
           <XAxis
@@ -216,31 +226,25 @@ export function FSFSITrendChart({ data, height = 500 }: FSFSITrendChartProps) {
             wrapperStyle={{ fontWeight: 600, fontSize: 13 }}
           />
 
-          <ReferenceLine
-            y={STRESS_THRESHOLDS.low}
-            stroke={STRESS_COLORS.low}
-            strokeDasharray="4 4"
-            strokeOpacity={0.7}
-          />
-          <ReferenceLine
-            y={STRESS_THRESHOLDS.medium}
-            stroke={STRESS_COLORS.medium}
-            strokeDasharray="4 4"
-            strokeOpacity={0.7}
-          />
-          <ReferenceLine
-            y={STRESS_THRESHOLDS.high}
-            stroke={STRESS_COLORS.high}
-            strokeDasharray="4 4"
-            strokeOpacity={0.9}
-            label={{
-              value: `${t('overview.chart_threshold_high')} (${STRESS_THRESHOLDS.high.toFixed(2)})`,
-              position: 'insideBottomRight',
-              fill: STRESS_COLORS.high,
-              fontSize: 11,
-              fontWeight: 600,
-            }}
-          />
+          {bands && (
+            <>
+              <ReferenceLine y={bands.low} stroke={STRESS_COLORS.low} strokeDasharray="4 4" strokeOpacity={0.7} />
+              <ReferenceLine y={bands.medium} stroke={STRESS_COLORS.medium} strokeDasharray="4 4" strokeOpacity={0.7} />
+              <ReferenceLine
+                y={bands.high}
+                stroke={STRESS_COLORS.high}
+                strokeDasharray="4 4"
+                strokeOpacity={0.9}
+                label={{
+                  value: `${t('overview.chart_threshold_high')} (${bands.high.toFixed(3)})`,
+                  position: 'insideBottomRight',
+                  fill: STRESS_COLORS.high,
+                  fontSize: 11,
+                  fontWeight: 600,
+                }}
+              />
+            </>
+          )}
 
           <Area type="monotone" dataKey="fsfsi" stroke="none" fill="url(#fsfsiGradient)" legendType="none" tooltipType="none" />
           <Line
@@ -285,7 +289,15 @@ export function FSFSITrendChart({ data, height = 500 }: FSFSITrendChartProps) {
             <li>{t('overview.chart_explain_blue')}</li>
             <li>{t('overview.chart_explain_red')}</li>
             <li>{t('overview.chart_explain_gap')}</li>
-            <li>{t('overview.chart_explain_threshold', { value: STRESS_THRESHOLDS.high.toFixed(2) })}</li>
+            {bands && <li>{t('overview.chart_explain_threshold', { value: bands.high.toFixed(3) })}</li>}
+            {thresholds?.is_calibrated && (
+              <li>
+                {t('overview.chart_explain_calibrated', {
+                  years: `${thresholds.calibration_years[0]}–${thresholds.calibration_years[thresholds.calibration_years.length - 1]}`,
+                  n: thresholds.n_observations,
+                })}
+              </li>
+            )}
           </ul>
         </div>
       )}

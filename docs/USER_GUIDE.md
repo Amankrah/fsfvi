@@ -79,12 +79,32 @@ FSFSI = Σ (weight × stress) for all 37 indicators
 
 ### Stress Levels
 
-| Level | FSFSI Range | Interpretation |
-|-------|-------------|----------------|
-| 🟢 **Low** | 0.00 – 0.05 | Food system is well-funded; indicators near benchmark |
-| 🟡 **Medium** | 0.05 – 0.15 | Moderate gaps; targeted investment can close deficits |
-| 🟠 **High** | 0.15 – 0.30 | Significant underinvestment; intervention needed |
-| 🔴 **Critical** | > 0.30 | Severe financing stress; urgent reallocation required |
+The Low / Medium / High / Critical labels are **derived from Rwanda's own data**, not from fixed numbers. The platform finds the natural break-points in the recorded stress values (a standard statistical method called Jenks natural breaks) and uses them as cut-points. Each aggregation level — indicator, component and the national FSFSI — has its own cut-points, because an average of many indicators naturally varies less than a single indicator.
+
+The cut-points currently in force (calibrated on FY2018–FY2024) are:
+
+| Level | 🟢 Low | 🟡 Medium | 🟠 High | 🔴 Critical |
+|-------|--------|-----------|---------|-------------|
+| National FSFSI and component stress | ≤ 0.202 | 0.202 – 0.342 | 0.342 – 0.461 | > 0.461 |
+| Single indicator stress | ≤ 0.176 | 0.176 – 0.399 | 0.399 – 0.653 | > 0.653 |
+
+How to read them:
+- **Critical** = in the worst natural grouping of Rwanda's recorded financing stress at that level. For the national score, it means the economy-wide average is worse than any year since 2018.
+- **Low** = in the best natural grouping. For a component this usually means funding has absorbed most of the gap (see "Why" below), not necessarily that the outcome has reached its benchmark.
+- The cut-points are **frozen** between calibrations, so progress shows up as fewer critical items, not as a moving goal-post. An administrator re-runs the calibration from the API or with `manage.py calibrate_stress_thresholds` (recommended once per PSTA cycle or after two new fiscal years). The exact values and the date of the last calibration are shown under the headline score and in the heatmap legend.
+
+### "Why" — gap versus financing
+
+A low stress score can mean two very different things: the sector is close to its benchmark, or the sector is far from its benchmark but heavily funded. The **Why** column in the component breakdown separates these:
+
+| Label | Meaning | Typical action |
+|-------|---------|----------------|
+| **At benchmark** | Performance gap is small | Maintain |
+| **Unfunded gap** | Large gap, little financing directed at it | First call on new or reallocated money |
+| **Partly funded gap** | Financing is reducing the gap but has not caught up | Sustain and monitor |
+| **Funded gap, outcome lag** | Financing has absorbed most of the gap but the outcome has not yet closed | Look at delivery and timing, not budget size |
+
+The percentage beside the label is the share of the performance gap absorbed by current financing (0 % = funding has not dented the gap; 100 % = funding has removed the stress).
 
 ### Point-in-Time vs. Cumulative FSFSI
 
@@ -241,7 +261,7 @@ The National Overview is your starting point. It provides a **national-level sna
 | **FSFSI Score** | The headline cumulative stress score for the national food system. Accompanied by the single-year (point-in-time) score in smaller text. |
 | **Risk Level** | Color-coded badge (Low / Medium / High / Critical) derived from the cumulative FSFSI. |
 | **Year-on-Year Change** | Percentage change in FSFSI vs. the previous fiscal year. A **negative** change means **improving** (stress is falling). |
-| **Critical Components** | Count of the 8 components with cumulative stress **> 0.30** (Critical level). |
+| **Critical Components** | Count of the 8 components whose cumulative stress is classed **Critical** on the calibrated component-level cut-points (currently > 0.461). |
 | **Total Budget** | Total national food system budget mapped to indicators for the selected fiscal year, in RWF. |
 
 > **Reading the YoY change:** A value of **−8.3%** means the FSFSI score fell by 8.3% compared to last year — the food system is **less stressed**. A value of **+5.1%** means stress **increased**.

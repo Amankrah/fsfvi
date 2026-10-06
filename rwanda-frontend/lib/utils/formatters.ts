@@ -14,6 +14,44 @@
 
 export type StressLevel = 'low' | 'medium' | 'high' | 'critical';
 
+/**
+ * Classify a score against backend-supplied cut-points (used only to colour
+ * chart cells/bands where the backend cannot attach a label to every pixel).
+ * The cut-points themselves always come from the API (`StressThreshold`).
+ */
+export function classifyWithThresholds(
+  score: number,
+  t: { low_max: number; medium_max: number; high_max: number | null } | null | undefined,
+): StressLevel {
+  if (!t) return 'medium';
+  if (score <= t.low_max) return 'low';
+  if (score <= t.medium_max) return 'medium';
+  if (t.high_max === null || score <= t.high_max) return 'high';
+  return 'critical';
+}
+
+/** i18n key for the gap × financing-coverage diagnosis label. */
+export function diagnosisTranslationKey(diagnosis: string | null | undefined): string {
+  const map: Record<string, string> = {
+    at_benchmark: 'diagnosis.at_benchmark',
+    unfunded_gap: 'diagnosis.unfunded_gap',
+    partially_funded_gap: 'diagnosis.partially_funded_gap',
+    funded_gap: 'diagnosis.funded_gap',
+  };
+  return map[diagnosis ?? ''] ?? 'diagnosis.unknown';
+}
+
+/** Tailwind classes for the diagnosis chip (neutral palette, distinct from risk colours). */
+export function getDiagnosisChipClass(diagnosis: string | null | undefined): string {
+  const map: Record<string, string> = {
+    at_benchmark: 'bg-emerald-50 text-emerald-800 border-emerald-200',
+    unfunded_gap: 'bg-rose-50 text-rose-800 border-rose-200',
+    partially_funded_gap: 'bg-amber-50 text-amber-800 border-amber-200',
+    funded_gap: 'bg-sky-50 text-sky-800 border-sky-200',
+  };
+  return map[diagnosis ?? ''] ?? 'bg-slate-50 text-slate-700 border-slate-200';
+}
+
 /** i18n key for full risk badge phrase (word order safe per locale). */
 export function riskBadgeTranslationKey(level: string | null | undefined): string {
   const l = (level ?? 'medium').toLowerCase();

@@ -317,22 +317,26 @@ def _stamp_planning_result(result, assessment, target_fsfvi, planning_years, gro
     # --- Implementation Risks (data-driven) ---
     risks = []
 
+    # Critical = above the calibrated component-level 'high' bound (not a fixed 0.30)
+    from apps.assessments import classification as _cls
+    critical_cut = _cls.critical_threshold(_cls.LEVEL_COMPONENT)
+
     # Count critical components based on CURRENT cumulative stress
     critical_count = sum(
         1 for comp in assessment.component_results.all()
-        if (float(comp.cumulative_stress) if comp.cumulative_stress else float(comp.component_stress)) > 0.30
+        if (float(comp.cumulative_stress) if comp.cumulative_stress else float(comp.component_stress)) > critical_cut
     )
     # How many components still critical at end of plan?
     still_critical = sum(
-        1 for c in comp_changes if c["final"] > 0.30
+        1 for c in comp_changes if c["final"] > critical_cut
     )
     if still_critical > 0:
-        still_names = [c["name"] for c in comp_changes if c["final"] > 0.30]
+        still_names = [c["name"] for c in comp_changes if c["final"] > critical_cut]
         risks.append({
             "risk_type": "Residual Stress",
             "severity": "high",
             "description": (
-                f"{still_critical} component(s) remain above the critical threshold (0.30) at the end of the plan: "
+                f"{still_critical} component(s) remain above the critical threshold ({critical_cut:.3f}) at the end of the plan: "
                 f"{', '.join(still_names[:3])}{'...' if len(still_names) > 3 else ''}. "
                 f"Even under the optimal allocation, accumulated damage takes longer to clear."
             ),
