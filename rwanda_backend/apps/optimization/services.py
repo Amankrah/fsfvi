@@ -291,6 +291,10 @@ class OptimizationService:
         assessment = AssessmentResult.objects.get(pk=assessment_id)
         components = _build_component_inputs_from_assessment(assessment)
         result = self.calculate_roi(components)
+        # The engine reports the envelope in its internal per-indicator units.
+        # Report the assessment's mapped total in real LCU, as the other tabs do.
+        if assessment.total_budget_lcu_bn is not None:
+            result["total_budget_lcu"] = float(assessment.total_budget_lcu_bn) * 1e9
         _merge_computing_time_ms(result, t0)
         return result
 

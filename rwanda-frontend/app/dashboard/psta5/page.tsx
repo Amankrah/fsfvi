@@ -524,7 +524,7 @@ export default function PSTA5Page() {
                     <span className="font-mono font-semibold">
                       {summary.budget_alignment.total_mapped_bn?.toFixed(2) ?? '–'} Bn
                     </span>{' '}
-                    RWF (only spending routed through mapped components).
+                    RWF (each FSFSI component's allocation is attributed to the priority area it serves).
                   </p>
                   <p>
                     Full plan envelope (final plan year):{' '}
@@ -537,11 +537,19 @@ export default function PSTA5Page() {
                     </span>{' '}
                     RWF.
                   </p>
-                  <p className="text-amber-900 bg-amber-50 border border-amber-100 rounded px-2 py-1.5 text-[11px] leading-snug">
-                    A small mapped total means that much of the plan sits in lines not attributed to priority areas in
-                    this mapping. It is <strong>not</strong> the full national agriculture budget (about 2.2T RWF).
-                    Treat this panel as a <strong>traceability slice</strong>, not complete coverage.
-                  </p>
+                  {(summary.budget_alignment.unmapped_bn ?? 0) > 0.5 ? (
+                    <p className="text-amber-900 bg-amber-50 border border-amber-100 rounded px-2 py-1.5 text-[11px] leading-snug">
+                      Part of the plan envelope sits in components with no priority-area bridge, so the shares above
+                      cover only the mapped total. Treat this panel as a <strong>traceability slice</strong>, not
+                      complete coverage.
+                    </p>
+                  ) : (
+                    <p className="text-[11px] leading-snug text-gray-600">
+                      The envelope is the plan's projected total for its final year, not the current year's mapped
+                      budget. Shares describe the modelled optimal mix of the eight FSFSI components, bridged to
+                      PSTA 5 priority areas.
+                    </p>
+                  )}
                 </div>
               </div>
             </div>

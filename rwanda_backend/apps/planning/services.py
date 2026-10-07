@@ -1305,13 +1305,19 @@ def compute_psta5_budget_alignment(
     if not priority_areas:
         return {"error": "No PSTA-5 Priority Areas defined. Run seed_psta5 command."}
 
-    # Build mapping lookup: component -> [(pillar_code, weight), ...]
+    # Build mapping lookup: component -> [(pillar_code, share), ...]
+    # Seeded weights describe how much each component contributes within a Priority Area
+    # (they sum to 1 per PA). For budget flow, a component's whole allocation must land on
+    # its PA(s), so normalise the weights per component to shares that sum to 1.
     component_to_pillars: dict[str, list[tuple[str, float]]] = {}
     for m in mappings:
-        comp = m.component
-        if comp not in component_to_pillars:
-            component_to_pillars[comp] = []
-        component_to_pillars[comp].append((m.pillar.code, float(m.contribution_weight)))
+        component_to_pillars.setdefault(m.component, []).append(
+            (m.pillar.code, float(m.contribution_weight))
+        )
+    for comp, pairs in component_to_pillars.items():
+        w_sum = sum(w for _, w in pairs)
+        if w_sum > 0:
+            component_to_pillars[comp] = [(code, w / w_sum) for code, w in pairs]
 
     # Calculate total budget
     total_bn = total_budget_bn if total_budget_bn and total_budget_bn > 0 else sum(
@@ -1382,11 +1388,28 @@ def compute_psta5_budget_alignment(
         "total_mapped_bn": round(total_mapped, 2),
         "unmapped_bn": round(total_bn - total_mapped, 2),
         "methodology": (
-            "Budget alignment maps FSFSI component allocations to PSTA 5 Priority Areas using contribution "
-            "weights (for example, 40% of crop production to PA1). The alignment score is 100 minus twice the "
-            "average absolute deviation from the target shares. A 58/17/24 split scores 100."
+            "Budget alignment assigns each FSFSI component's allocation to the PSTA 5 Priority Area it "
+            "serves (for example, crop production, animal systems and environment to PA1). The alignment "
+            "score is 100 minus twice the average absolute deviation from the target shares. A 58/17/24 "
+            "split scores 100."
         ),
     }
+
+
+def _plan_year_allocations_bn(yp: dict) -> tuple[float, dict[str, float]]:
+    """Component allocations for one plan year, in billions LCU.
+
+    ``total_budget`` in a stored plan year is in real LCU (after ``budget_scale``), while
+    ``recommended_allocations`` are the engine's internal per-indicator units. Only their
+    ratios are meaningful, so each component's share is applied to the year's total.
+    """
+    total_budget = float(yp.get("total_budget") or 0)
+    total_budget_bn = total_budget / 1e9 if total_budget > 1e6 else total_budget
+    rec = yp.get("recommended_allocations") or {}
+    tot = sum(float(v or 0) for v in rec.values())
+    if tot <= 0 or total_budget_bn <= 0:
+        return total_budget_bn, {}
+    return total_budget_bn, {k: float(v or 0) / tot * total_budget_bn for k, v in rec.items()}
 
 
 def compute_psta5_alignment_summary(
@@ -1484,12 +1507,7 @@ def compute_psta5_alignment_summary(
             year_target = yp.get("year_target") or yp.get("target_fsfvi", 0)
             component_projections = yp.get("component_projections", {})
 
-            # Scale to billions
-            total_budget_bn = total_budget / 1e9 if total_budget > 1e6 else total_budget
-            allocations_bn = {}
-            for comp, alloc in recommended.items():
-                alloc_bn = alloc / 1e9 if alloc > 1e6 else alloc
-                allocations_bn[comp] = alloc_bn
+            total_budget_bn, allocations_bn = _plan_year_allocations_bn(yp)
 
             # Compute projected indicator improvement for this year
             year_component_improvements: dict[str, float] = {}
@@ -1536,13 +1554,7 @@ def compute_psta5_alignment_summary(
         # Use the final year for main metrics
         if yearly_plans:
             final_year = yearly_plans[-1]
-            recommended = final_year.get("recommended_allocations", {})
-            total_budget = final_year.get("total_budget", 0)
-            total_budget_bn = total_budget / 1e9 if total_budget > 1e6 else total_budget
-            allocations_bn = {}
-            for comp, alloc in recommended.items():
-                alloc_bn = alloc / 1e9 if alloc > 1e6 else alloc
-                allocations_bn[comp] = alloc_bn
+            total_budget_bn, allocations_bn = _plan_year_allocations_bn(final_year)
             if allocations_bn:
                 budget_alignment = compute_psta5_budget_alignment(allocations_bn, total_budget_bn)
 

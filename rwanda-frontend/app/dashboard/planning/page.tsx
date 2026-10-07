@@ -683,7 +683,14 @@ export default function PlanningPage() {
                   <span className="text-lg font-bold">{cumulativeBaseline.toFixed(2)}</span>
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-blue-900">Current cumulative stress (critical)</p>
+                  <p className="text-sm font-semibold text-blue-900">
+                    Current cumulative stress
+                    {(() => {
+                      const lvl = (assessment?.cumulative_stress_level || assessment?.stress_level || '').toLowerCase();
+                      if (!lvl) return null;
+                      return ` (${t(lvl === 'medium' ? 'risk.moderate' : `risk.${lvl}`).toLowerCase()})`;
+                    })()}
+                  </p>
                   <p className="text-xs text-blue-700 mt-0.5">
                     A <strong>{targetReductionPct}%</strong> reduction over <strong>{planningYears} years</strong> gives a target of <strong>{targetFsfvi.toFixed(2)}</strong>.
                     Recovery is slow because stress carried over from earlier years persists.
