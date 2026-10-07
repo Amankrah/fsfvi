@@ -144,16 +144,19 @@ class IndicatorData(models.Model):
     )
 
     # FSFSI input values
+    # 8 decimal places: some benchmarks/observed values are very small ratios
+    # (e.g. IND-37 disaster damages / GDP = 1.7e-05) and were silently rounded
+    # to 0 with 4 decimal places.
     observed_value = models.DecimalField(
-        max_digits=15,
-        decimal_places=4,
+        max_digits=20,
+        decimal_places=8,
         null=True,
         blank=True,
         help_text="Current performance metric value"
     )
     benchmark_value = models.DecimalField(
-        max_digits=15,
-        decimal_places=4,
+        max_digits=20,
+        decimal_places=8,
         null=True,
         blank=True,
         help_text="Target/benchmark value"
@@ -163,6 +166,26 @@ class IndicatorData(models.Model):
         blank=True,
         default="",
         help_text="Benchmark reference when value is missing, e.g. Global_10/90pct, SSA_10/90pct"
+    )
+
+    # Provenance (from FSFSI_indicator_level_parameters.xlsx)
+    fsci_indicator_used = models.CharField(
+        max_length=255,
+        blank=True,
+        default="",
+        help_text="FSCI indicator the observed/benchmark values were taken from (empty = no proxy found)"
+    )
+    delta_imputed = models.BooleanField(
+        default=False,
+        help_text=(
+            "True when no FSCI proxy exists and observed/benchmark are placeholders "
+            "(performance gap was imputed from the component median in the parameters sheet)"
+        ),
+    )
+    data_note = models.TextField(
+        blank=True,
+        default="",
+        help_text="Data_note from the parameters sheet (proxy used, imputation, composite, ...)"
     )
 
     # Financial allocation in USD (converted from LCU)

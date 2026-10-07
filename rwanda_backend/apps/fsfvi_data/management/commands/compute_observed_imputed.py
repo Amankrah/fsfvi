@@ -114,7 +114,7 @@ class Command(BaseCommand):
                 self.stdout.write(
                     f"  {rec.indicator.code:8} | "
                     f"share_w={float(rec.share_weighted_percent or 0):6.2f} | "
-                    f"benchmark={float(rec.benchmark_value) if rec.benchmark_value else 0:8.2f} | "
+                    f"benchmark={float(rec.benchmark_value) if rec.benchmark_value is not None else 0:8.2f} | "
                     f"observed(DB)={obs_display:>10} | "
                     f"imputed={val:10.4f} | {formula}"
                 )

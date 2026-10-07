@@ -42,6 +42,7 @@ class IndicatorDataSerializer(serializers.ModelSerializer):
             "fiscal_year", "records_count",
             "gross_lcu_bn", "weighted_lcu_bn", "share_weighted_percent",
             "observed_value", "benchmark_value", "benchmark_used_type",
+            "fsci_indicator_used", "delta_imputed", "data_note",
             "financial_allocation_usd", "sensitivity_parameter",
             "performance_gap", "stress_value",
             "status", "created_by_username", "created_at", "updated_at",
@@ -49,6 +50,7 @@ class IndicatorDataSerializer(serializers.ModelSerializer):
         read_only_fields = [
             "id", "indicator_code", "indicator_name", "component", "component_display",
             "higher_is_better", "unit", "performance_gap", "stress_value",
+            "fsci_indicator_used", "delta_imputed", "data_note",
             "created_by_username", "created_at", "updated_at",
         ]
 
@@ -75,8 +77,8 @@ class IndicatorDataInputSerializer(serializers.Serializer):
         max_value=Decimal("100"),
         required=False,
     )
-    observed_value = serializers.DecimalField(max_digits=15, decimal_places=4, allow_null=True, required=False)
-    benchmark_value = serializers.DecimalField(max_digits=15, decimal_places=4, allow_null=True, required=False)
+    observed_value = serializers.DecimalField(max_digits=20, decimal_places=8, allow_null=True, required=False)
+    benchmark_value = serializers.DecimalField(max_digits=20, decimal_places=8, allow_null=True, required=False)
     benchmark_used_type = serializers.CharField(max_length=100, allow_blank=True, required=False)
     financial_allocation_usd = serializers.DecimalField(max_digits=18, decimal_places=2, allow_null=True, required=False)
     sensitivity_parameter = serializers.DecimalField(max_digits=10, decimal_places=6, allow_null=True, required=False)

@@ -618,8 +618,10 @@ pub fn assess_indicators(
             gross_lcu_bn: ind.gross_lcu_bn,
             weighted_lcu_bn: ind.weighted_lcu_bn,
             share_weighted_percent: ind.share_weighted_percent,
-            observed_value: round_to_precision(observed, Some(4)),
-            benchmark_value: round_to_precision(benchmark, Some(4)),
+            // Echo inputs at 8 dp: some indicators are tiny ratios (e.g. IND-37
+            // disaster damages / GDP ≈ 1.7e-05) that round to 0 at 4 dp.
+            observed_value: round_to_precision(observed, Some(8)),
+            benchmark_value: round_to_precision(benchmark, Some(8)),
         });
     }
 

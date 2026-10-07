@@ -143,18 +143,34 @@ mapping and AFTER any benchmark computation.
 ```bash
 python manage.py import_indicator_parameters \
   ../FSFSI_indicator_level_parameters.xlsx \
-  --default-fiscal-year 2024
+  --default-fiscal-year 2024 --propagate
 ```
 
 **What it does:**
 - Updates `Indicator` records: `unit`, `higher_is_better`, `default_sensitivity` (alpha)
-- Updates `IndicatorData` for FY2024: `observed_value`, `benchmark_value`, `sensitivity_parameter`
+- Updates `IndicatorData` for each row's `Obs_year` (FY2024 for most; FY2015–2022 for a few
+  FSCI proxies): `observed_value`, `benchmark_value`, `sensitivity_parameter`, plus
+  provenance: `benchmark_used_type`, `fsci_indicator_used`, `delta_imputed`, `data_note`
+- With `--propagate`: copies `benchmark_value`, provenance and alpha (not `observed_value`)
+  to every fiscal year of each indicator. Benchmarks are time-invariant in this pipeline.
+
+**Benchmark provenance.** Only 11 indicators (IND-01, 06, 07, 15, 18, 21, 22, 33, 35, 36, 37)
+have a real FSCI proxy; their benchmark is the SSA 90th/10th percentile for the observation
+year (`delta_imputed=False`). The other 26 have `delta_imputed=True`: no proxy exists and
+both observed and benchmark are round placeholders from the sheet. The flag is exposed on
+`IndicatorData` and copied to every `IndicatorResult`, so the API/UI can distinguish them.
 
 **Expected output:**
 ```
 Indicators updated: 33
-IndicatorData updated: 33
+IndicatorData updated: 32
+IndicatorData created: 1
+Benchmarks propagated to 219 IndicatorData rows (all fiscal years)
 ```
+
+Note: the sheet's `Obs_year` for IND-33 is 2015, so a FY2015 row (no budget) is created.
+Delete it unless you want a FY2015 assessment:
+`python manage.py shell -c "from apps.fsfvi_data.models import IndicatorData; IndicatorData.objects.filter(fiscal_year=2015).delete()"`
 
 ---
 
@@ -196,33 +212,13 @@ Summary:
 
 ### Step 4: Propagate Alpha and Benchmarks to All Years
 
-The parameters Excel only writes to FY2024. Intermediate years (FY2019–2023) and
-FY2018 need the same alpha and benchmark values. This step fills NULL values from
-the best available year (preferring FY2024).
+Handled by `--propagate` in Step 2. If Step 3 created new intermediate-year rows,
+re-run Step 2 with `--propagate` so those rows get the benchmark, provenance and alpha:
 
 ```bash
-python manage.py shell -c "
-from apps.fsfvi_data.models import IndicatorData, Indicator
-count = 0
-for ind in Indicator.objects.all():
-    alpha = ind.default_sensitivity
-    ref = IndicatorData.objects.filter(
-        indicator=ind, benchmark_value__isnull=False
-    ).order_by('-fiscal_year').first()
-    bench = ref.benchmark_value if ref else None
-    for data in IndicatorData.objects.filter(indicator=ind):
-        changed = False
-        if data.sensitivity_parameter is None and alpha is not None:
-            data.sensitivity_parameter = alpha
-            changed = True
-        if data.benchmark_value is None and bench is not None:
-            data.benchmark_value = bench
-            changed = True
-        if changed:
-            data.save(update_fields=['sensitivity_parameter', 'benchmark_value'])
-            count += 1
-print(f'Propagated alpha/benchmark to {count} rows')
-"
+python manage.py import_indicator_parameters \
+  ../FSFSI_indicator_level_parameters.xlsx \
+  --default-fiscal-year 2024 --propagate
 ```
 
 ---
@@ -379,32 +375,19 @@ python manage.py import_budget_mapping \
   ../budget_lines_to_food_system_indicators_mapping.xlsx
 
 # Step 2: Indicator parameters (source of truth for benchmarks + alpha)
+#   --propagate copies benchmark_value, benchmark provenance (benchmark_used_type,
+#   fsci_indicator_used, delta_imputed, data_note) and alpha to every fiscal year
+#   of each indicator. Observed values are only written to the sheet's Obs_year.
 python manage.py import_indicator_parameters \
   ../FSFSI_indicator_level_parameters.xlsx \
-  --default-fiscal-year 2024
+  --default-fiscal-year 2024 --propagate
 
 # Step 3: Fetch observed values for intermediate years (needs internet)
 python manage.py fetch_rwanda_observed \
   --fiscal-years 2019,2020,2021,2022,2023 --apply
 
-# Step 4: Propagate alpha and benchmarks to all years
-python manage.py shell -c "
-from apps.fsfvi_data.models import IndicatorData, Indicator
-count = 0
-for ind in Indicator.objects.all():
-    alpha = ind.default_sensitivity
-    ref = IndicatorData.objects.filter(indicator=ind, benchmark_value__isnull=False).order_by('-fiscal_year').first()
-    bench = ref.benchmark_value if ref else None
-    for data in IndicatorData.objects.filter(indicator=ind):
-        changed = False
-        if data.sensitivity_parameter is None and alpha is not None:
-            data.sensitivity_parameter = alpha; changed = True
-        if data.benchmark_value is None and bench is not None:
-            data.benchmark_value = bench; changed = True
-        if changed:
-            data.save(update_fields=['sensitivity_parameter', 'benchmark_value']); count += 1
-print(f'Propagated to {count} rows')
-"
+# Step 4: (no longer needed) benchmark/alpha propagation is done by --propagate in Step 2.
+#   Re-run Step 2 with --propagate after Step 3 if fetch_rwanda_observed created new rows.
 
 # Step 5: Impute any remaining missing observed values
 for year in 2018 2019 2020 2021 2022 2023 2024; do
@@ -552,8 +535,14 @@ That fiscal year has no budget data. Re-run Step 1 (`import_budget_mapping`)
 without `--fiscal-year` to import all years from the Mapping sheet.
 
 ### Benchmarks/alpha missing for intermediate years
-Run Step 4 (propagate alpha/benchmarks). The parameters Excel only writes to
-FY2024 — intermediate years need values propagated.
+Re-run Step 2 with `--propagate`. The parameters Excel only writes observed values
+to each row's `Obs_year` — benchmarks/alpha for other years come from propagation.
+
+### An indicator shows benchmark 0 / gap 0 although the Excel has a tiny value
+`observed_value`/`benchmark_value` used to be stored with 4 decimal places, which
+rounded values such as IND-37 (1.7e-05) to 0; a 0 was then treated as "missing" and
+replaced by the engine's synthetic fallback. Both are fixed (8 dp, `is not None`
+checks). If you see it, re-run Step 2 with `--propagate`, Step 5 and Step 6.
 
 ### `compute_benchmark_sample` overwrote Excel benchmarks
 Run `import_indicator_parameters` again (Step 2) — it is the last word on

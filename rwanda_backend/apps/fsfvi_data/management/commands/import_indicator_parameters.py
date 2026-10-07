@@ -3,11 +3,17 @@ Import benchmark and observed values from FSFSI_indicator_level_parameters.xlsx.
 
 Reads only the Indicator_Parameters sheet. Updates:
 - Indicator: unit, higher_is_better (from Direction), default_sensitivity (from alpha_per_bnLCU)
-- IndicatorData: observed_value (Obs_value), benchmark_value (Benchmark_used), sensitivity_parameter;
+- IndicatorData: observed_value (Obs_value), benchmark_value (Benchmark_used), sensitivity_parameter,
+  plus provenance: benchmark_used_type, fsci_indicator_used, delta_imputed, data_note;
   creates IndicatorData for (indicator, Obs_year) if missing, using funding/records from the sheet.
 
+With --propagate, the benchmark and its provenance (not the observed value) are also
+copied to every other fiscal year of the same indicator. Benchmarks in this pipeline
+are time-invariant, so this replaces the manual "Step 4" shell snippet.
+
 Usage:
-    python manage.py import_indicator_parameters /path/to/FSFSI_indicator_level_parameters.xlsx
+    python manage.py import_indicator_parameters /path/to/FSFSI_indicator_level_parameters.xlsx \
+        --default-fiscal-year 2024 --propagate
 """
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
@@ -38,6 +44,25 @@ COL_DIRECTION = 13       # N  "higher" | "lower"
 COL_DELTA = 14           # O
 COL_DELTA_IMPUTED = 15   # P
 COL_ALPHA_PER_BN_LCU = 16   # Q → default_sensitivity / sensitivity_parameter
+COL_DATA_NOTE = 25       # Z
+
+# Fields copied to all fiscal years of an indicator when --propagate is used
+PROPAGATED_FIELDS = [
+    "benchmark_value",
+    "benchmark_used_type",
+    "fsci_indicator_used",
+    "delta_imputed",
+    "data_note",
+    "sensitivity_parameter",
+]
+
+
+def _safe_bool(value):
+    if value is None:
+        return False
+    if isinstance(value, bool):
+        return value
+    return str(value).strip().lower() in ("true", "1", "yes", "y")
 
 
 def _safe_decimal(value, default=None):
@@ -101,6 +126,14 @@ class Command(BaseCommand):
             default=None,
             help="If Obs_year is blank in the sheet, use this year for IndicatorData (e.g. 2024).",
         )
+        parser.add_argument(
+            "--propagate",
+            action="store_true",
+            help=(
+                "Copy benchmark_value, benchmark provenance and sensitivity from the sheet "
+                "to every fiscal year of each indicator (observed values are not propagated)."
+            ),
+        )
 
     def handle(self, *args, **options):
         path = Path(options["excel_path"])
@@ -121,15 +154,43 @@ class Command(BaseCommand):
 
         ws = wb["Indicator_Parameters"]
         default_fy = options.get("default_fiscal_year")
+        propagate = options.get("propagate", False)
         try:
             with transaction.atomic():
-                self._load_indicator_parameters(ws, default_fiscal_year=default_fy)
+                self._load_indicator_parameters(
+                    ws, default_fiscal_year=default_fy, propagate=propagate
+                )
         finally:
             wb.close()
 
         self.stdout.write(self.style.SUCCESS("Import completed successfully."))
 
-    def _load_indicator_parameters(self, ws, default_fiscal_year=None):
+    def _propagate_benchmarks(self, rows, indicators):
+        """Copy benchmark + provenance (+ alpha) from the sheet row to all fiscal years."""
+        updated = 0
+        for r in rows:
+            ind = indicators.get(r["code"])
+            if ind is None or r["benchmark_value"] is None:
+                continue
+            targets = []
+            for rec in IndicatorData.objects.filter(indicator=ind):
+                rec.benchmark_value = r["benchmark_value"]
+                rec.benchmark_used_type = r["benchmark_used_type"]
+                rec.fsci_indicator_used = r["fsci_indicator_used"]
+                rec.delta_imputed = r["delta_imputed"]
+                rec.data_note = r["data_note"]
+                if r["default_sensitivity"] is not None:
+                    rec.sensitivity_parameter = r["default_sensitivity"]
+                rec.updated_at = timezone.now()
+                targets.append(rec)
+            if targets:
+                IndicatorData.objects.bulk_update(
+                    targets, PROPAGATED_FIELDS + ["updated_at"], batch_size=500
+                )
+                updated += len(targets)
+        self.stdout.write(f"  Benchmarks propagated to {updated} IndicatorData rows (all fiscal years)")
+
+    def _load_indicator_parameters(self, ws, default_fiscal_year=None, propagate=False):
         """Read Indicator_Parameters rows and update Indicator + IndicatorData."""
         rows = []
         for row in ws.iter_rows(min_row=2, values_only=True):
@@ -152,6 +213,9 @@ class Command(BaseCommand):
             direction = _safe_str(row[COL_DIRECTION]) if len(row) > COL_DIRECTION else ""
             obs_unit = _safe_str(row[COL_OBS_UNIT], 50) if len(row) > COL_OBS_UNIT else ""
             alpha = _safe_decimal(row[COL_ALPHA_PER_BN_LCU]) if len(row) > COL_ALPHA_PER_BN_LCU else None
+            fsci_used = _safe_str(row[COL_FSCI_INDICATOR_USED], 255) if len(row) > COL_FSCI_INDICATOR_USED else ""
+            delta_imputed = _safe_bool(row[COL_DELTA_IMPUTED]) if len(row) > COL_DELTA_IMPUTED else False
+            data_note = _safe_str(row[COL_DATA_NOTE]) if len(row) > COL_DATA_NOTE else ""
 
             funding_weighted = _safe_decimal(row[COL_FUNDING_WEIGHTED_BN], Decimal("0")) if len(row) > COL_FUNDING_WEIGHTED_BN else Decimal("0")
             funding_gross = _safe_decimal(row[COL_FUNDING_GROSS_BN], Decimal("0")) if len(row) > COL_FUNDING_GROSS_BN else Decimal("0")
@@ -166,6 +230,9 @@ class Command(BaseCommand):
                 "observed_value": obs_value,
                 "benchmark_value": benchmark_value,
                 "benchmark_used_type": benchmark_used_type,
+                "fsci_indicator_used": fsci_used,
+                "delta_imputed": delta_imputed,
+                "data_note": data_note,
                 "higher_is_better": _direction_to_higher_is_better(direction),
                 "unit": obs_unit,
                 "default_sensitivity": alpha,
@@ -248,6 +315,9 @@ class Command(BaseCommand):
                 rec.observed_value = r["observed_value"]
                 rec.benchmark_value = r["benchmark_value"]
                 rec.benchmark_used_type = r.get("benchmark_used_type") or ""
+                rec.fsci_indicator_used = r["fsci_indicator_used"]
+                rec.delta_imputed = r["delta_imputed"]
+                rec.data_note = r["data_note"]
                 if r["default_sensitivity"] is not None:
                     rec.sensitivity_parameter = r["default_sensitivity"]
                 rec.updated_at = timezone.now()
@@ -265,6 +335,9 @@ class Command(BaseCommand):
                         observed_value=r["observed_value"],
                         benchmark_value=r["benchmark_value"],
                         benchmark_used_type=r.get("benchmark_used_type") or "",
+                        fsci_indicator_used=r["fsci_indicator_used"],
+                        delta_imputed=r["delta_imputed"],
+                        data_note=r["data_note"],
                         sensitivity_parameter=r["default_sensitivity"],
                         status=DataStatus.VALIDATED,
                     )
@@ -273,7 +346,11 @@ class Command(BaseCommand):
         if to_update:
             IndicatorData.objects.bulk_update(
                 to_update,
-                ["observed_value", "benchmark_value", "benchmark_used_type", "sensitivity_parameter", "updated_at"],
+                [
+                    "observed_value", "benchmark_value", "benchmark_used_type",
+                    "fsci_indicator_used", "delta_imputed", "data_note",
+                    "sensitivity_parameter", "updated_at",
+                ],
                 batch_size=500,
             )
             self.stdout.write(f"  IndicatorData updated: {len(to_update)}")
@@ -282,3 +359,8 @@ class Command(BaseCommand):
             self.stdout.write(f"  IndicatorData created: {len(to_create)}")
         if not to_update and not to_create:
             self.stdout.write(self.style.WARNING("  No IndicatorData rows updated or created (fiscal years may not match existing data)."))
+
+        if propagate:
+            # One sheet row per indicator code (last wins) drives propagation
+            per_code = {r["code"]: r for r in rows if r["code"] in indicators}
+            self._propagate_benchmarks(list(per_code.values()), indicators)

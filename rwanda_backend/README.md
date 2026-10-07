@@ -116,7 +116,7 @@ Place the IFPRI Excel files where the commands can see them (paths below assume 
 | 1 | `python manage.py import_budget_mapping ../budget_lines_to_food_system_indicators_mapping.xlsx` | Budget lines → indicators; `IndicatorData` with LCU billions |
 | 2 | `python manage.py import_indicator_parameters ../FSFSI_indicator_level_parameters.xlsx --default-fiscal-year 2024` | Benchmarks, observed, alpha; **source of truth** for parameters sheet |
 | 3 | `python manage.py fetch_rwanda_observed --fiscal-years 2019,2020,2021,2022,2023 --apply` | Live WB API + interpolation; requires network |
-| 4 | Propagate alpha/benchmarks to all years | See **`RWANDA_BACKEND_PIPELINE_GUIDE.md`** (shell snippet) |
+| 4 | Propagate alpha/benchmarks to all years | Done by `import_indicator_parameters ... --propagate` (step 2); re-run it after step 3 |
 | 5 | `python manage.py compute_observed_imputed --fiscal-year YYYY --apply` | Per year; fills remaining NULL observed values |
 | 6 | `python manage.py run_assessments_all_years --years 2018,2019,2020,2021,2022,2023,2024` | Runs Rust FSFSI engine; stores assessments |
 

@@ -283,8 +283,17 @@ class AssessmentService:
             # keep the stored engine JSON consistent with the DB label
             comp_agg["priority_level"] = comp_result.priority_level
 
+        # Benchmark provenance for this fiscal year (from the parameters-sheet import)
+        provenance = {
+            code: (btype, imputed)
+            for code, btype, imputed in IndicatorData.objects.filter(
+                fiscal_year=fiscal_year
+            ).values_list("indicator__code", "benchmark_used_type", "delta_imputed")
+        }
+
         # Save indicator results (observed_value and benchmark_value from Rust output)
         for ind in result["indicator_results"]:
+            btype, imputed = provenance.get(ind["indicator_code"], ("", False))
             ind_result = IndicatorResult(
                 assessment=assessment,
                 indicator_code=ind["indicator_code"],
@@ -296,6 +305,8 @@ class AssessmentService:
                 share_weighted_percent=Decimal(str(ind["share_weighted_percent"])),
                 observed_value=Decimal(str(ind["observed_value"])) if ind.get("observed_value") is not None else None,
                 benchmark_value=Decimal(str(ind["benchmark_value"])) if ind.get("benchmark_value") is not None else None,
+                benchmark_used_type=btype or "",
+                delta_imputed=bool(imputed),
             )
             classification.apply_indicator_labels(ind_result)
             ind_result.save()
@@ -697,8 +708,11 @@ class AssessmentService:
                     "gross_lcu_bn": gross,
                     "weighted_lcu_bn": weighted,
                     "share_weighted_percent": share,
-                    "observed_value": float(data.observed_value) if data.observed_value else None,
-                    "benchmark_value": float(data.benchmark_value) if data.benchmark_value else None,
+                    # `is not None`, not truthiness: a legitimate 0.0 must not be
+                    # treated as missing (which would trigger the engine's synthetic
+                    # benchmark/observed fallback).
+                    "observed_value": float(data.observed_value) if data.observed_value is not None else None,
+                    "benchmark_value": float(data.benchmark_value) if data.benchmark_value is not None else None,
                     "higher_is_better": ind.higher_is_better,
                     "sensitivity_parameter": alpha,
                 })

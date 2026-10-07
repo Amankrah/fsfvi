@@ -266,6 +266,8 @@ class IndicatorResultSerializer(serializers.ModelSerializer):
             "component_display",
             "observed_value",
             "benchmark_value",
+            "benchmark_used_type",
+            "delta_imputed",
             "financial_allocation",
             "sensitivity",
             "performance_gap",

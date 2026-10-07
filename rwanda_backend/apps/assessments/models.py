@@ -416,12 +416,21 @@ class IndicatorResult(models.Model):
     indicator_name = models.CharField(max_length=255)
     component = models.CharField(max_length=30, choices=IndicatorComponent.choices)
 
-    # Input values
+    # Input values (8 dp: very small ratios such as IND-37 were rounded to 0 at 4 dp)
     observed_value = models.DecimalField(
-        max_digits=15, decimal_places=4, null=True, blank=True
+        max_digits=20, decimal_places=8, null=True, blank=True
     )
     benchmark_value = models.DecimalField(
-        max_digits=15, decimal_places=4, null=True, blank=True
+        max_digits=20, decimal_places=8, null=True, blank=True
+    )
+    # Benchmark provenance, copied from IndicatorData at assessment time
+    benchmark_used_type = models.CharField(
+        max_length=100, blank=True, default="",
+        help_text="e.g. SSA_10/90pct, Global_10/90pct"
+    )
+    delta_imputed = models.BooleanField(
+        default=False,
+        help_text="True when observed/benchmark are placeholders (no FSCI proxy in the parameters sheet)"
     )
     financial_allocation = models.DecimalField(
         max_digits=15, decimal_places=4, null=True, blank=True,
