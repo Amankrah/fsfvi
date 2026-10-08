@@ -316,6 +316,66 @@ export default function AssessmentPage() {
         </div>
       )}
 
+      {/* Run Assessment Controls */}
+      <Card className="border-[var(--rw-blue)]/20 bg-blue-50/30">
+        <CardContent className="py-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+            <div className="flex-1">
+              <h3 className="text-sm font-semibold text-gray-900">Run new assessment</h3>
+              <p className="text-xs text-gray-500 mt-0.5">Select weighting method and scenario, then run the FSFSI computation engine.</p>
+            </div>
+            <div className="flex items-center gap-3 flex-wrap">
+              <div>
+                <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Weighting</label>
+                <select
+                  value={weightingMethod}
+                  onChange={(e) => setWeightingMethod(e.target.value)}
+                  className="h-9 rounded-lg border border-gray-300 bg-white px-3 text-xs text-gray-700 min-w-[180px]"
+                  title="Weighting method"
+                >
+                  <option value="hybrid">Hybrid (expert + network + financial)</option>
+                  <option value="equal">Equal weights (1/n)</option>
+                  <option value="expert">Expert judgment (AHP)</option>
+                  <option value="financial">Budget proportional</option>
+                  <option value="network">Network centrality (PageRank)</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Scenario</label>
+                <select
+                  value={scenario}
+                  onChange={(e) => setScenario(e.target.value)}
+                  className="h-9 rounded-lg border border-gray-300 bg-white px-3 text-xs text-gray-700 min-w-[160px]"
+                  title="Scenario"
+                >
+                  <option value="normal_operations">Normal Operations</option>
+                  <option value="climate_shock">Climate Shock</option>
+                  <option value="financial_crisis">Financial Crisis</option>
+                  <option value="pandemic_disruption">Pandemic Disruption</option>
+                  <option value="political_instability">Political Instability</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">&nbsp;</label>
+                <button
+                  type="button"
+                  onClick={handleRunAssessment}
+                  disabled={running}
+                  className="h-9 inline-flex items-center gap-2 rounded-lg bg-[var(--rw-blue)] px-5 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {running ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Play className="h-4 w-4" />
+                  )}
+                  {running ? 'Running…' : 'Run assessment'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Summary cards (when we have an assessment for this year) */}
       {!isEmpty && summary && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -438,67 +498,6 @@ export default function AssessmentPage() {
           frameworkMeta={summary?.diagnosis_summary ?? null}
         />
       )}
-
-
-      {/* Run Assessment Controls */}
-      <Card className="border-[var(--rw-blue)]/20 bg-blue-50/30">
-        <CardContent className="py-4">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-            <div className="flex-1">
-              <h3 className="text-sm font-semibold text-gray-900">Run new assessment</h3>
-              <p className="text-xs text-gray-500 mt-0.5">Select weighting method and scenario, then run the FSFSI computation engine.</p>
-            </div>
-            <div className="flex items-center gap-3 flex-wrap">
-              <div>
-                <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Weighting</label>
-                <select
-                  value={weightingMethod}
-                  onChange={(e) => setWeightingMethod(e.target.value)}
-                  className="h-9 rounded-lg border border-gray-300 bg-white px-3 text-xs text-gray-700 min-w-[180px]"
-                  title="Weighting method"
-                >
-                  <option value="hybrid">Hybrid (expert + network + financial)</option>
-                  <option value="equal">Equal weights (1/n)</option>
-                  <option value="expert">Expert judgment (AHP)</option>
-                  <option value="financial">Budget proportional</option>
-                  <option value="network">Network centrality (PageRank)</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Scenario</label>
-                <select
-                  value={scenario}
-                  onChange={(e) => setScenario(e.target.value)}
-                  className="h-9 rounded-lg border border-gray-300 bg-white px-3 text-xs text-gray-700 min-w-[160px]"
-                  title="Scenario"
-                >
-                  <option value="normal_operations">Normal Operations</option>
-                  <option value="climate_shock">Climate Shock</option>
-                  <option value="financial_crisis">Financial Crisis</option>
-                  <option value="pandemic_disruption">Pandemic Disruption</option>
-                  <option value="political_instability">Political Instability</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">&nbsp;</label>
-                <button
-                  type="button"
-                  onClick={handleRunAssessment}
-                  disabled={running}
-                  className="h-9 inline-flex items-center gap-2 rounded-lg bg-[var(--rw-blue)] px-5 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {running ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Play className="h-4 w-4" />
-                  )}
-                  {running ? 'Running…' : 'Run assessment'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
 
       {/* Saved assessments (full width) + optional compare + detail */}
       <div className="space-y-4">

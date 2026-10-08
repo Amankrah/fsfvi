@@ -54,11 +54,23 @@ function componentLabel(key: string): string {
   return COMPONENT_DISPLAY_NAMES[k] ?? key.replace(/_/g, ' ');
 }
 
+/** Colour for 0–100 budget-fit scores (how closely allocations match PSTA-5 weights). */
 function getProgressColor(percent: number): string {
   if (percent >= 70) return PROGRESS_COLORS.onTrack;
   if (percent >= 40) return PROGRESS_COLORS.warning;
   return PROGRESS_COLORS.atRisk;
 }
+
+/**
+ * Colour for projected indicator improvement. Two bands only: at or above the plan's
+ * own promised reduction = green; below it = red. The threshold comes from the API
+ * (active plan's target_reduction_pct), so it moves when a different plan is saved.
+ */
+function getImprovementColor(percent: number, thresholdPct: number): string {
+  return percent >= thresholdPct ? PROGRESS_COLORS.onTrack : PROGRESS_COLORS.atRisk;
+}
+
+const DEFAULT_AT_RISK_THRESHOLD = 40;
 
 export default function PSTA5Page() {
   const [data, setData] = useState<PSTA5TrackerData | null>(null);
@@ -156,6 +168,11 @@ export default function PSTA5Page() {
   }
 
   const { alignment_summary: summary } = data;
+  // Cut-off for "at risk": the active plan's own target reduction (40 only without a plan).
+  const threshold = summary.at_risk_threshold_pct ?? DEFAULT_AT_RISK_THRESHOLD;
+  const thresholdLabel = `${Number.isInteger(threshold) ? threshold : threshold.toFixed(1)}%`;
+  const thresholdIsPlanTarget = summary.at_risk_threshold_source === 'plan_target';
+  const improvementColor = (pct: number) => getImprovementColor(pct, threshold);
 
   return (
     <div className="space-y-6">
@@ -236,12 +253,13 @@ export default function PSTA5Page() {
                     className="h-full rounded-full transition-all"
                     style={{
                       width: `${summary.overall_indicator_improvement ?? 0}%`,
-                      backgroundColor: getProgressColor(summary.overall_indicator_improvement ?? 0),
+                      backgroundColor: improvementColor(summary.overall_indicator_improvement ?? 0),
                     }}
                   />
                 </div>
                 <p className="text-[10px] text-gray-400 mt-1">
-                  Stress reduction in 33 indicators from plan allocations
+                  Modelled stress reduction from plan allocations, not observed KPI progress.
+                  {' '}Plan target: {thresholdLabel}.
                 </p>
               </div>
 
@@ -293,7 +311,7 @@ export default function PSTA5Page() {
                   id="psta-summary-at-risk-list"
                 >
                   <p className="text-[10px] font-semibold text-red-900 mb-1">
-                    KPIs projected below 40% driver improvement ({summary.kpis_at_risk.length})
+                    KPIs whose driver improvement is projected below the plan&apos;s {thresholdLabel} target ({summary.kpis_at_risk.length})
                   </p>
                   <ul className="space-y-1.5 text-[11px] text-red-950">
                     {summary.kpis_at_risk.map((k) => (
@@ -320,7 +338,8 @@ export default function PSTA5Page() {
               Projected Indicator Improvement by Priority Area
             </CardTitle>
             <p className="text-xs text-gray-500">
-              Stress reduction in FSFSI indicators from plan allocations → PSTA-5 KPI progress
+              Modelled stress reduction in FSFSI components from the active plan&apos;s allocations, rolled up to
+              Priority Areas. A projection, not observed KPI progress.
             </p>
           </CardHeader>
           <CardContent className="pb-4">
@@ -365,25 +384,40 @@ export default function PSTA5Page() {
                   />
                   <Bar dataKey="indicatorImprovement" name="Indicator Improvement" radius={[0, 4, 4, 0]} barSize={22}>
                     {pillarChartData.map((entry) => (
-                      <Cell key={entry.name} fill={getProgressColor(entry.indicatorImprovement)} />
+                      <Cell key={entry.name} fill={improvementColor(entry.indicatorImprovement)} />
                     ))}
                   </Bar>
                   {/* After <Bar> so the line layers above bar fills in this Recharts version */}
-                  <ReferenceLine x={40} stroke="#0f172a" strokeWidth={2} strokeDasharray="6 4" />
+                  <ReferenceLine
+                    x={threshold}
+                    stroke="#0f172a"
+                    strokeWidth={2}
+                    strokeDasharray="6 4"
+                    label={{ value: `Plan target ${thresholdLabel}`, position: 'top', fill: '#0f172a', fontSize: 10 }}
+                  />
                 </BarChart>
               </ResponsiveContainer>
             </div>
             <div className="mt-4 space-y-2 rounded-lg bg-slate-50 border border-slate-100 px-3 py-2.5 text-xs text-slate-700 leading-relaxed">
               <p>
                 <span className="font-semibold text-slate-900">What the horizontal axis shows: </span>
-                projected improvement in FSFSI-linked indicators (% reduction in financing stress vs baseline),
-                driven by the active plan&apos;s allocations.
+                projected % reduction in financing stress (baseline → final plan year) for the FSFSI components
+                that drive each Priority Area&apos;s KPIs, if the active plan&apos;s allocations are delivered.
+                This is a model output from plan allocations and component sensitivities; it is not measured
+                progress on the PSTA-5 KPIs.
               </p>
               <p className="flex flex-wrap items-start gap-2">
                 <span className="mt-0.5 inline-flex h-0 w-10 shrink-0 border-t-2 border-dashed border-slate-600" aria-hidden />
                 <span>
-                  <span className="font-semibold text-slate-900">Dashed vertical line at 40%:</span> the same cutoff
-                  used for &quot;at risk&quot; KPIs. Bars that end left of the line need attention.
+                  <span className="font-semibold text-slate-900">Dashed line at {thresholdLabel}:</span>{' '}
+                  {thresholdIsPlanTarget
+                    ? 'the national stress reduction the active plan itself promises. '
+                    : 'default cut-off (no saved plan to read a target from). '}
+                  <span className="inline-block h-2.5 w-2.5 rounded-sm align-middle" style={{ backgroundColor: PROGRESS_COLORS.onTrack }} aria-hidden />{' '}
+                  at or above the target;{' '}
+                  <span className="inline-block h-2.5 w-2.5 rounded-sm align-middle" style={{ backgroundColor: PROGRESS_COLORS.atRisk }} aria-hidden />{' '}
+                  below it (the plan does not deliver its own target for this area). The same cut-off defines
+                  &quot;at risk&quot; KPIs.
                 </span>
               </p>
             </div>
@@ -654,10 +688,10 @@ export default function PSTA5Page() {
                         dot={{ fill: PRIORITY_COLORS[2], r: 3 }}
                       />
                       <ReferenceLine
-                        y={40}
+                        y={threshold}
                         stroke="#94a3b8"
                         strokeDasharray="4 4"
-                        label={{ value: '40% threshold', position: 'right', fill: '#64748b', fontSize: 10 }}
+                        label={{ value: `Plan target ${thresholdLabel}`, position: 'right', fill: '#64748b', fontSize: 10 }}
                       />
                     </LineChart>
                   </ResponsiveContainer>
@@ -825,7 +859,7 @@ export default function PSTA5Page() {
                   <div className="mb-2">
                     <div className="flex justify-between text-xs mb-1">
                       <span className="text-gray-500">Indicator Improvement</span>
-                      <span className="font-medium" style={{ color: getProgressColor(indicatorImprovement) }}>
+                      <span className="font-medium" style={{ color: improvementColor(indicatorImprovement) }}>
                         {indicatorImprovement.toFixed(0)}%
                       </span>
                     </div>
@@ -834,7 +868,7 @@ export default function PSTA5Page() {
                         className="h-full rounded-full transition-all"
                         style={{
                           width: `${indicatorImprovement}%`,
-                          backgroundColor: getProgressColor(indicatorImprovement),
+                          backgroundColor: improvementColor(indicatorImprovement),
                         }}
                       />
                     </div>
@@ -866,7 +900,7 @@ export default function PSTA5Page() {
 
       {/* Priority Areas Requiring Attention: surfaced before the full KPI table for executive scan */}
       {(() => {
-        const atRiskPAs = summary.pillar_scores.filter((ps) => (ps.indicator_improvement ?? 0) < 40);
+        const atRiskPAs = summary.pillar_scores.filter((ps) => (ps.indicator_improvement ?? 0) < threshold);
         if (atRiskPAs.length === 0) return null;
         return (
           <Card className="border-amber-200 bg-amber-50/50 scroll-mt-4" id="psta-priority-attention">
@@ -876,7 +910,8 @@ export default function PSTA5Page() {
                 Priority Areas Requiring Attention
               </CardTitle>
               <p className="text-xs text-amber-600">
-                These Priority Areas have projected indicator improvement below 40%
+                Projected driver improvement below the plan&apos;s own {thresholdLabel} target: the active plan does
+                not deliver what it promises for these areas.
               </p>
             </CardHeader>
             <CardContent>
@@ -885,7 +920,7 @@ export default function PSTA5Page() {
                   const pillarIdx = data.pillars.findIndex((p) => p.code === pa.pillar_code);
                   const paKpis = data.kpis.filter((k) => k.pillar_code === pa.pillar_code);
                   const improvement = pa.indicator_improvement ?? 0;
-                  const barColor = getProgressColor(improvement);
+                  const barColor = improvementColor(improvement);
                   return (
                     <div
                       key={pa.pillar_code}
@@ -970,7 +1005,9 @@ export default function PSTA5Page() {
             )}
           </div>
           <p className="text-xs text-gray-500 mt-1">
-            KPI-specific projected improvements based on driving component stress reductions
+            KPI-specific projected improvements based on driving component stress reductions (model projection
+            from the active plan, not reported KPI outturns). Impact: ✓ at or above the plan&apos;s {thresholdLabel}{' '}
+            target, ⚠ below it.
           </p>
         </CardHeader>
         <CardContent>
@@ -991,8 +1028,8 @@ export default function PSTA5Page() {
                   // Get KPI-specific projected improvement (not PA average)
                   const kpiImprovements = summary.kpi_improvements ?? {};
                   const projectedImprovement = kpiImprovements[kpi.code] ?? 0;
-                  const isHighImpact = projectedImprovement >= 50;
-                  const isMediumImpact = projectedImprovement >= 25;
+                  // Same cut-off as everywhere else: does the plan deliver its own target for this KPI?
+                  const meetsTarget = projectedImprovement >= threshold;
                   // Show driving components for this KPI
                   const drivingComponents = kpi.driving_components ?? [];
                   return (
@@ -1033,9 +1070,9 @@ export default function PSTA5Page() {
                           <span
                             className="inline-flex items-center justify-center rounded-md px-2.5 py-1 text-sm font-bold tabular-nums"
                             style={{
-                              backgroundColor: `${getProgressColor(projectedImprovement)}22`,
-                              color: getProgressColor(projectedImprovement),
-                              border: `1px solid ${getProgressColor(projectedImprovement)}55`,
+                              backgroundColor: `${improvementColor(projectedImprovement)}22`,
+                              color: improvementColor(projectedImprovement),
+                              border: `1px solid ${improvementColor(projectedImprovement)}55`,
                             }}
                           >
                             {projectedImprovement.toFixed(0)}%
@@ -1045,19 +1082,23 @@ export default function PSTA5Page() {
                               className="h-full rounded-full transition-all"
                               style={{
                                 width: `${Math.min(100, Math.max(0, projectedImprovement))}%`,
-                                backgroundColor: getProgressColor(projectedImprovement),
+                                backgroundColor: improvementColor(projectedImprovement),
                               }}
                             />
                           </div>
                         </div>
                       </td>
                       <td className="py-3 px-3 text-center">
-                        {isHighImpact ? (
-                          <CheckCircle2 className="h-5 w-5 text-emerald-500 mx-auto" />
-                        ) : isMediumImpact ? (
-                          <TrendingUp className="h-5 w-5 text-amber-500 mx-auto" />
+                        {meetsTarget ? (
+                          <CheckCircle2
+                            className="h-5 w-5 text-emerald-500 mx-auto"
+                            aria-label={`Meets the plan's ${thresholdLabel} target`}
+                          />
                         ) : (
-                          <AlertTriangle className="h-5 w-5 text-red-500 mx-auto" />
+                          <AlertTriangle
+                            className="h-5 w-5 text-red-500 mx-auto"
+                            aria-label={`Below the plan's ${thresholdLabel} target`}
+                          />
                         )}
                       </td>
                     </tr>
@@ -1120,8 +1161,8 @@ export default function PSTA5Page() {
                           <span
                             className="font-medium text-xs px-1.5 py-0.5 rounded"
                             style={{
-                              backgroundColor: getProgressColor(compImprovement) + '20',
-                              color: getProgressColor(compImprovement),
+                              backgroundColor: improvementColor(compImprovement) + '20',
+                              color: improvementColor(compImprovement),
                             }}
                           >
                             {compImprovement > 0 ? `+${compImprovement.toFixed(0)}%` : '–'}
@@ -1138,7 +1179,7 @@ export default function PSTA5Page() {
                     <span className="text-xs text-gray-500">PA Improvement:</span>
                     <span
                       className="text-sm font-bold"
-                      style={{ color: getProgressColor(paScore?.indicator_improvement ?? 0) }}
+                      style={{ color: improvementColor(paScore?.indicator_improvement ?? 0) }}
                     >
                       {(paScore?.indicator_improvement ?? 0).toFixed(0)}%
                     </span>

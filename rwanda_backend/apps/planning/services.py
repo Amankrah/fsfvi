@@ -1454,6 +1454,18 @@ def compute_psta5_alignment_summary(
     else:
         plan = SavedStrategicPlan.objects.filter(is_active=True).order_by("-fiscal_year").first()
 
+    # "At risk" cut-off for projected indicator improvement. A KPI / Priority Area is
+    # at risk when the stress reduction the plan projects for its driver components is
+    # below the reduction the plan itself promises nationally (target_reduction_pct).
+    # Falls back to 40% only when there is no saved plan to read the target from.
+    DEFAULT_AT_RISK_THRESHOLD_PCT = 40.0
+    if plan and plan.target_reduction_pct is not None and float(plan.target_reduction_pct) > 0:
+        at_risk_threshold_pct = float(plan.target_reduction_pct)
+        threshold_source = "plan_target"
+    else:
+        at_risk_threshold_pct = DEFAULT_AT_RISK_THRESHOLD_PCT
+        threshold_source = "default"
+
     # Get Priority Areas and component mappings
     priority_areas = list(PSTA5Pillar.objects.filter(is_active=True).order_by("sort_order"))
     kpis = list(PSTA5KPI.objects.filter(is_active=True).select_related("pillar"))
@@ -1465,6 +1477,8 @@ def compute_psta5_alignment_summary(
             "pillar_scores": [],
             "component_alignment": [],
             "kpis_at_risk": [],
+            "at_risk_threshold_pct": at_risk_threshold_pct,
+            "at_risk_threshold_source": threshold_source,
             "data_year": 2024,
             "error": "No PSTA-5 Priority Areas defined",
         }
@@ -1661,10 +1675,10 @@ def compute_psta5_alignment_summary(
                         if pa_code == pa.code and comp_name not in pa_component_list:
                             pa_component_list.append(comp_name)
 
-        # Flag KPIs at risk if they have low projected improvement
+        # Flag KPIs at risk: projected driver improvement below the plan's own target
         for kpi in pa_kpis:
             kpi_improv = kpi_improvements.get(kpi.code, 0.0)
-            if kpi_improv < 40:
+            if kpi_improv < at_risk_threshold_pct:
                 kpis_at_risk.append({
                     "code": kpi.code,
                     "name": kpi.name,
@@ -1724,6 +1738,10 @@ def compute_psta5_alignment_summary(
         "pillar_scores": pillar_scores,
         "component_alignment": component_alignment,
         "kpis_at_risk": kpis_at_risk,
+        # Cut-off used for kpis_at_risk and for colouring projected-improvement bars.
+        # "plan_target" = the active plan's target_reduction_pct; "default" = 40 (no plan).
+        "at_risk_threshold_pct": round(at_risk_threshold_pct, 1),
+        "at_risk_threshold_source": threshold_source,
         "data_year": data_year,
         "plan_used": {
             "id": str(plan.id) if plan else None,

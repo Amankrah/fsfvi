@@ -507,7 +507,7 @@ export interface PSTA5AlignmentSummary {
     projected_stress: number;
     improvement_pct: number;
   }[];
-  /** KPIs needing attention (projected improvement < 40%) */
+  /** KPIs needing attention (projected improvement < at_risk_threshold_pct) */
   kpis_at_risk: {
     code: string;
     name: string;
@@ -516,6 +516,12 @@ export interface PSTA5AlignmentSummary {
     target_value: number;
     projected_improvement: number;
   }[];
+  /**
+   * Cut-off for "at risk" and for colouring projected-improvement bars.
+   * Equals the active plan's target_reduction_pct; 40 only when there is no plan.
+   */
+  at_risk_threshold_pct?: number;
+  at_risk_threshold_source?: 'plan_target' | 'default';
   /** Latest fiscal year with data */
   data_year: number;
   /** The plan used for budget alignment (if any) */
