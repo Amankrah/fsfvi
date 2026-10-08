@@ -64,7 +64,7 @@ The component score is the average of its indicators. The national FSFSI is the 
 
 ### The headline number carries memory
 
-The dashboard headline is **cumulative** stress, not just this year's. Past under-financing leaves damage that does not clear in one budget cycle, so the model carries stress forward with asymmetric persistence: stress builds quickly, recovers slowly. On the overview you will see two numbers: 0.3913 (cumulative, what the system is actually carrying) and 0.2894 (this fiscal year alone). The gap between them is the structural lag.
+The dashboard headline is **cumulative** stress, not just this year's. Past under-financing leaves damage that does not clear in one budget cycle, so the model carries stress forward with asymmetric persistence: stress builds quickly, recovers slowly. On the overview you will see two numbers: 0.4144 (cumulative, what the system is actually carrying) and 0.2947 (this fiscal year alone). The gap between them is the structural lag.
 
 ### The analytical questions it is built to answer
 
@@ -94,26 +94,26 @@ The dashboard headline is **cumulative** stress, not just this year's. Past unde
 ### What the pilot shows, in six findings
 
 **1. Rwanda's point-in-time stress has fallen; the cumulative burden has not.**
-Point-in-time FSFSI fell from 0.380 (FY2018) to 0.289 (FY2024). Cumulative FSFSI stayed close to 0.39 across the whole period. Reading: budgets have improved, but the system is still carrying damage from earlier under-financing. This is the single most important chart to show. It is why a one-year snapshot misleads.
+Point-in-time FSFSI fell from 0.402 (FY2018) to 0.295 (FY2024). Cumulative FSFSI stayed close to 0.41 across the whole period. Reading: budgets have improved, but the system is still carrying damage from earlier under-financing. This is the single most important chart to show. It is why a one-year snapshot misleads.
 
-**2. Two components are critical and they are the smallest budget lines.**
-Finance (cumulative 0.548) and Animal Systems (0.502) are the only components rated Critical. Finance receives 0.2% of the mapped budget (RWF 4.0 bn), Animal Systems 1.6% (RWF 35.8 bn). Finance is diagnosed as an **unfunded gap**: only 6% of its benchmark gap is absorbed by current money. Farmers with credit are at 12% against a 40% benchmark on a weighted budget of RWF 0.16 bn.
+**2. Three components are critical and they are among the smallest budget lines.**
+Finance (cumulative 0.548), Animal Systems (0.502) and Environment (0.501) are the components rated Critical. Finance receives 0.2% of the mapped budget (RWF 4.0 bn), Animal Systems 1.6% (RWF 35.8 bn), Environment 3.7% (RWF 83.7 bn). Finance is diagnosed as an **unfunded gap**: only 6% of its benchmark gap is absorbed by current money. Farmers with credit are at 12% against a 40% benchmark on a weighted budget of RWF 0.16 bn.
 
 **3. The diagnosis layer separates money from results.**
 Nutrition has a component stress of 0.0045 (Low) with 19.2% of the budget, yet stunting is at 30% against a 10% benchmark. The platform labels this **funded gap, outcome lag**: 99% of the gap is covered by financing, but the outcome has not responded. The answer there is delivery, timing and absorption, not more budget. Crop Production is the same pattern at 62% coverage. Without this layer, a Low label on Nutrition would have been misread as "nothing to do".
 
 **4. The same envelope could be split much better.**
-For FY2024 the engine's optimal split of the same RWF 2.2 trillion would bring point-in-time FSFSI from 0.289 to about 0.071. The modelled shift is from Markets (−RWF 592 bn), Nutrition (−223 bn) and Research (−89 bn) toward Animal Systems (+270 bn), Post-Harvest (+261 bn), Finance (+159 bn), Environment (+159 bn) and Crop Production (+55 bn). Say clearly on stage: these are rebalancing signals, not appropriation instructions, and the FY2024 numbers are affected by the mapping expansion described in section 6.
+For FY2024 the engine's optimal split of the same RWF 2.2 trillion would bring point-in-time FSFSI from 0.295 to about 0.076. The modelled shift is from Markets (−RWF 598 bn), Nutrition (−225 bn) and Research (−97 bn) toward Animal Systems (+265 bn), Post-Harvest (+255 bn), Environment (+194 bn), Finance (+157 bn) and Crop Production (+50 bn). Say clearly on stage: these are rebalancing signals, not appropriation instructions, and the FY2024 numbers are affected by the mapping expansion described in section 6.
 
 **5. A credible multi-year path exists and it is slow by design.**
-The active plan shows that 8% annual budget growth with optimal allocation takes cumulative FSFSI from 0.391 to 0.231 over five years (FY2025 to FY2029), with the envelope growing from RWF 2,419 bn to RWF 3,291 bn. Finance recovers fastest (−76% cumulative stress), Environment slowest (−18%), which matches the persistence assumptions: environmental damage is the most persistent. The platform also warns that the current-year snapshot understates the real position by 0.102 index points.
+The active plan shows that 8% annual budget growth with optimal allocation takes cumulative FSFSI from 0.414 to 0.245 over five years (FY2025 to FY2029), with the envelope growing from RWF 2,419 bn to RWF 3,291 bn. Finance recovers fastest (−76% cumulative stress), Environment slowest (−22%), which matches the persistence assumptions: environmental damage is the most persistent. The platform also warns that the current-year snapshot understates the real position by 0.120 index points.
 
 **6. Partner money can be priced in stress terms.**
-A worked example run live on the platform: a programme of RWF 80 bn over four years on the two Finance indicators (credit access and insurance) moves national FSFSI from 0.2894 to 0.2274, a 21% reduction, and lowers Finance component stress by 0.47. The platform also shows that this programme would sit entirely in PSTA 5 Priority Area 3, and flags that PA1 (58% national target) receives none of it. That is the conversation a ministry wants to have with a partner before the agreement is signed.
+A worked example run live on the platform: a programme of RWF 80 bn over four years on the two Finance indicators (credit access and insurance) moves national FSFSI from 0.2947 to 0.2327, a 21% reduction, and lowers Finance component stress by 0.47. The platform also shows that this programme would sit entirely in PSTA 5 Priority Area 3, and flags that PA1 (58% national target) receives none of it. That is the conversation a ministry wants to have with a partner before the agreement is signed.
 
 ### What the pilot demonstrates about the method itself
 
-- **Cut-points are derived from the data, not chosen.** The Low / Medium / High / Critical bands are Fisher-Jenks natural breaks on 112 component-year observations (goodness-of-variance fit 0.897) and 436 indicator-year observations (0.924). Under the engine's original fixed cut-points, 67% of indicator-years were "critical", which is not a useful signal. Under the calibrated set, Critical means "in the worst natural grouping of Rwanda's own record".
+- **Cut-points are derived from the data, not chosen.** The Low / Medium / High / Critical bands are Fisher-Jenks natural breaks on 112 component-year observations (goodness-of-variance fit 0.889) and 436 indicator-year observations (0.929). Under the engine's original fixed cut-points, 67% of indicator-years were "critical", which is not a useful signal. Under the calibrated set, Critical means "in the worst natural grouping of Rwanda's own record".
 - **Cut-points are frozen between calibrations**, so a change of level always reflects a change in data, never a moving goalpost.
 - **Everything is traceable.** Every assessment is saved with its weighting, scenario and timestamp. The budget history shows mapped versus fallback lines per year. The optimization page states which saved run it used.
 - **It runs fast.** The three optimisation steps for 33 indicators complete in about 50 ms. Nothing on the demo waits on computation.
@@ -149,7 +149,7 @@ Be candid here. The audience will trust the rest of the demonstration more if th
 
 | Item | What you will see | Why it matters | Status |
 |---|---|---|---|
-| **FY2024 mapping expansion** | Weighted total jumps +309% from FY2023 (RWF 547 bn to RWF 2,240 bn). Mapped lines go from 1,363 to 6,772 | This is almost certainly a change in mapping coverage, not a four-fold rise in spending. It drives the efficiency index down to 24.5% in FY2024 and inflates the "optimal" reallocation figures | The platform flags it on Budget Analysis ("Largest step in this window"). Needs reconciliation with MINAGRI and MINECOFIN before any FY2024 figure is quoted as a spending outcome |
+| **FY2024 mapping expansion** | Weighted total jumps +309% from FY2023 (RWF 547 bn to RWF 2,240 bn). Mapped lines go from 1,363 to 6,772 | This is almost certainly a change in mapping coverage, not a four-fold rise in spending. It drives the efficiency index down to 25.7% in FY2024 and inflates the "optimal" reallocation figures | The platform flags it on Budget Analysis ("Largest step in this window"). Needs reconciliation with MINAGRI and MINECOFIN before any FY2024 figure is quoted as a spending outcome |
 | **Fallback mapping share** | 36.5% of FY2024 lines mapped by fallback estimate | Weakens traceability to programmes and the credibility of indicator-level figures | Target to reduce; requires programme-to-indicator coding work in the ministry |
 | **Four indicators without data** | IND-23, 24, 26, 28 absent; platform runs on 33 of 37 | Framework coverage is incomplete; the finance component in particular has only 2 indicators | Decide whether to source data or formally drop them for Rwanda |
 | **Benchmarks** | Mix of World Bank global distributions and national targets (for example stunting benchmark 10%, irrigated land 15%) | Benchmark choice drives the gap, which drives everything | Need a documented, agreed benchmark per indicator, signed off by MINAGRI and NISR |
@@ -217,26 +217,26 @@ Walk down the page in order.
 **Fiscal year selector (top right).** Leave on FY 2024/2025. Mention that every page follows this selector.
 
 **National financing stress (headline card).**
-- Big number **0.3913**, badge **High risk**. Below it: "This fiscal year (point-in-time): 0.2894". Latest run: hybrid, normal operations.
+- Big number **0.4144**, badge **High risk**. Below it: "This fiscal year (point-in-time): 0.2947". Latest run: hybrid, normal operations.
 - Say: "The headline is cumulative stress: this year plus what the system still carries from earlier years. This year alone is 0.29, which is Medium. The system as a whole is High. The difference is damage that has not cleared."
-- The colour bar underneath shows where 0.39 sits between the calibrated cut-points: Low up to 0.202, Medium up to 0.342, High up to 0.461, Critical above.
+- The colour bar underneath shows where 0.41 sits between the calibrated cut-points: Low up to 0.202, Medium up to 0.342, High up to 0.461, Critical above.
 - Point at the small print: "Cut-points are natural breaks in Rwanda's FY2018 to 2024 record (112 observations)." Say: "These bands come from the data, not from us."
 
-**How to read the stress index (explainer card).** Expand it only if the audience is technical. It has four parts: what the number measures, how the four levels are set (with the cut-point table for component and indicator scale), headline versus this fiscal year, and why a component is stressed (the three coverage bands: under 17%, 17 to 55%, over 55%). This is your safety net if someone asks "what does 0.39 mean".
+**How to read the stress index (explainer card).** Expand it only if the audience is technical. It has four parts: what the number measures, how the four levels are set (with the cut-point table for component and indicator scale), headline versus this fiscal year, and why a component is stressed (the three coverage bands: under 17%, 17 to 55%, over 55%). This is your safety net if someone asks "what does 0.41 mean".
 
 **KPI tiles.**
-- Year-on-year change **+5.7%**: point-in-time stress rose from 0.274 to 0.289. Say: "Up slightly this year, driven by Finance."
-- Critical components **2 of 8**: Finance, Animal Systems. Say: "Both are the smallest budget lines in the system."
+- Year-on-year change **−2.3%**: point-in-time stress eased from 0.302 to 0.295. Say: "Down slightly this year, but Finance moved the other way."
+- Critical components **3 of 8**: Finance, Animal Systems, Environment. Say: "Together they get under 6% of the mapped budget."
 - Agriculture budget **RWF 2.2T**: the weighted mapped total. Say: "Weighted, so cross-cutting lines are not double counted. Gross is 4.8 trillion."
 
 **Historical trend card.** Three tabs.
-- *FSFSI trend*: red dashed line is cumulative, blue is point-in-time, orange dashed line is the High threshold at 0.461. Say: "Blue has come down from 0.38 to 0.29. Red has barely moved. That gap is the whole argument for multi-year planning."
+- *FSFSI trend*: red dashed line is cumulative, blue is point-in-time, orange dashed line is the High threshold at 0.461. Say: "Blue has come down from 0.40 to 0.29. Red has barely moved. That gap is the whole argument for multi-year planning."
 - *Components*: eight lines over time. Nutrition falls from 0.27 to 0.00; Finance jumps from 0.29 to 0.67 in FY2024.
-- *Heatmap*: fastest way to see persistence. Point at Finance (0.50 for five years, then 0.67) and Animal Systems (0.44 to 0.54 across the period). Then at Nutrition going green.
+- *Heatmap*: fastest way to see persistence. Point at Finance (0.50 for five years, a dip to 0.29, then 0.67) and Animal Systems (0.44 to 0.54 across the period). Then at Nutrition going green.
 
 **Budget Analysis card (summary).** Three tabs: Total, Components, Insights. The Insights tab lists eight plain-English findings generated by the engine from the budget history. Read finding 1 and 3 aloud; they are written for a ministerial brief.
 
-**Active plan card.** "PSTA 5 Aligned, Hybrid. 0.39 to 0.23, 5 years, −40% target, RWF 1.1T." Say: "That is the national plan the rest of the dashboard compares against."
+**Active plan card.** "PSTA 5 Aligned, Hybrid. 0.41 to 0.25, 5 years, −40% target, RWF 1.1T." Say: "That is the national plan the rest of the dashboard compares against."
 
 **Plan versus actual card.** Five plan years, FY2025 to FY2029, each with planned budget and target FSFSI; actuals blank. Say: "This is where next year's actual allocations get entered and tracked."
 
@@ -267,7 +267,7 @@ Say first: "Nothing on this page uses the stress index. It is the financial reco
 
 **URL:** `/dashboard/assessment`
 
-**KPI row.** Cumulative FSFSI 0.3913 (High), point-in-time 0.2894. Efficiency index **0.2450**. Total budget RWF 2.2T. Last updated date.
+**KPI row.** Cumulative FSFSI 0.4144 (High), point-in-time 0.2947. Efficiency index **0.2568**. Total budget RWF 2.2T. Last updated date.
 
 **Component breakdown and performance gaps.** Eight cards. Each shows component stress, indicator count, budget share and the diagnosis with coverage percentage.
 - Finance **0.6749**, 2 indicators, 0.18% budget, **Unfunded gap, 6%**.
@@ -276,25 +276,25 @@ Say first: "Nothing on this page uses the stress index. It is the financial reco
 - Say: "Finance and Nutrition are opposites. Finance is a money problem. Nutrition is a results problem. One stress score could not tell you that; the coverage figure can."
 
 **Top priorities.** Five indicator-level actions ranked by stress with a budget implication and a timeline.
-- #1 IND-13 Cold chain coverage, stress 0.729, increase by RWF 79.6 bn. #2 IND-25 Farmers with credit, 0.697, +RWF 108 bn. #3 IND-27 Insured farmers, 0.653, +RWF 106 bn.
+- #1 IND-13 Cold chain coverage, stress 0.729, increase by RWF 78.5 bn. #2 IND-25 Farmers with credit, 0.697, +RWF 107 bn. #3 IND-27 Insured farmers, 0.653, +RWF 105 bn.
 - Say: "These are the five lines the engine would move money to first, with the amount needed to reach the optimal mix."
 
 **Run new assessment.** Show the weighting dropdown (Hybrid, Equal, Expert AHP, Budget proportional, Network PageRank) and the scenario dropdown (Normal operations, Climate shock, Financial crisis, Pandemic, Political instability). Do **not** click Run during the demo unless you have rehearsed it; it adds another saved run to the list.
 
-**Saved assessments list.** Click one FY2024 run to open the detail panel: point-in-time 0.2894, cumulative 0.3913, weighting, scenario, 33 indicators, 8 components, and the component list. Say: "Every run is saved with its settings, so a figure quoted in a briefing can always be traced back."
+**Saved assessments list.** Click one FY2024 run to open the detail panel: point-in-time 0.2947, cumulative 0.4144, weighting, scenario, 33 indicators, 8 components, and the component list. Say: "Every run is saved with its settings, so a figure quoted in a briefing can always be traced back."
 
 ### 7.5 Optimization (4 minutes)
 
 **URL:** `/dashboard/optimization`
 
-Read the sentence under the fiscal year selector aloud: "For this assessment, point-in-time FSFSI of 0.2894 could fall to about 0.0709 with an optimal mix." Then the disclaimer: "Results are indicative rebalancing signals, not appropriation instructions."
+Read the sentence under the fiscal year selector aloud: "For this assessment, point-in-time FSFSI of 0.2947 could fall to about 0.0757 with an optimal mix." Then the disclaimer: "Results are indicative rebalancing signals, not appropriation instructions."
 
 **Efficiency tab.**
-- Current FSFSI 0.2894, Optimal 0.0709, Total budget RWF 2.2T. Efficiency index 24.5%.
-- The "Reading the results" paragraph names the shortfalls (Animal Systems 270 bn, Post-Harvest 261 bn, Finance 159 bn) and the surpluses (Markets 592 bn, Nutrition 223 bn).
+- Current FSFSI 0.2947, Optimal 0.0757, Total budget RWF 2.2T. Efficiency index 25.7%.
+- The "Reading the results" paragraph names the shortfalls (Animal Systems 265 bn, Post-Harvest 255 bn, Environment 194 bn) and the surpluses (Markets 598 bn, Nutrition 225 bn).
 - The table shows Current, Optimal, Gap and Status per component, with the total row showing the envelope is balanced (net zero).
 - Say: "Same total. Different split. This is the cheapest improvement available to any ministry: no new money."
-- Watch out: percentage gaps are extreme where the current line is tiny (Finance +3,966%). The page says so. Pre-empt it: "A 4,000% increase on a RWF 4 bn line is RWF 160 bn. Read the amount, not the percentage."
+- Watch out: percentage gaps are extreme where the current line is tiny (Finance +3,912%). The page says so. Pre-empt it: "A 4,000% increase on a RWF 4 bn line is RWF 157 bn. Read the amount, not the percentage."
 
 **Reallocation tab.** Same information as a ranked list of eight moves. Impact column reads "Increase funding to reduce stress" or "Reallocate surplus to higher-need areas".
 
@@ -304,16 +304,16 @@ Read the sentence under the fiscal year selector aloud: "For this assessment, po
 
 **URL:** `/dashboard/planning`
 
-**Saved strategic plans table.** One row: PSTA 5 Aligned, Hybrid, Active, 5 yr, 40%, 0.3913 to 0.2313. Click **Open**.
+**Saved strategic plans table.** One row: PSTA 5 Aligned, Hybrid, Active, 5 yr, 40%, 0.4144 to 0.2452. Click **Open**.
 
 **Planning parameters.** Show the controls without changing them: horizon options (3 years MTEF, 5 years PSTA 5, 7 years NST 2, 10 years Vision 2035), stress reduction target, milestone pacing (build-up first, uniform, early wins), annual budget growth (Rwanda average 8 to 10%), MTEF 3-year target, weighting, scenario. Say: "A planner sets the ambition and the fiscal envelope; the engine finds the allocation path."
 
 **Five output tabs.**
-- *Trajectory and budgets*: projected FSFSI (engine) against yearly milestone targets, with the horizon goal at 0.23. Below it the budget evolution (RWF 2.4T to 3.3T) and the allocation share by component each year.
-- *Component recovery*: table of cumulative stress by component by year. Finance 0.548 to 0.132 (−76%), Environment 0.314 to 0.257 (−18%). Say: "Environment recovers slowest because environmental damage is the most persistent. That is a modelling assumption, and it is one we want validated."
+- *Trajectory and budgets*: projected FSFSI (engine) against yearly milestone targets, with the horizon goal at 0.25. Below it the budget evolution (RWF 2.4T to 3.3T) and the allocation share by component each year.
+- *Component recovery*: table of cumulative stress by component by year. Finance 0.548 to 0.132 (−76%), Environment 0.501 to 0.390 (−22%). Say: "Environment recovers slowest because environmental damage is the most persistent. That is a modelling assumption, and it is one we want validated."
 - *Budget alignment*: a planner types proposed component budgets for a year and sees how far their mix is from the plan and what FSFSI it projects. Show the empty table; do not type values live unless rehearsed.
-- *MTEF (3 years)*: the three-year rolling view for MINECOFIN. Year 1 0.3488 and Year 2 0.3487 are on the policy track; Year 3 0.3484 misses the 0.3326 MTEF target, and the page lists the options (raise growth, revisit the improvement percentage, change pacing, shift more to high-stress components). Say: "The MTEF is deliberately stricter than the five-year plan. The engine tells us that three years at 8% is not enough on its own."
-- *Outcomes and risks*: expected outcomes, implementation risks (damage persistence: snapshot 0.2894 understates the real 0.3913, lag 0.102; budget commitment: five years of 8% growth) and success factors. Read the damage persistence risk aloud; it is the strongest single sentence on the page.
+- *MTEF (3 years)*: the three-year rolling view for MINECOFIN. Year 1 0.3691 and Year 2 0.3689 are on the policy track; Year 3 0.3686 misses the 0.3523 MTEF target, and the page lists the options (raise growth, revisit the improvement percentage, change pacing, shift more to high-stress components). Say: "The MTEF is deliberately stricter than the five-year plan. The engine tells us that three years at 8% is not enough on its own."
+- *Outcomes and risks*: expected outcomes, implementation risks (damage persistence: snapshot 0.2947 understates the real 0.4144, lag 0.120; budget commitment: five years of 8% growth) and success factors. Read the damage persistence risk aloud; it is the strongest single sentence on the page.
 
 ### 7.7 Investment strategy (4 minutes)
 
@@ -323,15 +323,15 @@ This is the page for the partner audience. Rehearse the example below so the num
 
 **Set-up.**
 - "You are using this as": choose **Development partner** (labels change; the model does not).
-- Strategic plan: PSTA 5 Aligned (active), trajectory baseline FSFSI 0.3913.
+- Strategic plan: PSTA 5 Aligned (active), trajectory baseline FSFSI 0.4144.
 - Implementation schedule: enter **20** in FY2025, FY2026, FY2027 and FY2028 (RWF 20 bn a year; total RWF 80 bn).
 - Programme name: "Rural Credit and Insurance Expansion".
 - Component filter: **Finance**; tick **IND-25 Farmers with credit** and **IND-27 Insured farmers**.
 - Weighting Hybrid, scenario Normal operations. Click **Estimate stress reduction**.
 
 **What appears.**
-- Baseline FSFSI 0.2894 (Medium) → With-envelope FSFSI **0.2274** (Medium). Δ FSFSI **0.0620**.
-- Stepped panel for **FY2028** (the last year with spending in the schedule): assessment baseline 0.2894, plan trajectory 0.2583 (milestone 0.2511), with your envelope 0.2274. Extra reduction against the plan trajectory +0.0309; position against the milestone +0.0237.
+- Baseline FSFSI 0.2947 (Medium) → With-envelope FSFSI **0.2327** (Medium). Δ FSFSI **0.0620**.
+- Stepped panel for **FY2028** (the last year with spending in the schedule): assessment baseline 0.2947, plan trajectory 0.2739 (milestone 0.2659), with your envelope 0.2327. Extra reduction against the plan trajectory +0.0412; position against the milestone +0.0332.
 - Average stress change by component: Finance −0.4716, all others 0.
 - Indicators covered: IND-25 Δ stress 0.487, IND-27 0.456.
 - PSTA 5 mix of the envelope: PA3 100%, PA1 0%, PA2 0%, alignment score 0 / 100 with the warning "Expect questions if a priority area with a high national target receives none of the modelled envelope."
@@ -346,11 +346,11 @@ Read the disclaimer once: "This is an illustrative financing-stress scenario und
 
 Say first: "Everything here uses the active strategic plan's modelled allocations, not audited outturn. The page says so at the top."
 
-**Summary card.** Weighted budget fit **61%**. Projected indicator improvement **41%**. 3 areas, 19 KPIs, **7 at risk**.
+**Summary card.** Weighted budget fit **64%**. Projected indicator improvement **41%**. 3 areas, 19 KPIs, **7 at risk**.
 
-**Projected indicator improvement by priority area.** Horizontal bars for PA1 (35%), PA2 (53%), PA3 (47%) against the 40% at-risk line. PA1 Modernization is below the line.
+**Projected indicator improvement by priority area.** Horizontal bars for PA1 (35%), PA2 (52%), PA3 (47%) against the 40% at-risk line. PA1 Modernization is below the line.
 
-**Strategic plan budget mix check.** Mean-gap mix score 68%. Budget flow: PA1 actual 34.3% against 58% target (−23.7 pp); PA2 28.6% against 17% (+11.6 pp); PA3 37.1% against 24% (+13.1 pp). Mapped total RWF 3,290.97 bn, equal to the full FY2029 plan envelope; nothing is unmapped.
+**Strategic plan budget mix check.** Mean-gap mix score 70%. Budget flow: PA1 actual 36.1% against 58% target (−21.9 pp); PA2 27.8% against 17% (+10.8 pp); PA3 36.1% against 24% (+12.1 pp). Mapped total RWF 3,290.97 bn, equal to the full FY2029 plan envelope; nothing is unmapped.
 - Say: "The optimal mix under-weights Modernization and over-weights Markets, Post-Harvest and the Systems Enablers relative to the official PSTA 5 shares. The engine chases stress; PSTA 5 chases a political balance. That gap is a conversation for MINAGRI, not a verdict."
 - If asked how the bridge works: each FSFSI component is attributed to the one priority area it serves (Crop Production, Animal Systems and Environment to PA1; Markets and Post-Harvest to PA2; Finance, Research and Nutrition to PA3).
 
@@ -391,82 +391,82 @@ Keep this open on a second screen.
 ### Headline, FY2024/25
 | | |
 |---|---|
-| Cumulative FSFSI | **0.3913** (High) |
-| Point-in-time FSFSI | **0.2894** (Medium) |
-| Year-on-year (point-in-time) | +5.7% (0.2737 → 0.2894) |
-| Critical components | 2: Finance (0.548), Animal Systems (0.502) |
+| Cumulative FSFSI | **0.4144** (High) |
+| Point-in-time FSFSI | **0.2947** (Medium) |
+| Year-on-year (point-in-time) | −2.3% (0.3017 → 0.2947) |
+| Critical components | 3: Finance (0.548), Animal Systems (0.502), Environment (0.501) |
 | Weighted mapped budget | RWF 2,239.78 bn (gross 4,805 bn) |
-| Efficiency index | 0.245 (optimal 0.0709 ÷ actual 0.2894) |
+| Efficiency index | 0.257 (optimal 0.0757 ÷ actual 0.2947) |
 | Indicators / components | 33 of 37 / 8 |
 | Weighting / scenario | Hybrid / normal operations |
 
 ### Trend FY2018 to FY2024 (point-in-time → cumulative)
 | FY | Point | Cumulative | Budget bn | Efficiency |
 |---|---|---|---|---|
-| 2018 | 0.380 | 0.380 | 280.6 | 0.83 |
-| 2019 | 0.363 | 0.392 | 296.9 | 0.77 |
-| 2020 | 0.355 | 0.386 | 314.7 | 0.76 |
-| 2021 | 0.352 | 0.387 | 353.8 | 0.76 |
-| 2022 | 0.345 | 0.393 | 446.8 | 0.74 |
-| 2023 | 0.274 | 0.350 | 547.1 | 0.72 |
-| 2024 | 0.289 | 0.391 | 2,239.8 | 0.25 |
+| 2018 | 0.402 | 0.402 | 280.6 | 0.84 |
+| 2019 | 0.385 | 0.413 | 296.9 | 0.79 |
+| 2020 | 0.372 | 0.402 | 314.7 | 0.77 |
+| 2021 | 0.373 | 0.407 | 353.8 | 0.78 |
+| 2022 | 0.367 | 0.414 | 446.8 | 0.75 |
+| 2023 | 0.302 | 0.379 | 547.1 | 0.72 |
+| 2024 | 0.295 | 0.414 | 2,239.8 | 0.26 |
 
 ### Components FY2024 (point stress / cumulative / budget share / diagnosis, coverage)
 | Component | Point | Cum. | Share | Diagnosis |
 |---|---|---|---|---|
 | Finance | 0.675 | 0.548 | 0.2% | Unfunded gap, 6% |
-| Post-Harvest | 0.442 | 0.461 | 5.3% | Partly funded, 25% |
 | Animal Systems | 0.383 | 0.502 | 1.6% | Partly funded, 19% |
-| Markets | 0.285 | 0.370 | 41.6% | Partly funded, 35% |
-| Environment | 0.247 | 0.306 | 3.7% | Partly funded, 28% |
-| Research | 0.200 | 0.371 | 16.1% | Partly funded, 52% |
+| Environment | 0.306 | 0.501 | 3.7% | Partly funded, 25% |
+| Post-Harvest | 0.442 | 0.461 | 5.2% | Partly funded, 25% |
 | Crop Production | 0.178 | 0.372 | 12.3% | Funded gap, outcome lag, 62% |
+| Research | 0.200 | 0.371 | 16.1% | Partly funded, 52% |
+| Markets | 0.285 | 0.370 | 41.6% | Partly funded, 35% |
 | Nutrition | 0.005 | 0.202 | 19.2% | Funded gap, outcome lag, 99% |
 
 ### Calibrated cut-points (Jenks, FY2018 to 2024)
 | Scale | Low ≤ | Medium ≤ | High ≤ | Critical > | n | GVF |
 |---|---|---|---|---|---|---|
-| National and component | 0.202 | 0.342 | 0.461 | 0.461 | 112 | 0.897 |
-| Indicator | 0.176 | 0.399 | 0.653 | 0.653 | 436 | 0.924 |
-| Financing coverage | 17% | 55% | | | 196 | 0.927 |
+| National and component | 0.202 | 0.342 | 0.461 | 0.461 | 112 | 0.889 |
+| Indicator | 0.189 | 0.399 | 0.684 | 0.684 | 436 | 0.929 |
+| Financing coverage | 17% | 55% | | | 203 | 0.928 |
 
 ### Optimization FY2024 (same envelope RWF 2.2T)
 | Component | Current bn | Optimal bn | Change |
 |---|---|---|---|
-| Markets | 931.1 | 338.8 | −592.3 |
-| Nutrition | 431.1 | 208.4 | −222.7 |
-| Research | 360.4 | 271.4 | −89.0 |
-| Crop Production | 276.0 | 330.6 | +54.6 |
-| Environment | 83.7 | 242.7 | +159.1 |
-| Finance | 4.0 | 163.5 | +159.4 |
-| Post-Harvest | 117.6 | 378.7 | +261.1 |
-| Animal Systems | 35.8 | 305.6 | +269.7 |
+| Markets | 931.1 | 332.7 | −598.4 |
+| Nutrition | 431.1 | 205.9 | −225.2 |
+| Research | 360.4 | 263.8 | −96.6 |
+| Crop Production | 276.0 | 326.0 | +50.0 |
+| Finance | 4.0 | 161.3 | +157.2 |
+| Environment | 83.7 | 277.2 | +193.5 |
+| Post-Harvest | 117.6 | 372.5 | +254.9 |
+| Animal Systems | 35.8 | 300.4 | +264.6 |
 
 ### Active plan: PSTA 5 Aligned, Hybrid
 | | |
 |---|---|
 | Horizon / growth / target | 5 years (FY2025 to 2029) / 8% a year / −40% |
-| Cumulative FSFSI | 0.3913 → 0.2313 |
+| Cumulative FSFSI | 0.4144 → 0.2452 (target 0.2487) |
 | Envelope | RWF 2,419 bn → 3,291 bn |
-| Fastest / slowest recovery | Finance −76% / Environment −18% |
-| Damage lag | 0.102 (snapshot 0.2894 understates 0.3913) |
-| MTEF (3 yr) | 0.3488 / 0.3487 / 0.3484 against a Year 3 target of 0.3326 (off track) |
+| Fastest / slowest recovery | Finance −76% / Environment −22% |
+| Damage lag | 0.120 (snapshot 0.2947 understates 0.4144) |
+| MTEF (3 yr) | 0.3691 / 0.3689 / 0.3686 against a Year 3 target of 0.3523 (off track) |
 
 ### Investment example (RWF 80 bn, IND-25 + IND-27, FY2025 to FY2028)
 | | |
 |---|---|
-| Baseline → with envelope | 0.2894 → 0.2274 (Δ 0.062, −21%) |
-| FY2028 plan → with envelope | 0.2583 → 0.2274 (+0.0309; +0.0237 against the 0.2511 milestone) |
+| Baseline → with envelope | 0.2947 → 0.2327 (Δ 0.062, −21%) |
+| FY2028 plan → with envelope | 0.2739 → 0.2327 (+0.0412; +0.0332 against the 0.2659 milestone) |
 | Finance component stress change | −0.47 |
 | PSTA 5 mix | 100% PA3; PA1 and PA2 receive 0% |
 
 ### PSTA 5 Tracker
 | | |
 |---|---|
-| Weighted budget fit / mean-gap score | 61% / 68% |
-| Budget shares vs target | PA1 34.3% vs 58; PA2 28.6% vs 17; PA3 37.1% vs 24 |
+| Weighted budget fit / mean-gap score | 64% / 70% |
+| Budget shares vs target | PA1 36.1% vs 58; PA2 27.8% vs 17; PA3 36.1% vs 24 |
 | Mapped envelope | RWF 3,291 bn (FY2029), fully attributed |
-| Projected indicator improvement | 41% overall; PA1 35%, PA2 53%, PA3 47% |
+| Projected indicator improvement | 41% overall; PA1 35%, PA2 52%, PA3 47% |
 | KPIs at risk (<40%) | 7 of 19 |
 
 ---
@@ -510,8 +510,8 @@ Rust for computation, Python/Django for data and API, Next.js for the interface.
 Do these in the order given, ideally the day before and again an hour before.
 
 ### Data hygiene
-Done on 7 October 2026 on both the local database and the live server at rwanda.fsfvi.ai (backups kept: `/var/backups/fsfvi-20261008-0117.sqlite3` on the server): the stray FY2015 rows were removed, so every dropdown and the trend chart run FY2018 to FY2024; the full FY2018 to FY2024 chain was rerun in order, so the cumulative figures are consistent; saved assessments were reduced to one per fiscal year; thresholds were recalibrated (unchanged cut-points); active plans were re-pointed to the new FY2024 run and regenerated.
-- [ ] **Live server plans.** The live database holds two plans named `test2` (active) and `Test Plan 1` (inactive), not the "PSTA 5 Aligned - Hybrid" plan this brief describes. Before presenting from rwanda.fsfvi.ai, either rename `test2` and set its parameters to the brief (5 years, 40% reduction, 8% growth, build-up pacing, Hybrid, Normal operations) and click Update plan, or create the plan fresh and make it active. Then re-check the figures in sections 7.6 to 7.8.
+Done on 7 and 8 October 2026 on both the local database and the live server at rwanda.fsfvi.ai (backups kept on the server: `/var/backups/fsfvi-20261008-0117.sqlite3` and `/var/backups/fsfvi-20261008-0153-pre-benchmark-fix.sqlite3`): the stray FY2015 rows were removed, so every dropdown and the trend chart run FY2018 to FY2024; benchmark and observed values are now stored at 8 decimal places (a precision bug had rounded small-valued indicators such as IND-37 to zero); the indicator parameter workbook was re-imported with provenance and propagated to every fiscal year; the full FY2018 to FY2024 chain was rerun in order, so the cumulative figures are consistent; saved assessments were reduced to one per fiscal year; thresholds were recalibrated (component and national cut-points unchanged, indicator cut-points moved to 0.189 / 0.399 / 0.684); active plans were re-pointed to the new FY2024 run, their absolute targets re-derived from the percentage target, and regenerated. Note for questions: 22 of the 33 indicators still use placeholder benchmarks from the parameter workbook; the validation item in section 6 stands.
+- [ ] **Live server plans.** The live database holds two plans named `test2` (active) and `Test Plan 1` (inactive), not the "PSTA 5 Aligned - Hybrid" plan this brief describes. Before presenting from rwanda.fsfvi.ai, either rename `test2` and set its parameters to the brief (5 years, 40% reduction, 8% growth, build-up pacing, Hybrid, Normal operations; `test2` is currently a 35% reduction plan on the same 0.4144 baseline) and click Update plan, or create the plan fresh and make it active. Then re-check the figures in sections 7.6 to 7.8.
 - [ ] Optional: enter FY2025 actuals for one or two components in Budget alignment and "Save as actual" so the Plan versus actual card on the Overview is not empty.
 
 ### Known display points
@@ -529,7 +529,7 @@ Done on 7 October 2026 on both the local database and the live server at rwanda.
 - [ ] Have this brief, the Technical Note (`docs/TECHNICAL_NOTE.md`) and the User Guide (`docs/USER_GUIDE.md`) open on a second screen.
 
 ### Rehearsal
-- [ ] Run the Investment example once (section 7.7) and confirm you get 0.2894 → 0.2274, with the FY2028 stepped panel showing 0.2583 → 0.2274.
+- [ ] Run the Investment example once (section 7.7) and confirm you get 0.2947 → 0.2327, with the FY2028 stepped panel showing 0.2739 → 0.2327.
 - [ ] Time the full walk-through. Target 25 to 30 minutes with 10 for questions.
 
 ---
@@ -561,4 +561,4 @@ Done on 7 October 2026 on both the local database and the live server at rwanda.
 
 ---
 
-*Prepared 7 October 2026 from the live platform at FY2024/25, database state as of that date. Figures will change when the FY2024 mapping is reconciled, parameters are validated or thresholds are recalibrated.*
+*Prepared 7 October 2026 and refreshed 8 October 2026 from the live platform at FY2024/25, database state as of that date (after the benchmark precision fix and full rerun). Figures will change when the FY2024 mapping is reconciled, parameters are validated or thresholds are recalibrated.*
