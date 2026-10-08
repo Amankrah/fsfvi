@@ -371,7 +371,12 @@ export interface DiagnosisBucket {
 
 export interface DiagnosisSummary {
   buckets: DiagnosisBucket[];
+  /** Indicators with data in this run (what the buckets count). */
   total_indicators: number;
+  /** Indicators that exist in the database (some framework indicators were never seeded). */
+  defined_indicator_count?: number;
+  /** Size of the FSFSI framework (37). */
+  framework_indicator_count?: number;
   imputed_indicator_count: number;
   unlabelled_count: number;
 }

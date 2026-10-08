@@ -432,6 +432,7 @@ export default function AssessmentPage() {
           serverSummary={
             summary?.assessment_id === selectedAssessment.id ? summary?.diagnosis_summary ?? null : null
           }
+          frameworkMeta={summary?.diagnosis_summary ?? null}
         />
       )}
 
@@ -680,6 +681,7 @@ function IndicatorsDiagnosisSection({
   fiscalYearLabel,
   runName,
   serverSummary,
+  frameworkMeta,
 }: {
   indicators: SavedIndicatorResult[];
   fiscalYearLabel: string;
@@ -689,12 +691,17 @@ function IndicatorsDiagnosisSection({
    * National Overview). Falls back to a client-side Συᵢ approximation for historical runs.
    */
   serverSummary?: DiagnosisSummary | null;
+  /** Framework and database indicator counts (not year-specific), for the client-side fallback. */
+  frameworkMeta?: DiagnosisSummary | null;
 }) {
   const { t } = useLanguage();
   const [diagnosisFilter, setDiagnosisFilter] = useState<DiagnosisFilter>('all');
   const diagnosisSummary = useMemo(
-    () => (serverSummary && serverSummary.total_indicators > 0 ? serverSummary : summarizeDiagnosis(indicators)),
-    [serverSummary, indicators],
+    () =>
+      serverSummary && serverSummary.total_indicators > 0
+        ? serverSummary
+        : summarizeDiagnosis(indicators, frameworkMeta),
+    [serverSummary, indicators, frameworkMeta],
   );
 
   // Reset the filter when a different run is loaded

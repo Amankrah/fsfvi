@@ -475,6 +475,8 @@ class DiagnosisSummarySerializer(serializers.Serializer):
 
     buckets = DiagnosisBucketSerializer(many=True)
     total_indicators = serializers.IntegerField()
+    defined_indicator_count = serializers.IntegerField()
+    framework_indicator_count = serializers.IntegerField()
     imputed_indicator_count = serializers.IntegerField()
     unlabelled_count = serializers.IntegerField()
 

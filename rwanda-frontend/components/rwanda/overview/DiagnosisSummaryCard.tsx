@@ -178,6 +178,9 @@ export function DiagnosisSummaryCard({
   const visible = summary.buckets.filter((b) => b.indicator_count > 0 || b.diagnosis !== 'at_benchmark');
   const money = summary.buckets.find((b) => b.diagnosis === 'unfunded_gap');
   const results = summary.buckets.find((b) => b.diagnosis === 'funded_gap');
+  const framework = summary.framework_indicator_count ?? null;
+  const defined = summary.defined_indicator_count ?? null;
+  const notSeeded = framework != null && defined != null ? Math.max(framework - defined, 0) : 0;
 
   const cols =
     visible.length >= 4 ? 'lg:grid-cols-4' : visible.length === 3 ? 'lg:grid-cols-3' : 'lg:grid-cols-2';
@@ -196,6 +199,16 @@ export function DiagnosisSummaryCard({
             <p className="mt-1 text-sm text-slate-500">
               {t('diagnosis.card_subtitle', { fy: fiscalYearLabel ?? '' })}
             </p>
+            {framework != null ? (
+              <p className="mt-1 text-xs text-slate-500">
+                {t('diagnosis.coverage_note', {
+                  total: summary.total_indicators,
+                  framework,
+                  fy: fiscalYearLabel ?? '',
+                })}
+                {notSeeded > 0 ? ` ${t('diagnosis.coverage_note_not_seeded', { n: notSeeded })}` : ''}
+              </p>
+            ) : null}
           </div>
           {linkHref ? (
             <Link

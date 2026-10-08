@@ -562,6 +562,9 @@ class AssessmentService:
         classification.DIAG_AT_BENCHMARK,
     )
     DIAGNOSIS_TOP_N = 5
+    # Size of the FSFSI indicator framework (IND-01 to IND-37). The database may hold
+    # fewer (indicators never seeded) and a given fiscal year fewer still (no data).
+    FRAMEWORK_INDICATOR_COUNT = 37
 
     def build_diagnosis_summary(self, assessment: AssessmentResult) -> dict:
         """Group an assessment's indicators by gap × financing-coverage diagnosis.
@@ -616,7 +619,11 @@ class AssessmentService:
 
         return {
             "buckets": buckets,
+            # Indicators with data in this run (what the buckets count)
             "total_indicators": total_n,
+            # Indicators that exist in the database, and in the framework design
+            "defined_indicator_count": Indicator.objects.count(),
+            "framework_indicator_count": self.FRAMEWORK_INDICATOR_COUNT,
             "imputed_indicator_count": sum(1 for i in indicators if i.delta_imputed),
             "unlabelled_count": sum(1 for i in indicators if not i.diagnosis),
         }

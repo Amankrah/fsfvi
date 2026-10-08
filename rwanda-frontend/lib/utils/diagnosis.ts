@@ -76,7 +76,11 @@ function num(value: unknown, fallback = 0): number {
  * engine weights are not stored on IndicatorResult; the backend version uses Σ wᵢυᵢ.
  * With near-equal indicator weights the two agree closely.
  */
-export function summarizeDiagnosis(rows: SavedIndicatorResult[]): DiagnosisSummary {
+export function summarizeDiagnosis(
+  rows: SavedIndicatorResult[],
+  /** Framework / database counts from the latest backend summary; they do not vary by year. */
+  meta?: Pick<DiagnosisSummary, 'defined_indicator_count' | 'framework_indicator_count'> | null,
+): DiagnosisSummary {
   const total = rows.length;
   const totalBudget = rows.reduce((s, r) => s + num(r.weighted_lcu_bn), 0);
   const totalStress = rows.reduce((s, r) => s + num(r.stress_value), 0);
@@ -112,6 +116,8 @@ export function summarizeDiagnosis(rows: SavedIndicatorResult[]): DiagnosisSumma
   return {
     buckets,
     total_indicators: total,
+    defined_indicator_count: meta?.defined_indicator_count,
+    framework_indicator_count: meta?.framework_indicator_count,
     imputed_indicator_count: rows.filter((r) => r.delta_imputed).length,
     unlabelled_count: rows.filter((r) => !r.diagnosis).length,
   };
