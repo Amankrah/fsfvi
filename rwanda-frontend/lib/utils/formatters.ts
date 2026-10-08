@@ -159,6 +159,16 @@ export function formatScore(score: number | string | null | undefined, decimals:
   return Number.isFinite(n) ? n.toFixed(decimals) : '–';
 }
 
+/**
+ * Observed / benchmark values as a reader would write them: thousands grouped,
+ * trailing zeros trimmed, at most 4 decimals (180000 -> "180,000", 25.36 -> "25.36").
+ */
+export function formatValue(value: number | string | null | undefined, maxDecimals: number = 4): string {
+  const n = value == null ? NaN : Number(value);
+  if (!Number.isFinite(n)) return '–';
+  return new Intl.NumberFormat('en-US', { maximumFractionDigits: maxDecimals }).format(n);
+}
+
 /** Human-readable engine run duration (avoid raw "0 ms" when work was negligible). */
 export function formatEngineDurationMs(ms: number | null | undefined): string {
   const n = ms == null ? NaN : Number(ms);

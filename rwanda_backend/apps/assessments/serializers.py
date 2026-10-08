@@ -443,6 +443,42 @@ class StressThresholdSerializer(serializers.Serializer):
     is_calibrated = serializers.BooleanField()
 
 
+class DiagnosisIndicatorSerializer(serializers.Serializer):
+    """One indicator inside a diagnosis bucket (top-N by stress)."""
+
+    indicator_code = serializers.CharField()
+    indicator_name = serializers.CharField()
+    component = serializers.CharField()
+    component_display = serializers.CharField()
+    performance_gap = serializers.FloatField()
+    stress_value = serializers.FloatField()
+    financing_coverage = serializers.FloatField(allow_null=True)
+    weighted_lcu_bn = serializers.FloatField()
+    delta_imputed = serializers.BooleanField()
+
+
+class DiagnosisBucketSerializer(serializers.Serializer):
+    """Indicators grouped by gap × financing-coverage diagnosis."""
+
+    diagnosis = serializers.CharField()
+    indicator_count = serializers.IntegerField()
+    indicator_share_percent = serializers.FloatField()
+    budget_lcu_bn = serializers.FloatField()
+    budget_share_percent = serializers.FloatField()
+    stress_share_percent = serializers.FloatField()
+    imputed_count = serializers.IntegerField()
+    indicators = DiagnosisIndicatorSerializer(many=True)
+
+
+class DiagnosisSummarySerializer(serializers.Serializer):
+    """Money-problem vs results-problem split of the latest assessment."""
+
+    buckets = DiagnosisBucketSerializer(many=True)
+    total_indicators = serializers.IntegerField()
+    imputed_indicator_count = serializers.IntegerField()
+    unlabelled_count = serializers.IntegerField()
+
+
 class DashboardSummarySerializer(serializers.Serializer):
     """Dashboard summary data. All fields from backend (stored assessment / calibrated classification)."""
 
@@ -462,6 +498,7 @@ class DashboardSummarySerializer(serializers.Serializer):
     # Which engine run produced this summary (latest assessment for the fiscal year).
     weighting_method = serializers.CharField(required=False, allow_null=True)
     scenario = serializers.CharField(required=False, allow_null=True)
+    diagnosis_summary = DiagnosisSummarySerializer(required=False, allow_null=True)
     empty = serializers.BooleanField(default=False)
 
 

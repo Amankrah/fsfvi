@@ -12,6 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PlanVsActualCard } from './PlanVsActualCard';
 import { BudgetTrendCard } from './BudgetTrendCard';
 import { StressScaleExplainer } from './StressScaleExplainer';
+import { DiagnosisSummaryCard } from './DiagnosisSummaryCard';
 import { FSFSITrendChart, ComponentStressTrend, StressHeatmap } from '@/components/rwanda/charts';
 import {
   TrendingUp,
@@ -273,6 +274,15 @@ export function NationalOverview() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Diagnosis layer: is the stress a money problem or a results/delivery problem? */}
+      {dashboardData.diagnosis_summary && dashboardData.diagnosis_summary.total_indicators > 0 ? (
+        <DiagnosisSummaryCard
+          summary={dashboardData.diagnosis_summary}
+          fiscalYearLabel={fiscalYear.label}
+          linkHref="/dashboard/assessment#indicators"
+        />
+      ) : null}
 
       {/* How to read the index: what it measures, how levels are derived, what "why" means */}
       <StressScaleExplainer thresholds={dashboardData.stress_thresholds ?? null} />

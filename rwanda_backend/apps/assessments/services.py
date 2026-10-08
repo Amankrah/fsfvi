@@ -554,6 +554,73 @@ class AssessmentService:
             .order_by("-fiscal_year")
         )
 
+    # Order in which diagnosis buckets are reported (money problem → results problem)
+    DIAGNOSIS_ORDER = (
+        classification.DIAG_UNFUNDED_GAP,
+        classification.DIAG_PARTIALLY_FUNDED_GAP,
+        classification.DIAG_FUNDED_GAP,
+        classification.DIAG_AT_BENCHMARK,
+    )
+    DIAGNOSIS_TOP_N = 5
+
+    def build_diagnosis_summary(self, assessment: AssessmentResult) -> dict:
+        """Group an assessment's indicators by gap × financing-coverage diagnosis.
+
+        Separates the "money problem" (unfunded gap) from the "results/delivery
+        problem" (funded gap, outcome lag). Per bucket: indicator count, budget
+        (bn LCU and share of total), share of the national FSFSI carried by the
+        bucket (Σ wᵢυᵢ from the stored engine output), how many of its indicators
+        rest on imputed (placeholder) benchmarks, and the top indicators by stress.
+        """
+        indicators = list(assessment.indicator_results.all())
+        total_n = len(indicators)
+        total_budget = sum(float(i.weighted_lcu_bn or 0) for i in indicators)
+
+        # Per-indicator contribution to the national index (wᵢ·υᵢ) from engine JSON
+        weighted_stress = {}
+        for ind in (assessment.result_json or {}).get("indicator_results", []) or []:
+            code = ind.get("indicator_code")
+            if code is not None and ind.get("weighted_stress") is not None:
+                weighted_stress[code] = float(ind["weighted_stress"])
+        total_weighted_stress = sum(weighted_stress.values())
+
+        buckets = []
+        for diag in self.DIAGNOSIS_ORDER:
+            rows = [i for i in indicators if i.diagnosis == diag]
+            rows.sort(key=lambda i: float(i.stress_value), reverse=True)
+            budget = sum(float(i.weighted_lcu_bn or 0) for i in rows)
+            ws = sum(weighted_stress.get(i.indicator_code, 0.0) for i in rows)
+            buckets.append({
+                "diagnosis": diag,
+                "indicator_count": len(rows),
+                "indicator_share_percent": (len(rows) / total_n * 100) if total_n else 0.0,
+                "budget_lcu_bn": budget,
+                "budget_share_percent": (budget / total_budget * 100) if total_budget else 0.0,
+                "stress_share_percent": (ws / total_weighted_stress * 100) if total_weighted_stress else 0.0,
+                "imputed_count": sum(1 for i in rows if i.delta_imputed),
+                "indicators": [
+                    {
+                        "indicator_code": i.indicator_code,
+                        "indicator_name": i.indicator_name,
+                        "component": i.component,
+                        "component_display": i.get_component_display(),
+                        "performance_gap": float(i.performance_gap),
+                        "stress_value": float(i.stress_value),
+                        "financing_coverage": float(i.financing_coverage) if i.financing_coverage is not None else None,
+                        "weighted_lcu_bn": float(i.weighted_lcu_bn or 0),
+                        "delta_imputed": bool(i.delta_imputed),
+                    }
+                    for i in rows[: self.DIAGNOSIS_TOP_N]
+                ],
+            })
+
+        return {
+            "buckets": buckets,
+            "total_indicators": total_n,
+            "imputed_indicator_count": sum(1 for i in indicators if i.delta_imputed),
+            "unlabelled_count": sum(1 for i in indicators if not i.diagnosis),
+        }
+
     def get_dashboard_summary(self, fiscal_year: int = None) -> dict:
         """Get summary data for dashboard display. Returns empty summary when no assessment exists."""
         assessment = self.get_latest_assessment(fiscal_year)
@@ -573,6 +640,7 @@ class AssessmentService:
                 "weighting_method": None,
                 "scenario": None,
                 "stress_thresholds": classification.get_all_thresholds(),
+                "diagnosis_summary": None,
                 "empty": True,
             }
 
@@ -632,6 +700,7 @@ class AssessmentService:
             "weighting_method": assessment.weighting_method,
             "scenario": assessment.scenario,
             "stress_thresholds": classification.get_all_thresholds(),
+            "diagnosis_summary": self.build_diagnosis_summary(assessment),
             "empty": False,
         }
 

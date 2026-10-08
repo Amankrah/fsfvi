@@ -298,6 +298,10 @@ export interface SavedIndicatorResult {
   cumulative_stress?: number | null;
   financing_coverage?: number | null;
   diagnosis?: StressDiagnosis | null;
+  /** Benchmark provenance from the parameters sheet, e.g. SSA_10/90pct, Global_10/90pct */
+  benchmark_used_type?: string | null;
+  /** True when observed/benchmark are placeholders (no FSCI proxy); the gap was imputed. */
+  delta_imputed?: boolean;
   weighted_lcu_bn: number;
   share_weighted_percent: number;
   /** From indicator catalog: affects performance-gap interpretation in the FSFSI engine */
@@ -338,6 +342,40 @@ export type StressThresholds = Record<StressThresholdLevel, StressThreshold>;
 /** Gap × financing-coverage diagnosis (backend). */
 export type StressDiagnosis = 'at_benchmark' | 'unfunded_gap' | 'partially_funded_gap' | 'funded_gap';
 
+/** One indicator inside a diagnosis bucket (top-N by stress). */
+export interface DiagnosisIndicator {
+  indicator_code: string;
+  indicator_name: string;
+  component: string;
+  component_display: string;
+  performance_gap: number;
+  stress_value: number;
+  financing_coverage: number | null;
+  weighted_lcu_bn: number;
+  delta_imputed: boolean;
+}
+
+/** Indicators grouped by diagnosis: the money-problem vs results-problem split. */
+export interface DiagnosisBucket {
+  diagnosis: StressDiagnosis;
+  indicator_count: number;
+  indicator_share_percent: number;
+  budget_lcu_bn: number;
+  budget_share_percent: number;
+  /** Share of the national FSFSI (Σ wᵢυᵢ) carried by this bucket. */
+  stress_share_percent: number;
+  /** Indicators in this bucket whose benchmark/observed values are placeholders. */
+  imputed_count: number;
+  indicators: DiagnosisIndicator[];
+}
+
+export interface DiagnosisSummary {
+  buckets: DiagnosisBucket[];
+  total_indicators: number;
+  imputed_indicator_count: number;
+  unlabelled_count: number;
+}
+
 export interface DashboardSummary {
   assessment_id?: string | null;
   overall_fsfsi: number;
@@ -358,6 +396,8 @@ export interface DashboardSummary {
   scenario?: string | null;
   /** Active calibrated thresholds per level (for scale bars, legends, reference lines). */
   stress_thresholds?: StressThresholds;
+  /** Money-problem vs results-problem split of the latest assessment (null when empty). */
+  diagnosis_summary?: DiagnosisSummary | null;
   /** True when no assessment has been run yet for this fiscal year. */
   empty?: boolean;
 }

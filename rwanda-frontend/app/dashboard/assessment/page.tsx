@@ -8,11 +8,10 @@ import {
   getRiskBgColor,
   formatRWFCompact,
   formatScore,
+  formatValue,
   getPerformanceGapDisplay,
   formatPolicyDate,
   riskBadgeTranslationKey,
-  diagnosisTranslationKey,
-  getDiagnosisChipClass,
 } from '@/lib/utils/formatters';
 import { assessmentAPI } from '@/lib/api/assessmentApi';
 import type {
@@ -22,8 +21,13 @@ import type {
   ActionPriority,
   ComponentResult,
   SavedIndicatorResult,
+  StressDiagnosis,
+  DiagnosisSummary,
 } from '@/lib/types/assessment';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { DiagnosisChip, ImputedMarker } from '@/components/rwanda/shared/DiagnosisChip';
+import { DiagnosisSummaryCard } from '@/components/rwanda/overview/DiagnosisSummaryCard';
+import { DIAGNOSIS_ORDER, summarizeDiagnosis } from '@/lib/utils/diagnosis';
 import {
   FileCheck,
   Loader2,
@@ -207,8 +211,18 @@ export default function AssessmentPage() {
       ]);
       setSummary(summaryRes);
       setAssessments(listRes);
-      setSelectedAssessment(null);
       setCompareIds([]);
+      // Open the latest run by default so the indicator-level diagnosis is visible
+      // without a click; the user can still pick an older run from the list.
+      if (summaryRes.assessment_id) {
+        try {
+          setSelectedAssessment(await assessmentAPI.getAssessment(summaryRes.assessment_id));
+        } catch {
+          setSelectedAssessment(null);
+        }
+      } else {
+        setSelectedAssessment(null);
+      }
     } catch (err) {
       console.error('Assessment fetch failed:', err);
       setError('Unable to load assessment data.');
@@ -409,22 +423,16 @@ export default function AssessmentPage() {
         </Card>
       ) : null}
 
-      {/* Indicators breakdown (when an assessment is selected) */}
+      {/* Diagnosis layer + indicators breakdown (latest run opens by default) */}
       {selectedAssessment?.indicator_results && selectedAssessment.indicator_results.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <Target className="h-5 w-5 text-[var(--rw-blue)]" />
-              Indicators breakdown & performance gaps
-            </CardTitle>
-            <p className="text-sm text-gray-500 font-normal">
-              Observed vs benchmark and performance gap per indicator.
-            </p>
-          </CardHeader>
-          <CardContent>
-            <IndicatorsBreakdownTable indicators={selectedAssessment.indicator_results} />
-          </CardContent>
-        </Card>
+        <IndicatorsDiagnosisSection
+          indicators={selectedAssessment.indicator_results}
+          fiscalYearLabel={fiscalYear.label}
+          runName={selectedAssessment.assessment_name || `Assessment ${selectedAssessment.id.slice(0, 8)}`}
+          serverSummary={
+            summary?.assessment_id === selectedAssessment.id ? summary?.diagnosis_summary ?? null : null
+          }
+        />
       )}
 
 
@@ -578,21 +586,6 @@ export default function AssessmentPage() {
   );
 }
 
-function DiagnosisChip({ diagnosis, coverage }: { diagnosis?: string | null; coverage?: number | null }) {
-  const { t } = useLanguage();
-  if (!diagnosis) return null;
-  const pct = coverage != null ? ` · ${Math.round(coverage * 100)}%` : '';
-  return (
-    <span
-      className={`inline-flex items-center rounded border px-1.5 py-0.5 text-[11px] font-medium ${getDiagnosisChipClass(diagnosis)}`}
-      title={t('diagnosis.coverage_hint')}
-    >
-      {t(diagnosisTranslationKey(diagnosis))}
-      {pct}
-    </span>
-  );
-}
-
 function ComponentSummaryCard({ component }: { component: ComponentSummary }) {
   const level = (component.priority_level || 'medium') as StressLevel;
   return (
@@ -604,7 +597,7 @@ function ComponentSummaryCard({ component }: { component: ComponentSummary }) {
         </span>
       </div>
       <p className="text-xs text-gray-500">
-        {component.indicator_count} indicators · {formatScore(component.budget_share_percent)}% budget
+        {component.indicator_count} indicators · {formatScore(component.budget_share_percent, 1)}% budget
       </p>
       <div className="mt-2">
         <DiagnosisChip diagnosis={component.diagnosis} coverage={component.financing_coverage} />
@@ -655,7 +648,7 @@ function ComponentsBreakdownTable({ components }: { components: ComponentResult[
               <td className="py-3 pr-4">
                 <DiagnosisChip diagnosis={c.diagnosis} coverage={c.financing_coverage} />
               </td>
-              <td className="py-3 pr-4 text-right">{formatScore(c.budget_share_percent)}%</td>
+              <td className="py-3 pr-4 text-right tabular-nums">{formatScore(c.budget_share_percent, 1)}%</td>
               <td className="py-3 text-right">{c.indicators_count}</td>
             </tr>
           ))}
@@ -666,9 +659,88 @@ function ComponentsBreakdownTable({ components }: { components: ComponentResult[
   );
 }
 
-type IndicatorSort = 'stress_desc' | 'stress_asc' | 'gap_desc' | 'gap_asc' | 'code_asc';
+type IndicatorSort =
+  | 'stress_desc'
+  | 'stress_asc'
+  | 'gap_desc'
+  | 'gap_asc'
+  | 'coverage_asc'
+  | 'coverage_desc'
+  | 'budget_desc'
+  | 'code_asc';
 
-function IndicatorsBreakdownTable({ indicators }: { indicators: SavedIndicatorResult[] }) {
+type DiagnosisFilter = StressDiagnosis | 'all';
+
+/**
+ * Diagnosis summary (money vs results) + the indicator table, sharing one diagnosis
+ * filter so clicking a bucket in the summary narrows the table.
+ */
+function IndicatorsDiagnosisSection({
+  indicators,
+  fiscalYearLabel,
+  runName,
+  serverSummary,
+}: {
+  indicators: SavedIndicatorResult[];
+  fiscalYearLabel: string;
+  runName: string;
+  /**
+   * Backend summary for this exact run (weighted Σwᵢυᵢ stress shares, identical to the
+   * National Overview). Falls back to a client-side Συᵢ approximation for historical runs.
+   */
+  serverSummary?: DiagnosisSummary | null;
+}) {
+  const { t } = useLanguage();
+  const [diagnosisFilter, setDiagnosisFilter] = useState<DiagnosisFilter>('all');
+  const diagnosisSummary = useMemo(
+    () => (serverSummary && serverSummary.total_indicators > 0 ? serverSummary : summarizeDiagnosis(indicators)),
+    [serverSummary, indicators],
+  );
+
+  // Reset the filter when a different run is loaded
+  useEffect(() => {
+    setDiagnosisFilter('all');
+  }, [indicators]);
+
+  return (
+    <div id="indicators" className="space-y-6 scroll-mt-24">
+      <DiagnosisSummaryCard
+        summary={diagnosisSummary}
+        fiscalYearLabel={fiscalYearLabel}
+        selected={diagnosisFilter}
+        onSelectDiagnosis={(d) => setDiagnosisFilter((prev) => (prev === d ? 'all' : d))}
+      />
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <Target className="h-5 w-5 text-[var(--rw-blue)]" />
+            {t('assessment_page.indicators_title')}
+          </CardTitle>
+          <p className="text-sm text-gray-500 font-normal">
+            {t('assessment_page.indicators_subtitle', { run: runName })}
+          </p>
+        </CardHeader>
+        <CardContent>
+          <IndicatorsBreakdownTable
+            indicators={indicators}
+            diagnosisFilter={diagnosisFilter}
+            onDiagnosisFilterChange={setDiagnosisFilter}
+          />
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function IndicatorsBreakdownTable({
+  indicators,
+  diagnosisFilter,
+  onDiagnosisFilterChange,
+}: {
+  indicators: SavedIndicatorResult[];
+  diagnosisFilter: DiagnosisFilter;
+  onDiagnosisFilterChange: (d: DiagnosisFilter) => void;
+}) {
   const { t } = useLanguage();
   const [componentFilter, setComponentFilter] = useState<string>('all');
   const [search, setSearch] = useState('');
@@ -682,10 +754,20 @@ function IndicatorsBreakdownTable({ indicators }: { indicators: SavedIndicatorRe
     return [...labels.entries()].sort((a, b) => a[1].localeCompare(b[1]));
   }, [indicators]);
 
+  const diagnosisCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const ind of indicators) {
+      if (ind.diagnosis) counts.set(ind.diagnosis, (counts.get(ind.diagnosis) ?? 0) + 1);
+    }
+    return counts;
+  }, [indicators]);
+
   const filteredSorted = useMemo(() => {
     const q = search.trim().toLowerCase();
+    const cov = (r: SavedIndicatorResult) => (r.financing_coverage == null ? -1 : r.financing_coverage);
     let rows = indicators.filter((ind) => {
       if (componentFilter !== 'all' && ind.component !== componentFilter) return false;
+      if (diagnosisFilter !== 'all' && ind.diagnosis !== diagnosisFilter) return false;
       if (!q) return true;
       return (
         ind.indicator_code.toLowerCase().includes(q) ||
@@ -703,6 +785,12 @@ function IndicatorsBreakdownTable({ indicators }: { indicators: SavedIndicatorRe
           return b.performance_gap - a.performance_gap;
         case 'gap_asc':
           return a.performance_gap - b.performance_gap;
+        case 'coverage_asc':
+          return cov(a) - cov(b);
+        case 'coverage_desc':
+          return cov(b) - cov(a);
+        case 'budget_desc':
+          return (b.weighted_lcu_bn || 0) - (a.weighted_lcu_bn || 0);
         case 'code_asc':
           return a.indicator_code.localeCompare(b.indicator_code);
         default:
@@ -711,7 +799,7 @@ function IndicatorsBreakdownTable({ indicators }: { indicators: SavedIndicatorRe
     };
     rows = [...rows].sort(cmp);
     return rows;
-  }, [indicators, componentFilter, search, sort]);
+  }, [indicators, componentFilter, diagnosisFilter, search, sort]);
 
   return (
     <div className="space-y-4">
@@ -719,6 +807,24 @@ function IndicatorsBreakdownTable({ indicators }: { indicators: SavedIndicatorRe
         <div className="flex items-center gap-2 text-slate-600">
           <Filter className="h-4 w-4 shrink-0" />
           <span className="text-xs font-semibold uppercase tracking-wide">Filters</span>
+        </div>
+        <div className="min-w-[11rem] flex-1 sm:max-w-[16rem]">
+          <label className="mb-1 block text-xs font-medium text-slate-600" htmlFor="ind-filter-diagnosis">
+            {t('diagnosis.column')}
+          </label>
+          <select
+            id="ind-filter-diagnosis"
+            className="w-full rounded-md border border-slate-300 bg-white px-2 py-2 text-sm"
+            value={diagnosisFilter}
+            onChange={(e) => onDiagnosisFilterChange(e.target.value as DiagnosisFilter)}
+          >
+            <option value="all">{t('diagnosis.filter_all')}</option>
+            {DIAGNOSIS_ORDER.map((d) => (
+              <option key={d} value={d}>
+                {t(`diagnosis.${d}`)} ({diagnosisCounts.get(d) ?? 0})
+              </option>
+            ))}
+          </select>
         </div>
         <div className="min-w-[10rem] flex-1 sm:max-w-[14rem]">
           <label className="mb-1 block text-xs font-medium text-slate-600" htmlFor="ind-filter-component">
@@ -765,6 +871,9 @@ function IndicatorsBreakdownTable({ indicators }: { indicators: SavedIndicatorRe
             <option value="stress_asc">Stress (low → high)</option>
             <option value="gap_desc">Performance gap (high → low)</option>
             <option value="gap_asc">Performance gap (low → high)</option>
+            <option value="coverage_asc">{t('diagnosis.sort_coverage_asc')}</option>
+            <option value="coverage_desc">{t('diagnosis.sort_coverage_desc')}</option>
+            <option value="budget_desc">{t('diagnosis.sort_budget_desc')}</option>
             <option value="code_asc">Indicator code (A–Z)</option>
           </select>
         </div>
@@ -776,6 +885,10 @@ function IndicatorsBreakdownTable({ indicators }: { indicators: SavedIndicatorRe
 
       <p className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs leading-relaxed text-slate-700">
         {t('assessment_page.gap_legend')}
+      </p>
+      <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs leading-relaxed text-slate-600">
+        <ImputedMarker />
+        <span>{t('diagnosis.imputed_hint')}</span>
       </p>
 
       <div className="overflow-x-auto rounded-lg border border-slate-100">
@@ -803,8 +916,13 @@ function IndicatorsBreakdownTable({ indicators }: { indicators: SavedIndicatorRe
                   </span>
                 </td>
                 <td className="py-3 pr-4 text-gray-700">{ind.component_display}</td>
-                <td className="py-3 pr-4 text-right tabular-nums">{ind.observed_value != null ? formatScore(ind.observed_value) : '–'}</td>
-                <td className="py-3 pr-4 text-right tabular-nums">{ind.benchmark_value != null ? formatScore(ind.benchmark_value) : '–'}</td>
+                <td className="py-3 pr-4 text-right tabular-nums">{formatValue(ind.observed_value)}</td>
+                <td className="py-3 pr-4 text-right tabular-nums">
+                  <span className="inline-flex items-center justify-end gap-1.5 whitespace-nowrap">
+                    {ind.delta_imputed ? <ImputedMarker /> : null}
+                    <span title={ind.benchmark_used_type || undefined}>{formatValue(ind.benchmark_value)}</span>
+                  </span>
+                </td>
                 <td className="py-3 pr-4 text-right">
                   {(() => {
                     const { className, isGood } = getPerformanceGapDisplay(ind.performance_gap);
@@ -836,7 +954,7 @@ function IndicatorsBreakdownTable({ indicators }: { indicators: SavedIndicatorRe
                 <td className="py-3 pr-4">
                   <DiagnosisChip diagnosis={ind.diagnosis} coverage={ind.financing_coverage} />
                 </td>
-                <td className="py-3 pr-3 text-right tabular-nums">{formatScore(ind.share_weighted_percent)}%</td>
+                <td className="py-3 pr-3 text-right tabular-nums">{formatScore(ind.share_weighted_percent, 1)}%</td>
               </tr>
             ))}
           </tbody>
