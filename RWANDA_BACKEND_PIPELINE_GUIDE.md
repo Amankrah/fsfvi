@@ -153,6 +153,17 @@ python manage.py import_indicator_parameters \
   provenance: `benchmark_used_type`, `fsci_indicator_used`, `delta_imputed`, `data_note`
 - With `--propagate`: copies `benchmark_value`, provenance and alpha (not `observed_value`)
   to every fiscal year of each indicator. Benchmarks are time-invariant in this pipeline.
+- Rows it has to **create** (the sheet's `Obs_year` has no `IndicatorData` yet, e.g. FY2024)
+  get **zero budget**. Budget never comes from this sheet — see Step 2b.
+
+**Funding columns are a multi-year pool, not a year.** The sheet's `Funding_weighted_bn_LCU`
+and `Funding_gross_bn_LCU` are the sum of mapped spend across every year of the budget
+mapping workbook (FY2018–2023: 2,239.78 bn weighted / 4,805 bn gross; the sheet's own
+Assumptions tab calls it "Total budget B"). Earlier versions of this command wrote those
+columns into FY2024 as if they were one year, which inflated FY2024 funding ~4×, understated
+FY2024 stress (0.29 instead of 0.38) and anchored the PSTA-5 plan to an "RWF 2.2T budget".
+`--with-funding` re-enables the old behaviour but is refused when the sheet total matches
+the sum of the mapping years in the database.
 
 **Benchmark provenance.** Only 11 indicators (IND-01, 06, 07, 15, 18, 21, 22, 33, 35, 36, 37)
 have a real FSCI proxy; their benchmark is the SSA 90th/10th percentile for the observation
@@ -171,6 +182,31 @@ Benchmarks propagated to 219 IndicatorData rows (all fiscal years)
 Note: the sheet's `Obs_year` for IND-33 is 2015, so a FY2015 row (no budget) is created.
 Delete it unless you want a FY2015 assessment:
 `python manage.py shell -c "from apps.fsfvi_data.models import IndicatorData; IndicatorData.objects.filter(fiscal_year=2015).delete()"`
+
+---
+
+### Step 2b: Give FY2024 a Budget (Carry Forward Until a FY2024/25 Mapping Exists)
+
+The budget mapping workbook stops at FY2023, so Step 2 leaves FY2024 with zero funding.
+Until a `budget_lines_to_food_system_indicators_mapping.xlsx` for FY2024/25 is available,
+carry the latest real year forward:
+
+```bash
+python manage.py carry_forward_funding --from-year 2023 --to-year 2024          # preview
+python manage.py carry_forward_funding --from-year 2023 --to-year 2024 --apply
+```
+
+Copies `gross_lcu_bn`, `weighted_lcu_bn`, `records_count`, `fallback_records` per indicator,
+recomputes `share_weighted_percent`, and stamps `IndicatorData.funding_source =
+"carried_forward:FY2023"`. Observed values, benchmarks and alpha are untouched. Indicators
+with no FY2023 budget line (IND-34, IND-36) get zero, which is what FY2023 says about them.
+It refuses to overwrite rows whose `funding_source` is `budget_mapping` unless `--force`.
+
+When a real FY2024/25 mapping arrives, run
+`import_budget_mapping <file> --fiscal-year 2024` instead; it replaces the carried-forward
+rows and stamps them `budget_mapping`. Then re-run Step 2 with `--propagate` and Step 6.
+
+`funding_source` is exposed on the `IndicatorData` API so the UI can flag carried-forward years.
 
 ---
 
@@ -382,6 +418,9 @@ python manage.py import_indicator_parameters \
   ../FSFSI_indicator_level_parameters.xlsx \
   --default-fiscal-year 2024 --propagate
 
+# Step 2b: FY2024 has no budget mapping; carry FY2023 budget forward (flagged in funding_source)
+python manage.py carry_forward_funding --from-year 2023 --to-year 2024 --apply
+
 # Step 3: Fetch observed values for intermediate years (needs internet)
 python manage.py fetch_rwanda_observed \
   --fiscal-years 2019,2020,2021,2022,2023 --apply
@@ -532,7 +571,18 @@ The alpha and allocation units must match: both in billions LCU (`alpha_per_bnLC
 
 ### Assessment fails with "Budget constraint error: allocation=0.00"
 That fiscal year has no budget data. Re-run Step 1 (`import_budget_mapping`)
-without `--fiscal-year` to import all years from the Mapping sheet.
+without `--fiscal-year` to import all years from the Mapping sheet. For a year the
+mapping workbook does not cover (FY2024), run Step 2b (`carry_forward_funding`).
+
+### FY2024 budget shows RWF 2.2T / budget jumps ~4× in the latest year
+FY2024 funding was taken from the parameters sheet's `Funding_*` columns, which pool
+FY2018–2023 (2,239.78 bn). Symptoms: "budget" ≈ 4× FY2023, CAGR ≈ +41%, FY2024 FSFSI
+≈ 0.29 instead of ≈ 0.38, 92% of budget in "funded gap" indicators, PSTA-5 plan anchored
+at RWF 2.4T+. Check with
+`python manage.py shell -c "from apps.fsfvi_data.models import IndicatorData; print(IndicatorData.objects.filter(fiscal_year=2024).values_list('funding_source', flat=True).distinct())"`
+— `parameters_sheet` means pooled. Fix: Step 2b, then Step 6 for 2024
+(`run_assessments_all_years --years 2024`). `import_indicator_parameters` no longer writes
+funding unless `--with-funding`, and refuses pooled totals even then.
 
 ### Benchmarks/alpha missing for intermediate years
 Re-run Step 2 with `--propagate`. The parameters Excel only writes observed values

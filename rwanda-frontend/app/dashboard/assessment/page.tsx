@@ -362,11 +362,14 @@ export default function AssessmentPage() {
             </CardContent>
           </Card>
           <Card>
-            <CardContent className="p-5">
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Total Budget</p>
+            <CardContent className="p-5" title={t('overview.total_budget_hint')}>
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                {t('overview.total_budget')}
+              </p>
               <p className="text-2xl font-bold text-gray-900 mt-1">
                 {formatRWFCompact(summary.total_budget_lcu_bn * 1_000_000_000)}
               </p>
+              <p className="text-xs text-slate-600 mt-2 leading-relaxed">{t('overview.total_budget_note')}</p>
             </CardContent>
           </Card>
           <Card>

@@ -114,7 +114,8 @@ Place the IFPRI Excel files where the commands can see them (paths below assume 
 |------|---------|--------|
 | 0 (optional) | `python manage.py seed_indicators` | Creates all **37** indicator definitions if you start without Excel |
 | 1 | `python manage.py import_budget_mapping ../budget_lines_to_food_system_indicators_mapping.xlsx` | Budget lines → indicators; `IndicatorData` with LCU billions |
-| 2 | `python manage.py import_indicator_parameters ../FSFSI_indicator_level_parameters.xlsx --default-fiscal-year 2024` | Benchmarks, observed, alpha; **source of truth** for parameters sheet |
+| 2 | `python manage.py import_indicator_parameters ../FSFSI_indicator_level_parameters.xlsx --default-fiscal-year 2024` | Benchmarks, observed, alpha; **source of truth** for parameters sheet. Never writes budget (its `Funding_*` columns pool FY2018–2023) |
+| 2b | `python manage.py carry_forward_funding --from-year 2023 --to-year 2024 --apply` | FY2024 has no budget mapping; carries FY2023 budget forward, stamped `funding_source=carried_forward:FY2023` |
 | 3 | `python manage.py fetch_rwanda_observed --fiscal-years 2019,2020,2021,2022,2023 --apply` | Live WB API + interpolation; requires network |
 | 4 | Propagate alpha/benchmarks to all years | Done by `import_indicator_parameters ... --propagate` (step 2); re-run it after step 3 |
 | 5 | `python manage.py compute_observed_imputed --fiscal-year YYYY --apply` | Per year; fills remaining NULL observed values |
@@ -133,7 +134,8 @@ Place the IFPRI Excel files where the commands can see them (paths below assume 
 | App | Command | Purpose |
 |-----|---------|-----------|
 | **fsfvi_data** | `import_budget_mapping <xlsx>` | Budget mapping Excel → DB |
-| | `import_indicator_parameters <xlsx>` | IFPRI parameters Excel → indicators + `IndicatorData` |
+| | `import_indicator_parameters <xlsx>` | IFPRI parameters Excel → indicators + `IndicatorData` (no budget unless `--with-funding`) |
+| | `carry_forward_funding --from-year A --to-year B` | Copy per-indicator budget to a year with no mapping |
 | | `fetch_rwanda_observed` | World Bank API → observed values + interpolation |
 | | `compute_observed_imputed` | Impute missing observed values |
 | | `merge_wb_reference_exports` | Merge `wb_new_data.json` + `wb_additional_data.json` into `reference_distributions.json` |

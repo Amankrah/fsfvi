@@ -5,7 +5,13 @@ Reads only the Indicator_Parameters sheet. Updates:
 - Indicator: unit, higher_is_better (from Direction), default_sensitivity (from alpha_per_bnLCU)
 - IndicatorData: observed_value (Obs_value), benchmark_value (Benchmark_used), sensitivity_parameter,
   plus provenance: benchmark_used_type, fsci_indicator_used, delta_imputed, data_note;
-  creates IndicatorData for (indicator, Obs_year) if missing, using funding/records from the sheet.
+  creates IndicatorData for (indicator, Obs_year) if missing, with ZERO budget.
+
+Budget (gross/weighted_lcu_bn) is deliberately not taken from this sheet: its
+Funding_* columns are the sum of weighted spend across every mapping year
+(2018–2023 = 2,239.78 bn), not one fiscal year. Budget comes from
+import_budget_mapping, or carry_forward_funding when no mapping exists for a year.
+--with-funding overrides this and is refused when the sheet total looks pooled.
 
 With --propagate, the benchmark and its provenance (not the observed value) are also
 copied to every other fiscal year of the same indicator. Benchmarks in this pipeline
@@ -134,6 +140,17 @@ class Command(BaseCommand):
                 "to every fiscal year of each indicator (observed values are not propagated)."
             ),
         )
+        parser.add_argument(
+            "--with-funding",
+            action="store_true",
+            help=(
+                "Also write Funding_weighted/gross_bn_LCU and Records into newly created "
+                "IndicatorData rows. Off by default: the parameters sheet's funding columns are "
+                "normally a multi-year pool, not a single fiscal year. Budget should come from "
+                "import_budget_mapping (or carry_forward_funding). Refused if the sheet total "
+                "looks pooled across the mapping years already in the database."
+            ),
+        )
 
     def handle(self, *args, **options):
         path = Path(options["excel_path"])
@@ -155,15 +172,62 @@ class Command(BaseCommand):
         ws = wb["Indicator_Parameters"]
         default_fy = options.get("default_fiscal_year")
         propagate = options.get("propagate", False)
+        with_funding = options.get("with_funding", False)
         try:
             with transaction.atomic():
                 self._load_indicator_parameters(
-                    ws, default_fiscal_year=default_fy, propagate=propagate
+                    ws, default_fiscal_year=default_fy, propagate=propagate,
+                    with_funding=with_funding,
                 )
         finally:
             wb.close()
 
         self.stdout.write(self.style.SUCCESS("Import completed successfully."))
+
+    def _check_funding_not_pooled(self, rows):
+        """
+        Refuse to write the sheet's Funding_* columns as a single-year budget when they
+        look like a pool of the mapping years already in the database.
+
+        The FSFSI_indicator_level_parameters workbook sums weighted spend across every
+        year of budget_lines_to_food_system_indicators_mapping.xlsx (its Assumptions tab
+        calls it "Total budget B"). Filed under one Obs_year it inflates that year's
+        funding several-fold.
+        """
+        from django.db.models import Sum
+        from apps.fsfvi_data.models import BudgetLineMapping
+
+        sheet_total = sum(float(r["funding_weighted_bn"] or 0) for r in rows)
+        per_year = {
+            r["fiscal_year"]: float(r["w"] or 0) / 1e9
+            for r in BudgetLineMapping.objects.values("fiscal_year").annotate(w=Sum("amount_weighted_lcu"))
+        }
+        if not per_year or sheet_total <= 0:
+            return
+        pooled_total = sum(per_year.values())
+        max_year_total = max(per_year.values())
+        years = sorted(per_year)
+        self.stdout.write(
+            f"  Funding check: sheet weighted total {sheet_total:,.1f} bn; "
+            f"mapping FY{years[0]}–FY{years[-1]} sum {pooled_total:,.1f} bn, largest single year {max_year_total:,.1f} bn"
+        )
+        looks_pooled = (
+            abs(sheet_total - pooled_total) / pooled_total < 0.05
+            and sheet_total > 1.5 * max_year_total
+        )
+        if looks_pooled:
+            raise CommandError(
+                "Refusing --with-funding: the sheet's Funding_weighted_bn_LCU total "
+                f"({sheet_total:,.1f} bn) matches the SUM of all mapping years "
+                f"({pooled_total:,.1f} bn across FY{years[0]}–FY{years[-1]}), i.e. it is pooled, "
+                "not a single fiscal year. Import a budget mapping for the target year "
+                "(import_budget_mapping --fiscal-year N) or run carry_forward_funding instead."
+            )
+        if sheet_total > 1.5 * max_year_total:
+            self.stdout.write(self.style.WARNING(
+                f"  Funding check: sheet total is {sheet_total / max_year_total:.1f}x the largest "
+                "single mapping year. Verify it is a one-year figure before trusting FSFSI results."
+            ))
 
     def _propagate_benchmarks(self, rows, indicators):
         """Copy benchmark + provenance (+ alpha) from the sheet row to all fiscal years."""
@@ -190,7 +254,7 @@ class Command(BaseCommand):
                 updated += len(targets)
         self.stdout.write(f"  Benchmarks propagated to {updated} IndicatorData rows (all fiscal years)")
 
-    def _load_indicator_parameters(self, ws, default_fiscal_year=None, propagate=False):
+    def _load_indicator_parameters(self, ws, default_fiscal_year=None, propagate=False, with_funding=False):
         """Read Indicator_Parameters rows and update Indicator + IndicatorData."""
         rows = []
         for row in ws.iter_rows(min_row=2, values_only=True):
@@ -246,6 +310,9 @@ class Command(BaseCommand):
         if not rows:
             self.stdout.write(self.style.WARNING("No data rows found in Indicator_Parameters."))
             return
+
+        if with_funding:
+            self._check_funding_not_pooled(rows)
 
         codes = list({r["code"] for r in rows})
         indicators = {ind.code: ind for ind in Indicator.objects.filter(code__in=codes).only("id", "code", "unit", "higher_is_better", "default_sensitivity")}
@@ -327,11 +394,12 @@ class Command(BaseCommand):
                     IndicatorData(
                         indicator_id=ind_id,
                         fiscal_year=fiscal_year,
-                        records_count=r["records_count"],
-                        fallback_records=r["fallback_records"],
-                        gross_lcu_bn=r["funding_gross_bn"],
-                        weighted_lcu_bn=r["funding_weighted_bn"],
+                        records_count=r["records_count"] if with_funding else 0,
+                        fallback_records=r["fallback_records"] if with_funding else 0,
+                        gross_lcu_bn=r["funding_gross_bn"] if with_funding else Decimal("0"),
+                        weighted_lcu_bn=r["funding_weighted_bn"] if with_funding else Decimal("0"),
                         share_weighted_percent=Decimal("0"),
+                        funding_source="parameters_sheet" if with_funding else "",
                         observed_value=r["observed_value"],
                         benchmark_value=r["benchmark_value"],
                         benchmark_used_type=r.get("benchmark_used_type") or "",
@@ -357,6 +425,12 @@ class Command(BaseCommand):
         if to_create:
             IndicatorData.objects.bulk_create(to_create)
             self.stdout.write(f"  IndicatorData created: {len(to_create)}")
+            if not with_funding:
+                years = sorted({rec.fiscal_year for rec in to_create})
+                self.stdout.write(self.style.WARNING(
+                    f"  Created rows have zero budget (funding not taken from the parameters sheet). "
+                    f"Run import_budget_mapping --fiscal-year N or carry_forward_funding for FY{years}."
+                ))
         if not to_update and not to_create:
             self.stdout.write(self.style.WARNING("  No IndicatorData rows updated or created (fiscal years may not match existing data)."))
 

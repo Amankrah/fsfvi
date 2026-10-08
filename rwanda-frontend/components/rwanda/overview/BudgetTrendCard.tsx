@@ -221,8 +221,8 @@ export function BudgetTrendCard() {
           </div>
         </div>
         <p className="text-xs text-gray-500 mt-1">
-          {view === 'total' && 'National weighted budget allocations over time (billions LCU)'}
-          {view === 'components' && 'Top 5 components share of national budget over time'}
+          {view === 'total' && 'Mapped food-system spend over time, weighted (billions LCU; not the MINAGRI budget)'}
+          {view === 'components' && 'Top 5 components share of mapped food-system spend over time'}
           {view === 'insights' && 'Policy-relevant insights from budget composition analysis'}
         </p>
       </CardHeader>

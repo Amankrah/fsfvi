@@ -40,7 +40,7 @@ class IndicatorDataSerializer(serializers.ModelSerializer):
             "id", "indicator_id", "indicator_code", "indicator_name",
             "component", "component_display", "higher_is_better", "unit",
             "fiscal_year", "records_count",
-            "gross_lcu_bn", "weighted_lcu_bn", "share_weighted_percent",
+            "gross_lcu_bn", "weighted_lcu_bn", "share_weighted_percent", "funding_source",
             "observed_value", "benchmark_value", "benchmark_used_type",
             "fsci_indicator_used", "delta_imputed", "data_note",
             "financial_allocation_usd", "sensitivity_parameter",
@@ -50,7 +50,7 @@ class IndicatorDataSerializer(serializers.ModelSerializer):
         read_only_fields = [
             "id", "indicator_code", "indicator_name", "component", "component_display",
             "higher_is_better", "unit", "performance_gap", "stress_value",
-            "fsci_indicator_used", "delta_imputed", "data_note",
+            "fsci_indicator_used", "delta_imputed", "data_note", "funding_source",
             "created_by_username", "created_at", "updated_at",
         ]
 

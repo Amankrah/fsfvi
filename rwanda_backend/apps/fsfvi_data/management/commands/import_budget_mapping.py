@@ -240,6 +240,7 @@ class Command(BaseCommand):
                 gross_lcu_bn=_safe_decimal(r["gross_bn"], Decimal("0")),
                 weighted_lcu_bn=_safe_decimal(r["weighted_bn"], Decimal("0")),
                 share_weighted_percent=_safe_decimal(r["share_pct"], Decimal("0")),
+                funding_source="budget_mapping",
                 status=DataStatus.VALIDATED,
             )
             for r in summary_rows
@@ -430,9 +431,10 @@ class Command(BaseCommand):
                     existing.share_weighted_percent = share_pct
                     existing.records_count = agg["records"]
                     existing.fallback_records = agg["fallback"]
+                    existing.funding_source = "budget_mapping"
                     existing.save(update_fields=[
                         "gross_lcu_bn", "weighted_lcu_bn", "share_weighted_percent",
-                        "records_count", "fallback_records",
+                        "records_count", "fallback_records", "funding_source",
                     ])
                     total_updated += 1
                 else:
@@ -444,6 +446,7 @@ class Command(BaseCommand):
                         share_weighted_percent=share_pct,
                         records_count=agg["records"],
                         fallback_records=agg["fallback"],
+                        funding_source="budget_mapping",
                         status=DataStatus.VALIDATED,
                     )
                     total_created += 1

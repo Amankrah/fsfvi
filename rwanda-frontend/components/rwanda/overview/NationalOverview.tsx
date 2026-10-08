@@ -353,14 +353,15 @@ export function NationalOverview() {
 
         <Card className={`${overviewPanelClass} sm:col-span-2 lg:col-span-1`}>
           <CardContent className="p-5 sm:p-6">
-            <div className="flex items-start justify-between gap-3">
-              <div>
+            <div className="flex items-start justify-between gap-3" title={t('overview.total_budget_hint')}>
+              <div className="min-w-0 flex-1">
                 <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
                   {t('overview.total_budget')}
                 </p>
                 <p className="mt-2 text-3xl font-bold tabular-nums text-slate-900 sm:text-4xl">
                   {formatRWFCompact(dashboardData.total_budget_lcu_bn * 1_000_000_000)}
                 </p>
+                <p className="mt-2 text-sm leading-snug text-slate-500">{t('overview.total_budget_note')}</p>
               </div>
               <span
                 className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-[var(--rw-green)]/10 text-[var(--rw-green)] ring-1 ring-[var(--rw-green)]/20"

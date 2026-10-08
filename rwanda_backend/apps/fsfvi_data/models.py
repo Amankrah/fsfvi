@@ -142,6 +142,17 @@ class IndicatorData(models.Model):
         decimal_places=4,
         help_text="Share of total weighted budget (%)"
     )
+    # Where gross/weighted_lcu_bn came from. Lets the dashboard and audits tell a real
+    # budget-mapping import apart from a carried-forward or pooled figure.
+    #   budget_mapping            — import_budget_mapping for this fiscal year
+    #   carried_forward:FY<yyyy>  — copied from another fiscal year (no mapping for this year)
+    #   parameters_sheet          — Funding_* columns of FSFSI_indicator_level_parameters.xlsx
+    funding_source = models.CharField(
+        max_length=50,
+        blank=True,
+        default="",
+        help_text="Provenance of gross/weighted_lcu_bn (budget_mapping | carried_forward:FY<yyyy> | parameters_sheet)"
+    )
 
     # FSFSI input values
     # 8 decimal places: some benchmarks/observed values are very small ratios
